@@ -1,0 +1,31 @@
+[setup]
+population = 150 # number of networks
+
+[setup.dimension]
+input = 3 # number inputs
+output = 1 # number outputs
+
+[reproduction]
+offspring_from_crossover = 0.5 # proportion of offspring that results from crossover
+offspring_from_crossover_interspecies = 0.001 # proportion of crossover that is interspecies
+champions = 1 # number of networks inside species allowed to continue unchanged
+champions_minimal_species_size = 5 # number of species members necessary to allow champion rule
+surviving = 0.3 # allow the top x percent of species to survive and reproduce
+
+[staleness]
+after = 35 # number of generations allowed without improvement (stale species are reproduced only by the top performing member)
+epsilon = 0.01 # minimum fitness improvement required to not be considered stale (to limit micro-optimisation)
+
+[mutation]
+gene_node = 0.02 # chance of adding a new node gene
+gene_connection = 0.05 # chance of adding a new connection gene
+weight = 0.9 # chance of mutating all weights of a genome
+weight_random = 0.1 # chance that a mutated weight is replaced by a totally random one
+weight_perturbation = 2.0 # amount of perturbation (step up or down, uniformly distibuted)
+
+[compatability]
+target_species = 15 # number of desired species
+threshold = 5.0 # difference above threshold is considered incompatible
+threshold_delta = 0.3 # adjust threshold by x if num species unequal target species
+factor_genes = 1.1 # gene difference factor
+factor_weights = 0.4 # weight difference factor

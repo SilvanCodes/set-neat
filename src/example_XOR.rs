@@ -1,0 +1,149 @@
+// external imports
+extern crate favannat;
+use favannat::network::{Net, Edge, Node, NodeId, Fabricator, Evaluator, activations::ActivationFunction};
+use favannat::matrix::{fabricator::MatrixFabricator};
+// std imports
+use std::time::{Instant};
+// crate imports
+use neat::runtime::Evaluation::{Progress, Solution};
+use neat::{Neat, genome::Genome, genes::node::NodeKind};
+
+const STEEP_SIGMOID: fn(f64) -> f64 = |val| 1.0 / (1.0 + (-4.9 * val).exp());
+
+fn main() {
+    fn genome_to_net(genome: &Genome) -> Net {
+        let edges = genome.connection_genes.iter()
+            .map(|connection_gene| Edge::new(
+                NodeId(connection_gene.input.0),
+                NodeId(connection_gene.output.0),
+                connection_gene.weight.0
+            ))
+            .collect::<Vec<Edge>>();
+        
+        let input_nodes = genome.node_genes.iter()
+            .filter(|node_gene| node_gene.kind == NodeKind::Input)
+            .map(|node_gene| Node::new(node_gene.id.0, None))
+            .collect::<Vec<Node>>();
+
+        let hidden_nodes = genome.node_genes.iter()
+            .filter(|node_gene| node_gene.kind == NodeKind::Hidden)
+            .map(|node_gene| Node::new(node_gene.id.0, Some(ActivationFunction::tanh())))
+            .collect::<Vec<Node>>();
+
+        let output_nodes = genome.node_genes.iter()
+            .filter(|node_gene| node_gene.kind == NodeKind::Output)
+            .map(|node_gene| Node::new(node_gene.id.0, Some(ActivationFunction(STEEP_SIGMOID))))
+            .collect::<Vec<Node>>();
+
+        Net::new(input_nodes.len(), output_nodes.len(), [input_nodes, hidden_nodes, output_nodes].concat(), edges)
+    }
+
+    fn fitness_function(genome: &Genome) -> f64 {
+        // println!("==========");
+        // println!("genome {:#?}", genome);
+        let net = genome_to_net(genome);
+
+        let result_0;
+        let result_1;
+        let result_2;
+        let result_3;
+
+        match MatrixFabricator::fabricate(net) {
+            Ok(evaluator) => {
+                result_0 = evaluator.evaluate(vec![1.0, 1.0, 0.0]);
+                result_1 = evaluator.evaluate(vec![1.0, 1.0, 1.0]);
+                result_2 = evaluator.evaluate(vec![1.0, 0.0, 1.0]);
+                result_3 = evaluator.evaluate(vec![1.0, 0.0, 0.0]);
+            },
+            Err(e) => {
+                println!("error fabricating genome: {:?} {:?}", genome, e);
+                panic!("")
+            }
+        }
+
+        // calculate fitness
+        (4.0 - ((1.0 - result_0[0]) + (0.0 - result_1[0]).abs() + (1.0 - result_2[0]) + (0.0 - result_3[0]).abs())).powi(2)
+    }
+
+    let neat = Neat::new("src/Config_XOR.toml", fitness_function, 15.9);
+
+    let mut millis_elapsed_in_run = Vec::new();
+    let mut connections_in_winner_in_run = Vec::new();
+    let mut nodes_in_winner_in_run = Vec::new();
+
+    for i in 0..100 {
+        let now = Instant::now();
+
+        if let Some(winner) = neat.run().filter_map(|evaluation| {
+            match evaluation {
+                Progress(_) => None,
+                Solution(genome) => Some(genome)
+            }
+        }).next() {
+            millis_elapsed_in_run.push(now.elapsed().as_millis() as f64);
+            connections_in_winner_in_run.push(winner.connection_genes.len());
+            nodes_in_winner_in_run.push(winner.node_genes.len());
+            println!("finished run {} in {} seconds ({}, {})", i, millis_elapsed_in_run.last().unwrap() / 1000.0, winner.node_genes.len(), winner.connection_genes.len());
+        }
+    }
+
+    let num_runs = millis_elapsed_in_run.len() as f64;
+
+    let total_millis: f64 = millis_elapsed_in_run.iter().sum();
+    let total_connections: usize = connections_in_winner_in_run.iter().sum();
+    let total_nodes: usize = nodes_in_winner_in_run.iter().sum();
+
+    println!(
+        "did {} runs in {} seconds / {} nodes average / {} connections  per run",
+        num_runs, total_millis / num_runs / 1000.0,
+        total_nodes as f64 / num_runs,
+        total_connections as f64 / num_runs
+    );
+
+    /* let now = Instant::now();
+
+    if let Some(winner) = neat.run().filter_map(|evaluation| {
+        match evaluation {
+            Progress(report) => {println!("{:#?}", report); None},
+            Solution(genome) => Some(genome)
+        }
+    }).next() {
+        let secs = now.elapsed().as_millis();
+        println!("winning genome ({},{}) after {} seconds: {:?}",winner.node_genes.len(), winner.connection_genes.len(), secs as f64 / 1000.0, winner);
+        let net = genome_to_net(&winner);
+        println!("as net {:?}", net);
+        let evaluator = MatrixFabricator::fabricate(net).unwrap();
+        println!("as evaluator {:#?}", evaluator);    
+    } */
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn fitness_function_good_result() {
+        let result_0: Vec<f64> = vec![1.0];
+        let result_1: Vec<f64> = vec![0.0];
+        let result_2: Vec<f64> = vec![1.0];
+        let result_3: Vec<f64> = vec![0.0];
+
+        let result = (4.0 - ((1.0 - result_0[0]) + (0.0 - result_1[0]).abs() + (1.0 - result_2[0]) + (0.0 - result_3[0]).abs())).powi(2);
+
+        println!("result {:?}", result);
+
+        assert_eq!(result, 16.0);
+    }
+
+    #[test]
+    fn fitness_function_bad_result() {
+        let result_0: Vec<f64> = vec![0.0];
+        let result_1: Vec<f64> = vec![1.0];
+        let result_2: Vec<f64> = vec![0.0];
+        let result_3: Vec<f64> = vec![1.0];
+
+        let result = (4.0 - ((1.0 - result_0[0]) + (0.0 - result_1[0]).abs() + (1.0 - result_2[0]) + (0.0 - result_3[0]).abs())).powi(2);
+
+        println!("result {:?}", result);
+
+        assert_eq!(result, 0.0);
+    }
+}
