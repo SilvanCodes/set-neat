@@ -5,8 +5,8 @@ use crate::genome::Genome;
 
 #[derive(Debug)]
 pub struct Species {
+    pub representative: Genome,
     pub members: Vec<Genome>,
-    pub representative: Option<Genome>,
     pub fitness: f64,
     pub stale: usize
 }
@@ -15,8 +15,8 @@ pub struct Species {
 impl Species {
     pub fn new(first_member: Genome) -> Self {
         Species {
-            members: vec![first_member.clone()],
-            representative: Some(first_member),
+            representative: first_member.clone(),
+            members: vec![first_member],
             fitness: 0.0,
             stale: 0
         }
@@ -25,64 +25,52 @@ impl Species {
     pub fn compatible(&self, genome: &Genome, parameters: &Parameters, context: &Context) -> bool {
         Species::compatability_distance(
             &genome,
-            &self.representative.as_ref().unwrap(),
+            &self.representative,
                 parameters.compatability.factor_genes,
                 parameters.compatability.factor_weights,
             ) < context.compatability_threshold
-    }
-
-    pub fn represent(&mut self) {
-        self.representative = self.members.first().map(|genome| genome.clone());
-        /* if self.representative.is_some() {
-            println!(
-                "species representative: connections {:?}, nodes {:?}, fitness: {:?}",
-                self.representative.as_ref().unwrap().connection_genes.len(),
-                self.representative.as_ref().unwrap().node_genes.len(),
-                self.representative.as_ref().unwrap().fitness
-            );
-        } */
     }
 
     pub fn adjust_fitness(&mut self, parameters: &Parameters) {
         let old_fitness = self.fitness;
         let factor = self.members.len() as f64;
 
-        self.fitness = 0.0;
-
         for genome in &mut self.members {
-            // println!("plain fitness: {}", genome.fitness);
-            genome.fitness = genome.fitness / factor;
-            self.fitness += genome.fitness;
+            genome.fitness /= factor;
         }
+
+        // sort members by descending fitness, i.e. fittest first
+        self.members.sort_by(|genome_0, genome_1| genome_1.fitness.partial_cmp(&genome_0.fitness).unwrap());
+
+        // we set the species fitness as the average of the reproducing members
+        self.fitness = self.members.iter()
+            .take((factor * parameters.reproduction.surviving).ceil() as usize)
+            .map(|member| member.fitness)
+            .sum();
+
         // did fitness increase ?
-        if self.fitness > old_fitness + parameters.staleness.epsilon {
+        if self.fitness > old_fitness {
             self.stale = 0;
         } else {
             self.stale += 1;
         }
-        // println!("staleness: {}", self.stale);
     }
 
-    // compatability distance mechanism assumes sorted connection genes!
     pub fn compatability_distance(genome_0: &Genome, genome_1: &Genome, c1: f64, c2: f64) -> f64 {
         let mut weight_difference = 0.0;
         
         let matching_genes_count = genome_0.connection_genes
             .intersection(&genome_1.connection_genes)
-            .inspect(|connection_gene| weight_difference += connection_gene.weight.difference(&genome_1.connection_genes.get(connection_gene).unwrap().weight))
+            .inspect(|connection_gene| weight_difference += connection_gene.weight.difference(
+                &genome_1.connection_genes.get(connection_gene).unwrap().weight
+            ))
             .count();
 
-        let different_genes_count = genome_0.connection_genes.symmetric_difference(&genome_1.connection_genes).count();
+        let different_genes_count = genome_0.connection_genes
+            .symmetric_difference(&genome_1.connection_genes)
+            .count();
 
-        // N is gene count of larger genome
-        // let n = genome_0.connection_genes.len().max(genome_1.connection_genes.len()) as f64;
-
-        // println!("different_genes_count: {:?}", different_genes_count);
-        // println!("matching_genes_count: {:?}", matching_genes_count);
-        // println!("weight_difference: {:?}", weight_difference);
-        // println!("n: {:?}", n);
-
-        // distance formula from paper
+        // distance formula from paper (modified)
         c1 * different_genes_count as f64 + c2 * weight_difference / matching_genes_count as f64
     }
 }

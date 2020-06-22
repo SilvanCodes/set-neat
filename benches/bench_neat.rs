@@ -1,7 +1,7 @@
-use neat::parameters::Parameters;
+use set_neat::parameters::Parameters;
 use criterion::{criterion_group, criterion_main, Criterion};
-use neat::genome::Genome;
-use neat::context::Context;
+use set_neat::genome::Genome;
+use set_neat::context::Context;
 
 pub fn crossover_same_genome_benchmark(c: &mut Criterion) {
     let mut parameters: Parameters = Default::default(); 

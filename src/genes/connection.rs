@@ -1,9 +1,15 @@
+use rand::rngs::SmallRng;
+use rand::Rng;
 use std::hash::Hasher;
 use std::hash::Hash;
 use rand::random;
 use super::Id;
 
-#[derive(Debug, Clone)]
+use favannat::network::EdgeLike;
+
+use serde::{Serialize, Deserialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConnectionGene {
     pub input: Id,
     pub output: Id,
@@ -15,8 +21,20 @@ impl ConnectionGene {
         ConnectionGene {
             input,
             output,
-            weight: weight.unwrap_or(Weight::new()),
+            weight: weight.unwrap_or_else(Weight::new),
         }
+    }
+}
+
+impl EdgeLike for ConnectionGene {
+    fn start(&self) -> usize {
+        self.input.0
+    }
+    fn end(&self) -> usize {
+        self.output.0
+    }
+    fn weight(&self) -> f64 {
+        self.weight.0
     }
 }
 
@@ -34,7 +52,7 @@ impl Hash for ConnectionGene {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct Weight(pub f64);
 
 impl Weight {
@@ -47,13 +65,13 @@ impl Weight {
     }
 
     #[inline]
-    pub fn perturbate(&mut self, range: f64) {
-        self.0 = self.0 + random::<f64>() * range * 2.0 - range;
+    pub fn perturbate(&mut self, rng: &mut SmallRng, range: f64) {
+        self.0 = self.0 + rng.gen::<f64>() * range * 2.0 - range;
     }
 
     #[inline]
-    pub fn random(&mut self) {
-        self.0 = random::<f64>() * 2.0 - 1.0;
+    pub fn random(&mut self, rng: &mut SmallRng) {
+        self.0 = rng.gen::<f64>() * 2.0 - 1.0;
     }
 }
 

@@ -7,7 +7,6 @@ pub struct Parameters {
     pub reproduction: Reproduction,
     pub mutation: Mutation,
     pub compatability: Compatability,
-    pub staleness: Staleness,    
 }
 
 #[derive(Deserialize, Default)]
@@ -20,15 +19,8 @@ pub struct Setup {
 pub struct Reproduction {
     pub offspring_from_crossover: f64,
     pub offspring_from_crossover_interspecies: f64,
-    pub champions: usize,
-    pub champions_minimal_species_size: usize,
     pub surviving: f64,
-}
-
-#[derive(Deserialize, Default)]
-pub struct Staleness {
-    pub after: usize,
-    pub epsilon: f64,
+    pub stale_after: usize
 }
 
 #[derive(Deserialize, Default)]
@@ -75,6 +67,6 @@ mod tests {
     fn read_parameters() {
         let parameters = Parameters::new("src/Config.toml").unwrap();
 
-        assert_eq!(parameters.reproduction.champions, 1)
+        assert_eq!(parameters.reproduction.offspring_from_crossover_interspecies, 0.001)
     }
 }

@@ -1,21 +1,36 @@
 // std imports
+use favannat::network::NetLike;
 use crate::parameters::Parameters;
 use std::collections::HashSet;
 // external imports
-use rand::{Rng};
 use rand::distributions::{Distribution, Uniform};
 use rand::seq::SliceRandom;
+use serde::{Serialize, Deserialize};
 // crate imports
 use crate::context::Context;
-// sub-modules
 use crate::genes::{node::{NodeGene, NodeKind}, connection::{ConnectionGene, Weight}};
 
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Genome {
     pub node_genes: Vec<NodeGene>,
     pub connection_genes: HashSet<ConnectionGene>,
     pub fitness: f64
+}
+
+impl NetLike<NodeGene, ConnectionGene> for Genome {
+    fn nodes(&self) -> Vec<&NodeGene> {
+        self.node_genes.iter().collect()
+    }
+    fn edges(&self) -> Vec<&ConnectionGene> {
+        self.connection_genes.iter().collect()
+    }
+    fn inputs(&self) -> Vec<&NodeGene> {
+        self.node_genes.iter().filter(|node_gene|node_gene.kind == NodeKind::Input).collect()
+    }
+    fn outputs(&self) -> Vec<&NodeGene> {
+        self.node_genes.iter().filter(|node_gene| node_gene.kind == NodeKind::Output).collect()
+    }
 }
 
 // public API
@@ -61,54 +76,53 @@ impl Genome {
 
     pub fn mutate(&mut self, context: &mut Context, parameters: &Parameters) {
         // mutate weigths
-        if context.small_rng.gen::<f64>() < parameters.mutation.weight {
-            self.connection_genes = self.connection_genes.drain().map(|mut connection_gene| {
-                if context.small_rng.gen::<f64>() < parameters.mutation.weight_random {
-                    connection_gene.weight.random();
-                } else {
-                    connection_gene.weight.perturbate(parameters.mutation.weight_perturbation);
-                }
-                connection_gene
-            }).collect();
+        if context.gamble(parameters.mutation.weight) {
+            self.connection_genes = self.connection_genes
+                .drain()
+                .map(|mut connection_gene| {
+                    if context.gamble(parameters.mutation.weight_random) {
+                        connection_gene.weight.random(&mut context.small_rng);
+                    } else {
+                        connection_gene.weight.perturbate(&mut context.small_rng, parameters.mutation.weight_perturbation);
+                    }
+                    connection_gene
+                })
+                .collect();
         }
 
         // mutate connection gene
-        if context.small_rng.gen::<f64>() < parameters.mutation.gene_connection {
+        if context.gamble(parameters.mutation.gene_connection) {
             self.add_connection(context).unwrap_or_default();
         }
 
         // mutate node gene
-        if context.small_rng.gen::<f64>() < parameters.mutation.gene_node {
+        if context.gamble(parameters.mutation.gene_node) {
             self.add_node(context);
         }
     }
 
     pub fn crossover(&self, partner: &Genome, context: &mut Context) -> Self {
-        // dbg!(self.connection_genes.difference(&partner.connection_genes).count());
-        // dbg!(partner.connection_genes.difference(&self.connection_genes).count());
-        // dbg!(partner.connection_genes.symmetric_difference(&self.connection_genes).count());
-
         // self is fitter if it has higher fitness or in case of equal fitness has fewer genes
         let self_is_fitter = self.fitness > partner.fitness
             || (
-                self.fitness == partner.fitness
+                (self.fitness - partner.fitness).abs() < f64::EPSILON
                 && self.connection_genes.len() < partner.connection_genes.len()
             );
 
         // gamble for matching genes
         let mut offspring_connection_genes: HashSet<ConnectionGene> = self.connection_genes
             .intersection(&partner.connection_genes)
-            .map(|gene_self| if context.small_rng.gen::<f64>() < 0.5 { gene_self.clone() } else { partner.connection_genes.get(&gene_self).unwrap().clone() })
+            .map(|gene_self| if context.gamble(0.5) { gene_self.clone() } else { partner.connection_genes.get(&gene_self).unwrap().clone() })
             .collect();
 
-        // select different genes
-        let different_genes = if self_is_fitter {
-            self.connection_genes.difference(&partner.connection_genes).cloned()
-        } else {
-            partner.connection_genes.difference(&self.connection_genes).cloned()
-        };
         // add different genes
-        offspring_connection_genes.extend(different_genes);
+        offspring_connection_genes.extend(
+            if self_is_fitter {
+                self.connection_genes.difference(&partner.connection_genes).cloned()
+            } else {
+                partner.connection_genes.difference(&self.connection_genes).cloned()
+            }
+        );
 
         // select required nodes
         let offspring_node_genes: Vec<NodeGene> = if self_is_fitter {
@@ -141,13 +155,13 @@ impl Genome {
                                   && !self.would_form_cycle(possible_start_node_gene, node_gene)
             ) {
                 // add new connection
-                let new_connection_gene = ConnectionGene::new(
-                    possible_start_node_gene.id,
-                    possible_end_node_gene.id,
-                    None
+                self.connection_genes.insert(
+                    ConnectionGene::new(
+                        possible_start_node_gene.id,
+                        possible_end_node_gene.id,
+                        None
+                    )
                 );
-
-                self.connection_genes.insert(new_connection_gene);
 
                 return Ok(())
             }
@@ -160,55 +174,58 @@ impl Genome {
         // println!("add_node called");
         let between = Uniform::from(0..self.connection_genes.len());
 
-        loop {
-            // select an connection gene and split
-            let mut random_connection_gene = self.connection_genes.iter().nth(between.sample(&mut context.small_rng)).unwrap().clone();
+        // select an connection gene and split
+        let mut random_connection_gene = self.connection_genes
+            .iter()
+            .nth(between.sample(&mut context.small_rng))
+            .unwrap()
+            .clone();
 
-            // construct new node gene
-            let new_node_gene_0 = NodeGene::new(
-                context.get_id(Some((random_connection_gene.input, random_connection_gene.output))),
-                None
-            );
-            // construct connection pointing to new node
-            let new_connection_gene_0 = ConnectionGene::new(
+        // construct new node gene
+        let new_node_gene_0 = NodeGene::new(
+            context.get_id(Some((random_connection_gene.input, random_connection_gene.output))),
+            None
+        );
+
+        // insert connection pointing to new node
+        self.connection_genes.insert(
+            ConnectionGene::new(
                 random_connection_gene.input,
                 new_node_gene_0.id,
                 Some(Weight(1.0))
-            );
-            // construct connection pointing from new node
-            let new_connection_gene_1 = ConnectionGene::new(
+            )
+        );
+        // insert connection pointing from new node
+        self.connection_genes.insert(
+            ConnectionGene::new(
                 new_node_gene_0.id,
                 random_connection_gene.output,
                 Some(random_connection_gene.weight)
-            );
+            )
+        );
+        // insert new node into genome
+        self.node_genes.push(new_node_gene_0);
 
-            // set weight to zero to 'deactivate' connnection
-            random_connection_gene.weight = Weight(0.0);
-
-            // insert new structure into genome
-            if self.connection_genes.insert(new_connection_gene_0) && self.connection_genes.insert(new_connection_gene_1) {
-                self.connection_genes.replace(random_connection_gene);
-                self.node_genes.push(new_node_gene_0);
-                // println!("success adding node: {:?}", self);
-                break;
-            };
-        }
+        // update weight to zero to 'deactivate' connnection
+        random_connection_gene.weight = Weight(0.0);
+        self.connection_genes.replace(random_connection_gene);
     }
 
     // check if to nodes are connected
     fn are_connected(&self, node_gene_start: &NodeGene, node_gene_end: &NodeGene) -> bool {
-        for connection_gene in &self.connection_genes {
-            if connection_gene.input == node_gene_start.id && connection_gene.output == node_gene_end.id {
-                return true;
-            }
-        }
-        false
+        self.connection_genes
+            .iter()
+            .find(|connection_gene| connection_gene.input == node_gene_start.id && connection_gene.output == node_gene_end.id)
+            .is_some()
     }
 
     // can only operate when no cycles present yet, which is assumed
     fn would_form_cycle(&self, node_gene_start: &NodeGene, node_gene_end: &NodeGene) -> bool {
         // needs to detect if there is a path from end to start
-        let mut possible_paths = self.connection_genes.iter().filter(|connection_gene| connection_gene.input == node_gene_end.id).collect::<Vec<&ConnectionGene>>();
+        let mut possible_paths: Vec<&ConnectionGene> = self.connection_genes
+            .iter()
+            .filter(|connection_gene| connection_gene.input == node_gene_end.id)
+            .collect();
         let mut next_possible_path = Vec::new();
 
         while !possible_paths.is_empty() {
@@ -219,7 +236,11 @@ impl Genome {
                 }
                 // collect further paths
                 else {
-                    next_possible_path.append(&mut self.connection_genes.iter().filter(|connection_gene| connection_gene.input == path.output).collect::<Vec<&ConnectionGene>>());
+                    next_possible_path.extend(
+                        self.connection_genes
+                            .iter()
+                            .filter(|connection_gene| connection_gene.input == path.output)
+                    );
                 }
             }
             possible_paths = next_possible_path;
@@ -258,7 +279,7 @@ mod tests {
 
     #[test]
     fn dont_add_same_connection_twice() {
-        let mut parameters: Parameters = Default::default(); 
+        let mut parameters: Parameters = Default::default();
         let mut context = Context::new(&parameters);
 
         parameters.setup.dimension.input = 1;
@@ -316,11 +337,13 @@ mod tests {
 
         // mutate genome_1
         genome_1.add_node(&mut context);
+        context.cached_node_genes.clear();
         genome_1.add_node(&mut context);
 
         println!("genome_0 {:?}", genome_0);
         println!("genome_1 {:?}", genome_1);
 
+        // shorter genome is fitter genome
         let offspring = genome_0.crossover(&genome_1, &mut context);
 
         println!("offspring {:?}", offspring);
