@@ -1,9 +1,10 @@
 use favannat::network::NodeLike;
-use favannat::network::activations;
 use std::borrow::Borrow;
 use std::hash::Hasher;
 use std::hash::Hash;
 use super::Id;
+use super::activations::{self, Activation};
+
 
 use serde::{Serialize, Deserialize};
 
@@ -18,13 +19,15 @@ pub enum NodeKind {
 pub struct NodeGene {
     pub id: Id,
     pub kind: NodeKind,
+    pub activation: Activation
 }
 
 impl NodeGene {
-    pub fn new(id: Id, kind: Option<NodeKind>) -> Self {
+    pub fn new(id: Id, kind: Option<NodeKind>, activation: Option<Activation>) -> Self {
         NodeGene {
             id,
-            kind: kind.unwrap_or(NodeKind::Hidden)
+            kind: kind.unwrap_or(NodeKind::Hidden),
+            activation: activation.unwrap_or_default()
         }
     }
 }
@@ -34,7 +37,12 @@ impl NodeLike for NodeGene {
         self.id.0
     }
     fn activation(&self) -> fn(f64) -> f64 {
-        activations::TANH
+        match self.activation {
+            Activation::Linear => activations::LINEAR,
+            Activation::Sigmoid => activations::SIGMOID,
+            Activation::Gaussian => activations::GAUSSIAN,
+            Activation::Tanh => activations::TANH
+        }
     }
 }
 

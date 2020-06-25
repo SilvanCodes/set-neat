@@ -6,7 +6,7 @@ use ndarray::{Axis, stack};
 
 use std::fs;
 
-pub const ENV: &str = "MountainCarContinuous-v0";
+pub const ENV: &str = "CartPole-v1";
 
 fn main() {
     let gym = gym::GymClient::default();
@@ -17,11 +17,10 @@ fn main() {
     ).expect("cant read file");
     let winner: Genome = serde_json::from_str(&winner_json).unwrap();
 
-    // let net = genome_to_net(&winner);
     let evaluator = MatrixFabricator::fabricate(&winner).unwrap();
 
-    let mut done = false;
     let mut recent_observation = env.reset().expect("Unable to reset");
+    let mut done = false;
 
     while !done {
         env.render();
@@ -31,10 +30,15 @@ fn main() {
         // add bias input
         let output = evaluator.evaluate(stack![Axis(0), observations, [1.0]]);
 
-        let State { observation, is_done, .. } = env.step(&SpaceData::BOX(output)).unwrap();
-
-        recent_observation = observation;
-        done = is_done;
+        if output[0] > 0.0 {
+            let State { observation, is_done, .. } = env.step(&SpaceData::DISCRETE(0)).unwrap();
+            recent_observation = observation;
+            done = is_done;
+        } else {
+            let State { observation, is_done, .. } = env.step(&SpaceData::DISCRETE(1)).unwrap();
+            recent_observation = observation;
+            done = is_done;
+        }
     }
     env.close();
 }

@@ -1,7 +1,6 @@
 use favannat::network::{Fabricator, Evaluator};
 use favannat::matrix::fabricator::MatrixFabricator;
-use set_neat::runtime::Evaluation::{Progress, Solution};
-use set_neat::{Neat, genome::Genome};
+use set_neat::{Neat, Genome, Progress, Solution};
 use ndarray::array;
 use std::time::Instant;
 
@@ -14,10 +13,10 @@ fn main() {
 
         match MatrixFabricator::fabricate(genome) {
             Ok(evaluator) => {
-                result_0 = evaluator.evaluate(array![1.0, 1.0, 0.0]);
-                result_1 = evaluator.evaluate(array![1.0, 1.0, 1.0]);
-                result_2 = evaluator.evaluate(array![1.0, 0.0, 1.0]);
-                result_3 = evaluator.evaluate(array![1.0, 0.0, 0.0]);
+                result_0 = evaluator.evaluate(array![1.0, 1.0, 0.0]);// 2.0 + 0.5;
+                result_1 = evaluator.evaluate(array![1.0, 1.0, 1.0]);// 2.0 + 0.5;
+                result_2 = evaluator.evaluate(array![1.0, 0.0, 1.0]);// 2.0 + 0.5;
+                result_3 = evaluator.evaluate(array![1.0, 0.0, 0.0]);// 2.0 + 0.5;
             },
             Err(e) => {
                 println!("error fabricating genome: {:?} {:?}", genome, e);
@@ -29,7 +28,7 @@ fn main() {
         (4.0 - ((1.0 - result_0[0]) + (0.0 - result_1[0]).abs() + (1.0 - result_2[0]) + (0.0 - result_3[0]).abs())).powi(2)
     }
 
-    let neat = Neat::new("examples/xor.toml", fitness_function, 15.9);
+    let neat = Neat::new("examples/XOR.toml", fitness_function, 15.0);
 
     let mut millis_elapsed_in_run = Vec::new();
     let mut connections_in_winner_in_run = Vec::new();
@@ -74,9 +73,7 @@ fn main() {
     }).next() {
         let secs = now.elapsed().as_millis();
         println!("winning genome ({},{}) after {} seconds: {:?}",winner.node_genes.len(), winner.connection_genes.len(), secs as f64 / 1000.0, winner);
-        let net = genome_to_net(&winner);
-        println!("as net {:?}", net);
-        let evaluator = MatrixFabricator::fabricate(net).unwrap();
+        let evaluator = MatrixFabricator::fabricate(&winner).unwrap();
         println!("as evaluator {:#?}", evaluator);    
     } */
 }

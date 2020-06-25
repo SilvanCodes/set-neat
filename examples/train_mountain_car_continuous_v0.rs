@@ -1,6 +1,4 @@
-use set_neat::Neat;
-use set_neat::runtime::Evaluation::{Progress, Solution};
-use set_neat::genome::Genome;
+use set_neat::{Neat, Genome, Progress, Solution};
 use favannat::network::{activations, Fabricator, Evaluator};
 use favannat::matrix::fabricator::MatrixFabricator;
 use gym::{State, SpaceData};
@@ -9,23 +7,24 @@ use ndarray::{Axis, stack};
 use std::time::Instant;
 use std::fs;
 
+pub const RUNS: usize = 100;
+pub const STEPS: usize = 100;
+pub const ENV: &str = "MountainCarContinuous-v0";
 
 fn main() {
     fn fitness_function(genome: &Genome) -> f64 {
         let gym = gym::GymClient::default();
-        let env = gym.make("MountainCarContinuous-v0");
-        let runs = 100;
-        let steps = 200;
+        let env = gym.make(ENV);
 
         let evaluator = MatrixFabricator::fabricate(genome).unwrap();
         let mut fitness = 0.0;
 
-        for _ in 0..runs {
+        for _ in 0..RUNS {
             let mut total_reward = 0.0;
             let mut recent_observation = env.reset().expect("Unable to reset");
 
             // while !done {
-            for _ in 0..steps {
+            for _ in 0..STEPS {
                 let mut observations = recent_observation.get_box().unwrap();
                 // normalize inputs
                 observations.mapv_inplace(activations::TANH);
@@ -44,10 +43,10 @@ fn main() {
             fitness += total_reward;
         }
         env.close();
-        fitness / runs as f64
+        fitness / RUNS as f64
     };
 
-    let neat = Neat::new("examples/mountain_car_continuous_v0.toml", fitness_function, 90.0);
+    let neat = Neat::new(&format!("examples/{}.toml", ENV), fitness_function, 90.0);
 
     let now = Instant::now();
 
@@ -60,7 +59,7 @@ fn main() {
         }
     }).next() {
         fs::write(
-            "examples/winner_mountain_car_continuous_v0.json",
+            format!("examples/winner_{}.json", ENV),
             serde_json::to_string(&winner).unwrap()
         ).expect("Unable to write file");
         
@@ -70,12 +69,11 @@ fn main() {
         println!("as evaluator {:#?}", evaluator);
 
         let gym = gym::GymClient::default();
-        let env = gym.make("MountainCarContinuous-v0");
+        let env = gym.make(ENV);
 
-        let steps = 200;
         let mut recent_observation = env.reset().expect("Unable to reset");
 
-        for step in 0..steps {
+        for step in 0..STEPS {
             env.render();
             let mut observations = recent_observation.get_box().unwrap();
             // normalize inputs

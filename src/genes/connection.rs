@@ -1,8 +1,7 @@
-use rand::rngs::SmallRng;
-use rand::Rng;
+
+use crate::genes::weights::Weight;
 use std::hash::Hasher;
 use std::hash::Hash;
-use rand::random;
 use super::Id;
 
 use favannat::network::EdgeLike;
@@ -21,8 +20,12 @@ impl ConnectionGene {
         ConnectionGene {
             input,
             output,
-            weight: weight.unwrap_or_else(Weight::new),
+            weight: weight.unwrap_or_default(),
         }
+    }
+
+    pub fn id(&self) -> (Id, Id) {
+        (self.input, self.output)
     }
 }
 
@@ -52,43 +55,11 @@ impl Hash for ConnectionGene {
     }
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
-pub struct Weight(pub f64);
-
-impl Weight {
-    pub fn new() -> Self {
-        Weight(random::<f64>() * 2.0 - 1.0)
-    }
-
-    pub fn difference(&self, other: &Weight) -> f64 {
-        (self.0 - other.0).abs()
-    }
-
-    #[inline]
-    pub fn perturbate(&mut self, rng: &mut SmallRng, range: f64) {
-        self.0 = self.0 + rng.gen::<f64>() * range * 2.0 - range;
-    }
-
-    #[inline]
-    pub fn random(&mut self, rng: &mut SmallRng) {
-        self.0 = rng.gen::<f64>() * 2.0 - 1.0;
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::Weight;
     use super::ConnectionGene;
     use crate::genes::Id;
     use std::collections::HashSet;
-
-    #[test]
-    fn generate_random_weight() {
-        for _ in 0..100 {
-            let Weight(w) = Weight::new();
-            assert!(w < 1.0)
-        }
-    }
 
     #[test]
     fn eq_is_hash() {

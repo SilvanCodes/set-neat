@@ -70,8 +70,10 @@ impl Species {
             .symmetric_difference(&genome_1.connection_genes)
             .count();
 
+        let n = genome_0.connection_genes.len().min(genome_1.connection_genes.len()) as f64;
+
         // distance formula from paper (modified)
-        c1 * different_genes_count as f64 + c2 * weight_difference / matching_genes_count as f64
+        c1 * different_genes_count as f64 / n + c2 * weight_difference / matching_genes_count as f64
     }
 }
 
@@ -80,14 +82,14 @@ impl Species {
 mod tests {
     use super::Species;
     use crate::genome::Genome;
-    use crate::genes::{Id, node::{NodeGene, NodeKind}, connection::{ConnectionGene, Weight}};
+    use crate::genes::{Id, node::{NodeGene, NodeKind}, connection::ConnectionGene, weights::Weight};
 
     #[test]
     fn compatability_distance_same_genome() {
         let genome_0 = Genome {
             node_genes: vec![
-                NodeGene::new(Id(0), Some(NodeKind::Input)),
-                NodeGene::new(Id(1), Some(NodeKind::Output)),
+                NodeGene::new(Id(0), Some(NodeKind::Input), None),
+                NodeGene::new(Id(1), Some(NodeKind::Output), None),
             ],
             connection_genes: vec![
                 ConnectionGene::new(Id(0), Id(1), None)
@@ -106,8 +108,8 @@ mod tests {
     fn compatability_distance_different_weight_genome() {
         let genome_0 = Genome {
             node_genes: vec![
-                NodeGene::new(Id(0), Some(NodeKind::Input)),
-                NodeGene::new(Id(1), Some(NodeKind::Output)),
+                NodeGene::new(Id(0), Some(NodeKind::Input), None),
+                NodeGene::new(Id(1), Some(NodeKind::Output), None),
             ],
             connection_genes: vec![
                 ConnectionGene::new(Id(0), Id(1), Some(Weight(1.0))),
@@ -131,8 +133,8 @@ mod tests {
     fn compatability_distance_different_connection_genome() {
         let genome_0 = Genome {
             node_genes: vec![
-                NodeGene::new(Id(0), Some(NodeKind::Input)),
-                NodeGene::new(Id(1), Some(NodeKind::Output)),
+                NodeGene::new(Id(0), Some(NodeKind::Input), None),
+                NodeGene::new(Id(1), Some(NodeKind::Output), None),
             ],
             connection_genes: vec![
                 ConnectionGene::new(Id(0), Id(1), Some(Weight(1.0))),

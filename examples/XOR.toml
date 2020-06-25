@@ -1,8 +1,9 @@
 [setup]
-population = 250 # number of networks
+population = 150 # number of networks
+activation = "Sigmoid"
 
 [setup.dimension]
-input = 4 # number inputs
+input = 3 # number inputs
 output = 1 # number outputs
 
 [reproduction]
@@ -14,13 +15,14 @@ stale_after = 15 # number of generations allowed without improvement (stale spec
 [mutation]
 gene_node = 0.03 # chance of adding a new node gene
 gene_connection = 0.05 # chance of adding a new connection gene
-weight = 0.8 # chance of mutating all weights of a genome
+weight = 0.2 # chance of mutating all weights of a genome
 weight_random = 0.1 # chance that a mutated weight is replaced by a totally random one
-weight_perturbation = 1.0 # amount of perturbation (step up or down, uniformly distibuted)
+weight_perturbation = 5.0 # amount of perturbation (step up or down, uniformly distibuted)
+weight_distribution = "Normal"
 
 [compatability]
-target_species = 25 # number of desired species
-threshold = 3.0 # difference above threshold is considered incompatible
-threshold_delta = 0.5 # adjust threshold by x if num species unequal target species
-factor_genes = 1.1 # gene difference factor
-factor_weights = 0.8 # weight difference factor
+target_species = 16 # number of desired species
+threshold = 5.0 # difference above threshold is considered incompatible
+threshold_delta = 0.3 # adjust threshold by x if num species unequal target species
+factor_genes = 10.0 # factor for percent of different genes
+factor_weights = 0.1 # weight difference factor

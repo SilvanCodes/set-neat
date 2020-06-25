@@ -1,6 +1,4 @@
-use set_neat::Neat;
-use set_neat::runtime::Evaluation::{Progress, Solution};
-use set_neat::genome::Genome;
+use set_neat::{Neat, Genome, Progress, Solution};
 use favannat::network::{activations, Fabricator, Evaluator};
 use favannat::matrix::fabricator::MatrixFabricator;
 use gym::{State, SpaceData};
@@ -9,11 +7,14 @@ use ndarray::{Axis, stack};
 use std::time::Instant;
 use std::fs;
 
+pub const RUNS: usize = 100;
+pub const STEPS: usize = 100;
+pub const ENV: &str = "CartPole-v1";
 
 fn main() {
     fn fitness_function(genome: &Genome) -> f64 {
         let gym = gym::GymClient::default();
-        let env = gym.make("CartPole-v1");
+        let env = gym.make(ENV);
         let runs = 100;
         let expected_steps = 500;
 
@@ -55,7 +56,7 @@ fn main() {
         fitness / runs as f64
     };
 
-    let neat = Neat::new("examples/cartpole_v1.toml", fitness_function, 495.0);
+    let neat = Neat::new(&format!("examples/{}.toml", ENV), fitness_function, 495.0);
 
     let now = Instant::now();
 
@@ -66,7 +67,7 @@ fn main() {
         }
     }).next() {
         fs::write(
-            "examples/winner_cartpole_v1.json",
+            format!("examples/winner_{}.json", ENV),
             serde_json::to_string(&winner).unwrap()
         ).expect("Unable to write file");
 
@@ -76,7 +77,7 @@ fn main() {
         println!("as evaluator {:#?}", evaluator);
 
         let gym = gym::GymClient::default();
-        let env = gym.make("CartPole-v1");
+        let env = gym.make(ENV);
 
         let mut recent_observation = env.reset().expect("Unable to reset");
         let mut done = false;

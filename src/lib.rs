@@ -1,19 +1,15 @@
-extern crate rand;
-extern crate config;
-extern crate rayon;
-// std imports
-use crate::runtime::Runtime;
-use crate::parameters::Parameters;
-use crate::genome::Genome;
-// external imports
-// sub modules
 pub mod genome;
-pub mod genes;
+mod genes;
 pub mod context;
 mod species;
 pub mod parameters;
-pub mod runtime;
+mod runtime;
 
+use crate::runtime::Runtime;
+use crate::parameters::Parameters;
+// re-exports
+pub use crate::genome::Genome;
+pub use crate::runtime::Evaluation::{Progress, Solution};
 
 pub struct Neat {
     parameters: Parameters,
@@ -33,5 +29,9 @@ impl Neat {
 
     pub fn run(&self) -> Runtime {
         Runtime::new(&self)
+    }
+
+    pub fn run_with(&self, genome: Genome) -> Runtime {
+        Runtime::load(&self, genome)
     }
 }

@@ -1,5 +1,6 @@
 [setup]
 population = 250 # number of networks
+activation = "Tanh"
 
 [setup.dimension]
 input = 3 # number inputs
@@ -20,7 +21,7 @@ weight_perturbation = 1.0 # amount of perturbation (step up or down, uniformly d
 
 [compatability]
 target_species = 25 # number of desired species
-threshold = 2.0 # difference above threshold is considered incompatible
-threshold_delta = 0.3 # adjust threshold by x if num sp ecies unequal target species
-factor_genes = 1.1 # gene difference factor
-factor_weights = 0.6 # weight difference factor
+threshold = 3.0 # difference above threshold is considered incompatible
+threshold_delta = 0.3 # adjust threshold by x if num species unequal target species
+factor_genes = 1.1 # factor for number of different genes
+factor_weights = 0.8 # factor for average weight difference of common genes

@@ -4,63 +4,58 @@ use favannat::matrix::fabricator::MatrixFabricator;
 use gym::{State, SpaceData};
 use ndarray::{Axis, stack};
 
-
-use rand::SeedableRng;
-use rand::rngs::{ThreadRng, SmallRng};
-use rand::distributions::{Distribution, WeightedIndex};
-
 use std::time::Instant;
 use std::fs;
 
+pub const RUNS: usize = 3;
+pub const STEPS: usize = 1600;
+pub const ENV: &str = "BipedalWalker-v3";
 
 fn main() {
     fn fitness_function(genome: &Genome) -> f64 {
         let gym = gym::GymClient::default();
-        let env = gym.make("MountainCar-v0");
-        let runs = 100;
+        let env = gym.make(ENV);
 
         let evaluator = MatrixFabricator::fabricate(genome).unwrap();
         let mut fitness = 0.0;
 
-        let actions = [&SpaceData::DISCRETE(0), &SpaceData::DISCRETE(1), &SpaceData::DISCRETE(2)];
-        // let mut rng = SmallRng::from_rng(&mut ThreadRng::default()).unwrap();
-
-        for _ in 0..runs {
-            let mut total_reward = 0.0;
-            let mut done = false;
+        for _ in 0..RUNS {
             let mut recent_observation = env.reset().expect("Unable to reset");
+            let mut total_reward = 0.0;
 
-            while !done {
+            for _ in 0..STEPS {
                 let mut observations = recent_observation.get_box().unwrap();
                 // normalize inputs
                 observations.mapv_inplace(activations::TANH);
                 // add bias input
                 let output = evaluator.evaluate(stack![Axis(0), observations, [1.0]]);
 
-                /* let softmaxsum: f64 = output.iter().map(|x| x.exp()).sum();
-                let softmax: Vec<f64> = output.iter().map(|x| x.exp() / softmaxsum).collect();
-                let dist = WeightedIndex::new(&softmax).unwrap();
-                let State { observation, reward, is_done } = env.step(actions[dist.sample(&mut rng)]).unwrap(); */
-
-                let max = output.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b));
-                let pos = output.iter().position(|&value| value == max).unwrap();
-                let State { observation, reward, is_done } = env.step(actions[pos]).unwrap();
-
+                let State { observation, is_done, reward } = env.step(&SpaceData::BOX(output)).unwrap();
                 recent_observation = observation;
                 total_reward += reward;
-                done = is_done;
+
+                if is_done {
+                    // println!("finished with reward {} after {} steps", reward, step);
+                    break;
+                }
+                
             }
             fitness += total_reward;
         }
         env.close();
-        fitness / runs as f64
+        fitness / RUNS as f64
     };
 
-    let neat = Neat::new("examples/mountaincar_v0.toml", fitness_function, -110.0);
+    let neat = Neat::new(&format!("examples/{}.toml", ENV), fitness_function, 300.0);
 
     let now = Instant::now();
 
-    println!("starting training...");
+    println!("starting training ...");
+
+    /* let winner_json = fs::read_to_string(
+        format!("examples/winner_{}.json", ENV)
+    ).expect("cant read file");
+    let winner: Genome = serde_json::from_str(&winner_json).unwrap(); */
 
     if let Some(winner) = neat.run().filter_map(|evaluation| {
         match evaluation {
@@ -69,7 +64,7 @@ fn main() {
         }
     }).next() {
         fs::write(
-            "examples/winner_mountain_car_v0.json",
+            format!("examples/winner_{}.json", ENV),
             serde_json::to_string(&winner).unwrap()
         ).expect("Unable to write file");
 
@@ -79,11 +74,7 @@ fn main() {
         println!("as evaluator {:#?}", evaluator);
 
         let gym = gym::GymClient::default();
-        let env = gym.make("MountainCar-v0");
-        // let steps = 200;
-
-        let actions = [&SpaceData::DISCRETE(0), &SpaceData::DISCRETE(1), &SpaceData::DISCRETE(2)];
-        let mut rng = SmallRng::from_rng(&mut ThreadRng::default()).unwrap();
+        let env = gym.make(ENV);
 
         let mut recent_observation = env.reset().expect("Unable to reset");
         let mut done = false;
@@ -96,15 +87,10 @@ fn main() {
             // add bias input
             let output = evaluator.evaluate(stack![Axis(0), observations, [1.0]]);
 
-            let softmaxsum: f64 = output.iter().map(|x| x.exp()).sum();
-            let softmax: Vec<f64> = output.iter().map(|x| x.exp() / softmaxsum).collect();
-            let dist = WeightedIndex::new(&softmax).unwrap();
-
-            let State { observation, is_done, .. } = env.step(actions[dist.sample(&mut rng)]).unwrap();
+            let State { observation, is_done, .. } = env.step(&SpaceData::BOX(output)).unwrap();
             recent_observation = observation;
             done = is_done;
         }
         env.close();
-        println!("finished");
     }
 }

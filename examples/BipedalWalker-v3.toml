@@ -1,0 +1,28 @@
+[setup]
+population = 500 # number of networks
+activation = "Tanh"
+
+[setup.dimension]
+input = 25 # number inputs
+output = 4 # number outputs
+
+[reproduction]
+offspring_from_crossover = 0.75 # proportion of offspring that results from crossover
+offspring_from_crossover_interspecies = 0.001 # proportion of crossover that is interspecies
+surviving = 0.2 # allow the top x percent of species to survive and reproduce
+stale_after = 15 # number of generations allowed without improvement (stale species are reproduced only by the top performing member)
+
+[mutation]
+gene_node = 0.03 # chance of adding a new node gene
+gene_connection = 0.05 # chance of adding a new connection gene
+weight = 0.3 # chance of mutating all weights of a genome
+weight_random = 0.1 # chance that a mutated weight is replaced by a totally random one
+weight_perturbation = 1.0 # amount of perturbation (step up or down, normal distributed)
+weight_distribution = "Uniform" # probability distribution of perturbation
+
+[compatability]
+target_species = 15 # number of desired species
+threshold = 3.0 # difference above threshold is considered incompatible
+threshold_delta = 0.3 # adjust threshold by x if num species unequal target species
+factor_genes = 10.0 # factor for number of different genes
+factor_weights = 0.1 # factor for average weight difference of common genes

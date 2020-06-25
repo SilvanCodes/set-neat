@@ -1,6 +1,4 @@
-use set_neat::Neat;
-use set_neat::runtime::Evaluation::{Progress, Solution};
-use set_neat::genome::Genome;
+use set_neat::{Neat, Genome, Progress, Solution};
 use favannat::network::{activations, Fabricator, Evaluator};
 use favannat::matrix::fabricator::MatrixFabricator;
 use gym::{State, SpaceData};
@@ -48,7 +46,7 @@ fn main() {
         fitness / RUNS as f64
     };
 
-    let neat = Neat::new("examples/pendulum_v0.toml", fitness_function, -400.0);
+    let neat = Neat::new(&format!("examples/{}.toml", ENV), fitness_function, -400.0);
 
     let now = Instant::now();
 

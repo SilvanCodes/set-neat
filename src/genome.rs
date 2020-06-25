@@ -8,7 +8,7 @@ use rand::seq::SliceRandom;
 use serde::{Serialize, Deserialize};
 // crate imports
 use crate::context::Context;
-use crate::genes::{node::{NodeGene, NodeKind}, connection::{ConnectionGene, Weight}};
+use crate::genes::{node::{NodeGene, NodeKind}, connection::ConnectionGene, weights::Weight};
 
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -38,10 +38,10 @@ impl Genome {
     pub fn new(context: &mut Context, parameters: &Parameters) -> Self {
         let mut node_genes = Vec::new();
         for _ in 0..parameters.setup.dimension.input {
-            node_genes.push(NodeGene::new(context.get_id(None), Some(NodeKind::Input)))
+            node_genes.push(NodeGene::new(context.get_id(), Some(NodeKind::Input), None))
         }
         for _ in 0..parameters.setup.dimension.output {
-            node_genes.push(NodeGene::new(context.get_id(None), Some(NodeKind::Output)))
+            node_genes.push(NodeGene::new(context.get_id(), Some(NodeKind::Output), Some(parameters.setup.activation.clone())))
         }
 
         Genome {
@@ -81,9 +81,9 @@ impl Genome {
                 .drain()
                 .map(|mut connection_gene| {
                     if context.gamble(parameters.mutation.weight_random) {
-                        connection_gene.weight.random(&mut context.small_rng);
+                        connection_gene.weight.random(context);
                     } else {
-                        connection_gene.weight.perturbate(&mut context.small_rng, parameters.mutation.weight_perturbation);
+                        connection_gene.weight.perturbate(context);
                     }
                     connection_gene
                 })
@@ -181,9 +181,16 @@ impl Genome {
             .unwrap()
             .clone();
 
+
+        let id = context.get_id_iter(random_connection_gene.id())
+            .filter(|&id| self.node_genes.iter().find(|node| node.id == id).is_none())
+            .next()
+            .unwrap();
+        
         // construct new node gene
         let new_node_gene_0 = NodeGene::new(
-            context.get_id(Some((random_connection_gene.input, random_connection_gene.output))),
+            id,
+            None,
             None
         );
 
@@ -262,6 +269,7 @@ mod tests {
     #[test]
     fn add_random_connection() {
         let mut parameters: Parameters = Default::default(); 
+        parameters.mutation.weight_perturbation = 1.0;
         let mut context = Context::new(&parameters);
 
         parameters.setup.dimension.input = 1;
@@ -280,6 +288,7 @@ mod tests {
     #[test]
     fn dont_add_same_connection_twice() {
         let mut parameters: Parameters = Default::default();
+        parameters.mutation.weight_perturbation = 1.0;
         let mut context = Context::new(&parameters);
 
         parameters.setup.dimension.input = 1;
@@ -303,6 +312,7 @@ mod tests {
     #[test]
     fn add_random_node() {
         let mut parameters: Parameters = Default::default(); 
+        parameters.mutation.weight_perturbation = 1.0;
         let mut context = Context::new(&parameters);
 
         parameters.setup.dimension.input = 1;
@@ -321,6 +331,7 @@ mod tests {
     #[test]
     fn crossover_same_fitness() {
         let mut parameters: Parameters = Default::default(); 
+        parameters.mutation.weight_perturbation = 1.0;
         let mut context = Context::new(&parameters);
 
         parameters.setup.dimension.input = 1;
@@ -337,7 +348,6 @@ mod tests {
 
         // mutate genome_1
         genome_1.add_node(&mut context);
-        context.cached_node_genes.clear();
         genome_1.add_node(&mut context);
 
         println!("genome_0 {:?}", genome_0);
@@ -355,6 +365,7 @@ mod tests {
     #[test]
     fn crossover_different_fitness() {
         let mut parameters: Parameters = Default::default(); 
+        parameters.mutation.weight_perturbation = 1.0;
         let mut context = Context::new(&parameters);
 
         parameters.setup.dimension.input = 2;
@@ -387,6 +398,7 @@ mod tests {
     #[test]
     fn detect_no_cycle() {
         let mut parameters: Parameters = Default::default(); 
+        parameters.mutation.weight_perturbation = 1.0;
         let mut context = Context::new(&parameters);
 
         parameters.setup.dimension.input = 1;
@@ -404,6 +416,7 @@ mod tests {
     #[test]
     fn detect_cycle() {
         let mut parameters: Parameters = Default::default(); 
+        parameters.mutation.weight_perturbation = 1.0;
         let mut context = Context::new(&parameters);
 
         parameters.setup.dimension.input = 1;
@@ -425,7 +438,8 @@ mod tests {
 
     #[test]
     fn crossover_no_cycle() {
-        let parameters: Parameters = Default::default();
+        let mut parameters: Parameters = Default::default();
+        parameters.mutation.weight_perturbation = 1.0;
         let mut context = Context::new(&parameters);
 
         // assumption:
@@ -436,10 +450,10 @@ mod tests {
 
         let mut genome0 = Genome {
             node_genes: vec![
-                NodeGene::new(Id(0), Some(NodeKind::Input)),
-                NodeGene::new(Id(1), Some(NodeKind::Output)),
-                NodeGene::new(Id(2), Some(NodeKind::Hidden)),
-                NodeGene::new(Id(3), Some(NodeKind::Hidden))
+                NodeGene::new(Id(0), Some(NodeKind::Input), None),
+                NodeGene::new(Id(1), Some(NodeKind::Output), None),
+                NodeGene::new(Id(2), Some(NodeKind::Hidden), None),
+                NodeGene::new(Id(3), Some(NodeKind::Hidden), None)
             ],
             connection_genes: vec![
                 ConnectionGene::new(Id(0), Id(2), None),
