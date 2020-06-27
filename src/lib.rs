@@ -1,15 +1,16 @@
-pub mod context;
+mod context;
 mod genes;
-pub mod genome;
-pub mod parameters;
+mod genome;
+mod parameters;
 mod runtime;
 mod species;
 
-use crate::parameters::Parameters;
-use crate::runtime::Runtime;
 // re-exports
+pub use crate::context::Context;
 pub use crate::genome::Genome;
+pub use crate::parameters::Parameters;
 pub use crate::runtime::Evaluation::{Progress, Solution};
+pub use crate::runtime::Runtime;
 
 pub struct Neat {
     parameters: Parameters,

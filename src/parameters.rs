@@ -50,6 +50,7 @@ pub struct Compatability {
     pub threshold_delta: f64,
     pub factor_weights: f64,
     pub factor_genes: f64,
+    pub factor_activations: f64,
 }
 
 impl Parameters {

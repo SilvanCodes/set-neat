@@ -1,7 +1,6 @@
 use crate::context::Context;
 use crate::genome::Genome;
 use crate::parameters::Parameters;
-use std::collections::HashSet;
 
 #[derive(Debug)]
 pub struct Species {
@@ -28,6 +27,7 @@ impl Species {
             &self.representative,
             parameters.compatability.factor_genes,
             parameters.compatability.factor_weights,
+            parameters.compatability.factor_activations,
         ) < context.compatability_threshold
     }
 
@@ -59,21 +59,27 @@ impl Species {
         }
     }
 
-    pub fn compatability_distance(genome_0: &Genome, genome_1: &Genome, c1: f64, c2: f64) -> f64 {
+    pub fn compatability_distance(
+        genome_0: &Genome,
+        genome_1: &Genome,
+        c1: f64,
+        c2: f64,
+        c3: f64,
+    ) -> f64 {
         let mut weight_difference = 0.0;
-        let mut nodes_to_check = HashSet::new();
+        let mut activation_difference = 0.0;
 
         let matching_genes_count = genome_0
             .connection_genes
             .intersection(&genome_1.connection_genes)
             .inspect(|connection_gene| {
-                let matching_connection_gene =
-                    genome_1.connection_genes.get(connection_gene).unwrap();
-                weight_difference += connection_gene
-                    .weight
-                    .difference(&matching_connection_gene.weight);
-                nodes_to_check.insert(connection_gene.input);
-                nodes_to_check.insert(connection_gene.output);
+                weight_difference += connection_gene.weight.difference(
+                    &genome_1
+                        .connection_genes
+                        .get(connection_gene)
+                        .unwrap()
+                        .weight,
+                );
             })
             .count();
 
@@ -84,13 +90,25 @@ impl Species {
 
         // TODO: add term for activation function difference
 
+        let matching_nodes_count = genome_0
+            .node_genes
+            .intersection(&genome_1.node_genes)
+            .inspect(|node_gene| {
+                if node_gene.activation != genome_1.node_genes.get(node_gene).unwrap().activation {
+                    activation_difference += 1.0;
+                }
+            })
+            .count();
+
         let n = genome_0
             .connection_genes
             .len()
             .min(genome_1.connection_genes.len()) as f64;
 
         // distance formula from paper (modified)
-        c1 * different_genes_count as f64 / n + c2 * weight_difference / matching_genes_count as f64
+        c1 * different_genes_count as f64 / n
+            + c2 * weight_difference / matching_genes_count as f64
+            + c3 * activation_difference / matching_nodes_count as f64
     }
 }
 
@@ -103,7 +121,10 @@ mod tests {
     #[test]
     fn compatability_distance_same_genome() {
         let genome_0 = Genome {
-            node_genes: vec![NodeGene::input(Id(0)), NodeGene::output(Id(1), None)],
+            node_genes: vec![NodeGene::input(Id(0)), NodeGene::output(Id(1), None)]
+                .iter()
+                .cloned()
+                .collect(),
             connection_genes: vec![ConnectionGene::new(Id(0), Id(1), None)]
                 .iter()
                 .cloned()
@@ -113,7 +134,7 @@ mod tests {
 
         let genome_1 = Genome::from(&genome_0);
 
-        let delta = Species::compatability_distance(&genome_0, &genome_1, 1.0, 0.4);
+        let delta = Species::compatability_distance(&genome_0, &genome_1, 1.0, 0.4, 0.0);
 
         assert_eq!(delta, 0.0);
     }
@@ -121,7 +142,10 @@ mod tests {
     #[test]
     fn compatability_distance_different_weight_genome() {
         let genome_0 = Genome {
-            node_genes: vec![NodeGene::input(Id(0)), NodeGene::output(Id(1), None)],
+            node_genes: vec![NodeGene::input(Id(0)), NodeGene::output(Id(1), None)]
+                .iter()
+                .cloned()
+                .collect(),
             connection_genes: vec![ConnectionGene::new(Id(0), Id(1), Some(Weight(1.0)))]
                 .iter()
                 .cloned()
@@ -138,7 +162,7 @@ mod tests {
         println!("genome_0: {:?}", genome_0);
         println!("genome_1: {:?}", genome_1);
 
-        let delta = Species::compatability_distance(&genome_0, &genome_1, 0.0, 2.0);
+        let delta = Species::compatability_distance(&genome_0, &genome_1, 0.0, 2.0, 0.0);
 
         assert_eq!(delta, 2.0);
     }
@@ -146,7 +170,10 @@ mod tests {
     #[test]
     fn compatability_distance_different_connection_genome() {
         let genome_0 = Genome {
-            node_genes: vec![NodeGene::input(Id(0)), NodeGene::output(Id(1), None)],
+            node_genes: vec![NodeGene::input(Id(0)), NodeGene::output(Id(1), None)]
+                .iter()
+                .cloned()
+                .collect(),
             connection_genes: vec![ConnectionGene::new(Id(0), Id(1), Some(Weight(1.0)))]
                 .iter()
                 .cloned()
@@ -166,7 +193,7 @@ mod tests {
         println!("genome_0: {:?}", genome_0);
         println!("genome_1: {:?}", genome_1);
 
-        let delta = Species::compatability_distance(&genome_0, &genome_1, 2.0, 0.0);
+        let delta = Species::compatability_distance(&genome_0, &genome_1, 2.0, 0.0, 0.0);
 
         // factor 2 times 2 different genes
         assert_eq!(delta, 2.0 * 2.0);

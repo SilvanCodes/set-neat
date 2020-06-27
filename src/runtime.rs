@@ -11,7 +11,7 @@ use crate::Neat;
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Report {
-    num_generation: usize,
+    pub num_generation: usize,
     num_species: usize,
     num_species_stale: usize,
     num_offpring: usize,
@@ -332,6 +332,9 @@ mod tests {
         let mut neat = Neat::new("src/Config.toml", |_| 0.0, 0.0);
 
         neat.parameters.compatability.threshold = 3.0;
+        neat.parameters.compatability.factor_genes = 10.0;
+        neat.parameters.compatability.factor_weights = 10.0;
+        neat.parameters.compatability.factor_activations = 10.0;
         neat.parameters.reproduction.surviving = 1.0;
 
         let mut runtime = neat.run();

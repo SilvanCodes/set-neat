@@ -3,7 +3,6 @@ use super::Id;
 use crate::context::Context;
 use favannat::network::NodeLike;
 use rand_distr::{Distribution, Standard};
-use std::borrow::Borrow;
 use std::hash::Hash;
 use std::hash::Hasher;
 
@@ -78,12 +77,6 @@ impl NodeLike for NodeGene {
             Activation::Gaussian => activations::GAUSSIAN,
             Activation::Tanh => activations::TANH,
         }
-    }
-}
-
-impl Borrow<Id> for &NodeGene {
-    fn borrow(&self) -> &Id {
-        &self.id
     }
 }
 
