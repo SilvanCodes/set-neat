@@ -89,7 +89,7 @@ fn main() {
 
         let mut recent_observation = env.reset().expect("Unable to reset");
 
-        for step in 0..STEPS {
+        for _ in 0..STEPS {
             env.render();
             let mut observations = recent_observation.get_box().unwrap();
             // normalize inputs

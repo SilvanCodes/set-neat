@@ -24,7 +24,7 @@ fn main() {
         for _ in 0..runs {
             let mut recent_observation = env.reset().expect("Unable to reset");
             let mut total_reward = 0.0;
-            let mut done = false;
+            let mut done;
 
             for _ in 0..expected_steps {
                 let mut observations = recent_observation.get_box().unwrap();
