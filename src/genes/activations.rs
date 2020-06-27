@@ -1,7 +1,7 @@
 use rand::random;
-use serde::{Deserialize, Serialize};
 use rand::Rng;
 use rand_distr::{Distribution, Standard};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize)]
 pub enum ActivationStrategy {
@@ -9,7 +9,7 @@ pub enum ActivationStrategy {
     FixedSigmoid,
     FixedTanh,
     FixedGaussian,
-    Random
+    Random,
 }
 
 impl Default for ActivationStrategy {
@@ -33,7 +33,7 @@ impl Activation {
             ActivationStrategy::FixedSigmoid => Activation::Sigmoid,
             ActivationStrategy::FixedTanh => Activation::Tanh,
             ActivationStrategy::FixedGaussian => Activation::Gaussian,
-            ActivationStrategy::Random => random()
+            ActivationStrategy::Random => random(),
         }
     }
 }
@@ -50,13 +50,13 @@ impl Distribution<Activation> for Standard {
             0 => Activation::Linear,
             1 => Activation::Sigmoid,
             2 => Activation::Tanh,
-            _ => Activation::Gaussian
+            _ => Activation::Gaussian,
         }
     }
 }
 
 pub const LINEAR: fn(f64) -> f64 = |val| val;
 // pub const SIGMOID: fn(f64) -> f64 = |val| 1.0 / (1.0 + (-1.0 * val).exp());
-pub const SIGMOID: fn(f64) -> f64 =|val| 1.0 / (1.0 + (-4.9 * val).exp());
+pub const SIGMOID: fn(f64) -> f64 = |val| 1.0 / (1.0 + (-4.9 * val).exp());
 pub const TANH: fn(f64) -> f64 = |val| 2.0 * SIGMOID(2.0 * val) - 1.0;
 pub const GAUSSIAN: fn(f64) -> f64 = |val| (val * val / -2.0).exp(); // a = 1, b = 0, c = 1

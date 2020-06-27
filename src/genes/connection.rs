@@ -1,12 +1,11 @@
-
-use crate::genes::weights::Weight;
-use std::hash::Hasher;
-use std::hash::Hash;
 use super::Id;
+use crate::genes::weights::Weight;
+use std::hash::Hash;
+use std::hash::Hasher;
 
 use favannat::network::EdgeLike;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConnectionGene {

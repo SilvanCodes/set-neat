@@ -1,8 +1,8 @@
 use crate::context::Context;
-use serde::{Deserialize, Serialize};
-use rand::rngs::SmallRng;
 use rand::random;
-use rand_distr::{Uniform, Normal, Distribution};
+use rand::rngs::SmallRng;
+use rand_distr::{Distribution, Normal, Uniform};
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct Weight(pub f64);
@@ -29,11 +29,10 @@ impl Weight {
     }
 }
 
-
 #[derive(Debug, Serialize, Deserialize)]
 pub enum WeightDistribution {
     Uniform,
-    Normal
+    Normal,
 }
 
 impl Default for WeightDistribution {
@@ -44,14 +43,14 @@ impl Default for WeightDistribution {
 
 pub enum Perturbator {
     Uniform(Uniform<f64>),
-    Normal(Normal<f64>)
+    Normal(Normal<f64>),
 }
 
 impl Perturbator {
     pub fn new(kind: &WeightDistribution, range: f64) -> Self {
         match kind {
             WeightDistribution::Uniform => Perturbator::Uniform(Uniform::new(-range, range)),
-            WeightDistribution::Normal => Perturbator::Normal(Normal::new(0.0, range).unwrap())
+            WeightDistribution::Normal => Perturbator::Normal(Normal::new(0.0, range).unwrap()),
         }
     }
 

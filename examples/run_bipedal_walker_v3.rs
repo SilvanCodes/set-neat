@@ -1,8 +1,8 @@
-use set_neat::Genome;
-use favannat::network::{activations, Fabricator, Evaluator};
 use favannat::matrix::fabricator::MatrixFabricator;
-use gym::{State, SpaceData};
-use ndarray::{Axis, stack};
+use favannat::network::{activations, Evaluator, Fabricator};
+use gym::{SpaceData, State};
+use ndarray::{stack, Axis};
+use set_neat::Genome;
 use std::fs;
 
 pub const ENV: &str = "BipedalWalker-v3";
@@ -11,11 +11,9 @@ fn main() {
     let gym = gym::GymClient::default();
     let env = gym.make(ENV);
 
-    let winner_json = fs::read_to_string(
-        format!("examples/winner_{}.json", ENV)
-    ).expect("cant read file");
+    let winner_json =
+        fs::read_to_string(format!("examples/winner_{}.json", ENV)).expect("cant read file");
     let winner: Genome = serde_json::from_str(&winner_json).unwrap();
-
 
     let evaluator = MatrixFabricator::fabricate(&winner).unwrap();
 
@@ -30,7 +28,11 @@ fn main() {
         // add bias input
         let output = evaluator.evaluate(stack![Axis(0), observations, [1.0]]);
 
-        let State { observation, is_done, .. } = env.step(&SpaceData::BOX(output)).unwrap();
+        let State {
+            observation,
+            is_done,
+            ..
+        } = env.step(&SpaceData::BOX(output)).unwrap();
         recent_observation = observation;
         done = is_done;
     }

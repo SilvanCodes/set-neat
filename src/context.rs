@@ -1,18 +1,17 @@
 // std imports
-use std::ops::RangeFrom;
 use std::collections::HashMap;
+use std::ops::RangeFrom;
 // external imports
-use rand::{SeedableRng, Rng};
-use rand::rngs::{ThreadRng, SmallRng};
+use rand::rngs::{SmallRng, ThreadRng};
+use rand::{Rng, SeedableRng};
 // crate imports
-use crate::parameters::Parameters;
 use crate::genes::{Id, Perturbator};
-
+use crate::parameters::Parameters;
 
 pub struct IdIter<'a> {
     index: usize,
     ids: &'a mut Vec<Id>,
-    gen: &'a mut RangeFrom<usize>
+    gen: &'a mut RangeFrom<usize>,
 }
 
 impl<'a> Iterator for IdIter<'a> {
@@ -33,11 +32,7 @@ impl<'a> Iterator for IdIter<'a> {
 
 impl<'a> IdIter<'a> {
     pub fn new(ids: &'a mut Vec<Id>, gen: &'a mut RangeFrom<usize>) -> Self {
-        IdIter {
-            index: 0,
-            ids,
-            gen
-        }
+        IdIter { index: 0, ids, gen }
     }
 }
 
@@ -49,7 +44,7 @@ pub struct Context {
     pub compatability_threshold: f64,
     pub last_num_species: usize,
     pub small_rng: SmallRng,
-    pub weight_pertubator: Perturbator
+    pub weight_pertubator: Perturbator,
 }
 
 impl Context {
@@ -62,8 +57,8 @@ impl Context {
             small_rng: SmallRng::from_rng(&mut ThreadRng::default()).unwrap(),
             weight_pertubator: Perturbator::new(
                 &parameters.mutation.weight_distribution,
-                parameters.mutation.weight_perturbation
-            )
+                parameters.mutation.weight_perturbation,
+            ),
         }
     }
 
@@ -85,7 +80,10 @@ impl Context {
 
     // checks if same structure evolved already and return corresponding id
     pub fn get_id_iter(&mut self, connection_id: (Id, Id)) -> IdIter {
-        let cache_entry = self.cached_node_genes.entry(connection_id).or_insert_with(Vec::new);
+        let cache_entry = self
+            .cached_node_genes
+            .entry(connection_id)
+            .or_insert_with(Vec::new);
         IdIter::new(cache_entry, &mut self.id_gen)
     }
 }
@@ -94,8 +92,8 @@ impl Context {
 mod tests {
     use super::Context;
     use super::IdIter;
-    use crate::parameters::Parameters;
     use crate::genes::Id;
+    use crate::parameters::Parameters;
 
     #[test]
     fn get_same_id_for_same_node_mutation() {

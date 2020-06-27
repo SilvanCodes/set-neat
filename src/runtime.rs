@@ -4,9 +4,9 @@ use std::time::Instant;
 use rand::seq::SliceRandom;
 use rayon::prelude::*;
 
-use crate::species::Species;
-use crate::genome::Genome;
 use crate::context::Context;
+use crate::genome::Genome;
+use crate::species::Species;
 use crate::Neat;
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -20,7 +20,7 @@ pub struct Report {
     milliseconds_elapsed_reproducing: u128,
     milliseconds_elapsed_speciation: u128,
     milliseconds_elapsed_evaluation: u128,
-    top_fitness: f64
+    top_fitness: f64,
 }
 
 pub struct Runtime<'a> {
@@ -28,7 +28,7 @@ pub struct Runtime<'a> {
     context: Context,
     population: Vec<Genome>,
     species: Vec<Species>,
-    statistics: Report
+    statistics: Report,
 }
 
 pub enum Evaluation {
@@ -58,7 +58,7 @@ impl<'a> Runtime<'a> {
             context: Context::new(&neat.parameters),
             population: Vec::with_capacity(neat.parameters.setup.population),
             species: Vec::new(),
-            statistics: Default::default()
+            statistics: Default::default(),
         };
 
         // setup fully connected input -> output
@@ -76,12 +76,15 @@ impl<'a> Runtime<'a> {
             context: Context::new(&neat.parameters),
             population: Vec::with_capacity(neat.parameters.setup.population),
             species: Vec::new(),
-            statistics: Default::default()
+            statistics: Default::default(),
         };
 
-        let id = initial_genome.connection_genes.iter()
+        let id = initial_genome
+            .connection_genes
+            .iter()
             .flat_map(|connection_gene| vec![connection_gene.input.0, connection_gene.output.0])
-            .max().unwrap();
+            .max()
+            .unwrap();
 
         println!("max id is {}", id);
 
@@ -146,16 +149,19 @@ impl<'a> Runtime<'a> {
         self.species.retain(|species| species.stale < threshold);
 
         // sort species by fitness in descending order
-        self.species.sort_by(|species_0, species_1| species_1.fitness.partial_cmp(&species_0.fitness).unwrap());
+        self.species.sort_by(|species_0, species_1| {
+            species_1.fitness.partial_cmp(&species_0.fitness).unwrap()
+        });
 
         // check if num species near target species
         if self.species.len() > parameters.compatability.target_species
-            && self.species.len() >= context.last_num_species {
-                context.compatability_threshold += parameters.compatability.threshold_delta;
-        }
-        else if self.species.len() < parameters.compatability.target_species
-            && self.species.len() <= context.last_num_species {
-                context.compatability_threshold -= parameters.compatability.threshold_delta;
+            && self.species.len() >= context.last_num_species
+        {
+            context.compatability_threshold += parameters.compatability.threshold_delta;
+        } else if self.species.len() < parameters.compatability.target_species
+            && self.species.len() <= context.last_num_species
+        {
+            context.compatability_threshold -= parameters.compatability.threshold_delta;
         }
 
         // remember number of species of last generation
@@ -170,7 +176,11 @@ impl<'a> Runtime<'a> {
         let now = Instant::now();
 
         // evaluate nets in parallel
-        let mut fitnesses: Vec<f64> = self.population.par_iter().map(self.neat.fitness_function).collect();
+        let mut fitnesses: Vec<f64> = self
+            .population
+            .par_iter()
+            .map(self.neat.fitness_function)
+            .collect();
 
         // dbg!(&fitnesses);
 
@@ -178,7 +188,10 @@ impl<'a> Runtime<'a> {
 
         // check if some net is sufficient
         if maximum > self.neat.required_fitness {
-            let pos = fitnesses.iter().position(|&fitness| fitness == maximum).unwrap();
+            let pos = fitnesses
+                .iter()
+                .position(|&fitness| fitness == maximum)
+                .unwrap();
             let mut winner = self.population[pos].clone();
             winner.fitness = maximum;
             return Some(winner);
@@ -209,25 +222,35 @@ impl<'a> Runtime<'a> {
         let statistics = &mut self.statistics;
         let offspring_ratio; // expresses how much offspring one point of fitness is worth
 
-        let total_fitness = self.species.iter().fold(0.0, |sum, species| sum + species.fitness);
+        let total_fitness = self
+            .species
+            .iter()
+            .fold(0.0, |sum, species| sum + species.fitness);
 
         if total_fitness == 0.0 {
             // remove species with no members
             self.species.retain(|species| !species.members.is_empty());
-            offspring_ratio = self.neat.parameters.setup.population as f64 / self.species.len() as f64;
+            offspring_ratio =
+                self.neat.parameters.setup.population as f64 / self.species.len() as f64;
         } else {
             offspring_ratio = self.neat.parameters.setup.population as f64 / total_fitness;
             // remove species that do not qualify for offspring
-            self.species.retain(|species| species.fitness * offspring_ratio >= 1.0);
+            self.species
+                .retain(|species| species.fitness * offspring_ratio >= 1.0);
         }
 
         let all_species = &self.species;
 
         for species in all_species {
             // collect members that are allowed to reproduce
-            let allowed_members: Vec<&Genome> = species.members.iter()
+            let allowed_members: Vec<&Genome> = species
+                .members
+                .iter()
                 // need to ceil due to choose + unwrap, i.e. at least one member
-                .take((species.members.len() as f64 * parameters.reproduction.surviving).ceil() as usize)
+                .take(
+                    (species.members.len() as f64 * parameters.reproduction.surviving).ceil()
+                        as usize,
+                )
                 .collect();
 
             // calculate offspring count for species
@@ -235,34 +258,42 @@ impl<'a> Runtime<'a> {
                 offspring_ratio
             } else {
                 species.fitness * offspring_ratio
-            }.round() as usize;
+            }
+            .round() as usize;
 
-            let offspring_from_crossover_count = (offspring_count as f64 * parameters.reproduction.offspring_from_crossover).round() as usize;
+            let offspring_from_crossover_count = (offspring_count as f64
+                * parameters.reproduction.offspring_from_crossover)
+                .round() as usize;
 
             self.population.extend(
-                allowed_members.iter()
+                allowed_members
+                    .iter()
                     .cycle()
                     .take(offspring_count)
                     .enumerate()
                     .map(|(count, &member)| {
                         if count < offspring_from_crossover_count {
-                            if context.gamble(parameters.reproduction.offspring_from_crossover_interspecies) {
+                            if context.gamble(
+                                parameters
+                                    .reproduction
+                                    .offspring_from_crossover_interspecies,
+                            ) {
                                 statistics.num_offspring_from_crossover_interspecies += 1;
                                 member.crossover(
                                     &all_species.choose(&mut context.small_rng).unwrap().members[0],
-                                    context
+                                    context,
                                 )
                             } else {
                                 statistics.num_offspring_from_crossover += 1;
                                 member.crossover(
                                     allowed_members.choose(&mut context.small_rng).unwrap(),
-                                    context
+                                    context,
                                 )
                             }
                         } else {
                             member.clone()
                         }
-                    })
+                    }),
             );
         }
 
@@ -290,12 +321,11 @@ impl<'a> Runtime<'a> {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use crate::runtime::Evaluation::{Progress, Solution};
     use super::Neat;
     use crate::genome::Genome;
+    use crate::runtime::Evaluation::{Progress, Solution};
 
     #[test]
     fn place_into_species() {
@@ -377,19 +407,20 @@ mod tests {
 
     #[test]
     fn run_neat_till_10_connections() {
-
         fn fitness_function(genome: &Genome) -> f64 {
             genome.connection_genes.len() as f64
         }
 
         let neat = Neat::new("src/Config.toml", fitness_function, 10.0);
 
-        if let Some(winner) = neat.run().filter_map(|evaluation| {
-            match evaluation {
+        if let Some(winner) = neat
+            .run()
+            .filter_map(|evaluation| match evaluation {
                 Progress(_) => None,
-                Solution(genome) => Some(genome)
-            }
-        }).next() {
+                Solution(genome) => Some(genome),
+            })
+            .next()
+        {
             assert!((winner.connection_genes.len() as i64 - 10) >= 0);
         }
     }
@@ -402,12 +433,14 @@ mod tests {
 
         let neat = Neat::new("src/Config.toml", fitness_function, 50.0);
 
-        if let Some(winner) = neat.run().filter_map(|evaluation| {
-            match evaluation {
+        if let Some(winner) = neat
+            .run()
+            .filter_map(|evaluation| match evaluation {
                 Progress(_) => None,
-                Solution(genome) => Some(genome)
-            }
-        }).next() {
+                Solution(genome) => Some(genome),
+            })
+            .next()
+        {
             assert!((winner.connection_genes.len() as i64 - 50) >= 0);
         }
     }

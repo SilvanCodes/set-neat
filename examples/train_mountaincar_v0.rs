@@ -1,17 +1,15 @@
-use set_neat::{Neat, Genome, Progress, Solution};
-use favannat::network::{activations, Fabricator, Evaluator};
 use favannat::matrix::fabricator::MatrixFabricator;
-use gym::{State, SpaceData};
-use ndarray::{Axis, stack};
+use favannat::network::{activations, Evaluator, Fabricator};
+use gym::{SpaceData, State};
+use ndarray::{stack, Axis};
+use set_neat::{Genome, Neat, Progress, Solution};
 
-
-use rand::SeedableRng;
-use rand::rngs::{ThreadRng, SmallRng};
 use rand::distributions::{Distribution, WeightedIndex};
+use rand::rngs::{SmallRng, ThreadRng};
+use rand::SeedableRng;
 
-use std::time::Instant;
 use std::fs;
-
+use std::time::Instant;
 
 fn main() {
     fn fitness_function(genome: &Genome) -> f64 {
@@ -22,7 +20,11 @@ fn main() {
         let evaluator = MatrixFabricator::fabricate(genome).unwrap();
         let mut fitness = 0.0;
 
-        let actions = [&SpaceData::DISCRETE(0), &SpaceData::DISCRETE(1), &SpaceData::DISCRETE(2)];
+        let actions = [
+            &SpaceData::DISCRETE(0),
+            &SpaceData::DISCRETE(1),
+            &SpaceData::DISCRETE(2),
+        ];
         // let mut rng = SmallRng::from_rng(&mut ThreadRng::default()).unwrap();
 
         for _ in 0..runs {
@@ -44,7 +46,11 @@ fn main() {
 
                 let max = output.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b));
                 let pos = output.iter().position(|&value| value == max).unwrap();
-                let State { observation, reward, is_done } = env.step(actions[pos]).unwrap();
+                let State {
+                    observation,
+                    reward,
+                    is_done,
+                } = env.step(actions[pos]).unwrap();
 
                 recent_observation = observation;
                 total_reward += reward;
@@ -62,19 +68,31 @@ fn main() {
 
     println!("starting training...");
 
-    if let Some(winner) = neat.run().filter_map(|evaluation| {
-        match evaluation {
-            Progress(report) => {println!("{:#?}", report); None},
-            Solution(genome) => Some(genome)
-        }
-    }).next() {
+    if let Some(winner) = neat
+        .run()
+        .filter_map(|evaluation| match evaluation {
+            Progress(report) => {
+                println!("{:#?}", report);
+                None
+            }
+            Solution(genome) => Some(genome),
+        })
+        .next()
+    {
         fs::write(
             "examples/winner_mountain_car_v0.json",
-            serde_json::to_string(&winner).unwrap()
-        ).expect("Unable to write file");
+            serde_json::to_string(&winner).unwrap(),
+        )
+        .expect("Unable to write file");
 
         let secs = now.elapsed().as_millis();
-        println!("winning genome ({},{}) after {} seconds: {:?}", winner.node_genes.len(), winner.connection_genes.len(), secs as f64 / 1000.0, winner);
+        println!(
+            "winning genome ({},{}) after {} seconds: {:?}",
+            winner.node_genes.len(),
+            winner.connection_genes.len(),
+            secs as f64 / 1000.0,
+            winner
+        );
         let evaluator = MatrixFabricator::fabricate(&winner).unwrap();
         println!("as evaluator {:#?}", evaluator);
 
@@ -82,7 +100,11 @@ fn main() {
         let env = gym.make("MountainCar-v0");
         // let steps = 200;
 
-        let actions = [&SpaceData::DISCRETE(0), &SpaceData::DISCRETE(1), &SpaceData::DISCRETE(2)];
+        let actions = [
+            &SpaceData::DISCRETE(0),
+            &SpaceData::DISCRETE(1),
+            &SpaceData::DISCRETE(2),
+        ];
         let mut rng = SmallRng::from_rng(&mut ThreadRng::default()).unwrap();
 
         let mut recent_observation = env.reset().expect("Unable to reset");
@@ -100,7 +122,11 @@ fn main() {
             let softmax: Vec<f64> = output.iter().map(|x| x.exp() / softmaxsum).collect();
             let dist = WeightedIndex::new(&softmax).unwrap();
 
-            let State { observation, is_done, .. } = env.step(actions[dist.sample(&mut rng)]).unwrap();
+            let State {
+                observation,
+                is_done,
+                ..
+            } = env.step(actions[dist.sample(&mut rng)]).unwrap();
             recent_observation = observation;
             done = is_done;
         }

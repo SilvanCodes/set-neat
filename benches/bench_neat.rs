@@ -1,10 +1,10 @@
-use set_neat::parameters::Parameters;
 use criterion::{criterion_group, criterion_main, Criterion};
-use set_neat::genome::Genome;
 use set_neat::context::Context;
+use set_neat::genome::Genome;
+use set_neat::parameters::Parameters;
 
 pub fn crossover_same_genome_benchmark(c: &mut Criterion) {
-    let mut parameters: Parameters = Default::default(); 
+    let mut parameters: Parameters = Default::default();
     let mut context = Context::new(&parameters);
 
     parameters.setup.dimension.input = 1;
@@ -16,7 +16,9 @@ pub fn crossover_same_genome_benchmark(c: &mut Criterion) {
 
     let genome_1 = Genome::from(&genome_0);
 
-    c.bench_function("crossover same genome", |b| b.iter(|| genome_0.crossover(&genome_1, &mut context)));
+    c.bench_function("crossover same genome", |b| {
+        b.iter(|| genome_0.crossover(&genome_1, &mut context))
+    });
 }
 
 pub fn crossover_higly_mutated_genomes_benchmark(c: &mut Criterion) {
@@ -42,7 +44,9 @@ pub fn crossover_higly_mutated_genomes_benchmark(c: &mut Criterion) {
         genome_1.mutate(&mut context, &parameters);
     }
 
-    c.bench_function("crossover higly mutated genomes", |b| b.iter(|| genome_0.crossover(&genome_1, &mut context)));
+    c.bench_function("crossover higly mutated genomes", |b| {
+        b.iter(|| genome_0.crossover(&genome_1, &mut context))
+    });
 }
 
 pub fn mutate_genome_benchmark(c: &mut Criterion) {
@@ -61,11 +65,13 @@ pub fn mutate_genome_benchmark(c: &mut Criterion) {
 
     genome_0.init();
 
-    c.bench_function("mutate genome", |b| b.iter(|| genome_0.mutate(&mut context, &parameters)));
+    c.bench_function("mutate genome", |b| {
+        b.iter(|| genome_0.mutate(&mut context, &parameters))
+    });
 }
 
 pub fn add_connection_to_genome_benchmark(c: &mut Criterion) {
-    let mut parameters: Parameters = Default::default(); 
+    let mut parameters: Parameters = Default::default();
     let mut context = Context::new(&parameters);
 
     parameters.setup.dimension.input = 1;
@@ -73,11 +79,13 @@ pub fn add_connection_to_genome_benchmark(c: &mut Criterion) {
 
     let mut genome_0 = Genome::new(&mut context, &parameters);
 
-    c.bench_function("add connection to genome", |b| b.iter(|| genome_0.add_connection(&mut context)));
+    c.bench_function("add connection to genome", |b| {
+        b.iter(|| genome_0.add_connection(&mut context))
+    });
 }
 
 pub fn add_node_to_genome_benchmark(c: &mut Criterion) {
-    let mut parameters: Parameters = Default::default(); 
+    let mut parameters: Parameters = Default::default();
     let mut context = Context::new(&parameters);
 
     parameters.setup.dimension.input = 1;
@@ -87,10 +95,13 @@ pub fn add_node_to_genome_benchmark(c: &mut Criterion) {
 
     genome_0.init();
 
-    c.bench_function("add node to genome", |b| b.iter(|| genome_0.add_node(&mut context, &parameters)));
+    c.bench_function("add node to genome", |b| {
+        b.iter(|| genome_0.add_node(&mut context, &parameters))
+    });
 }
 
-criterion_group!(benches,
+criterion_group!(
+    benches,
     // mutate_genome_benchmark,
     crossover_same_genome_benchmark,
     crossover_higly_mutated_genomes_benchmark,

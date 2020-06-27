@@ -1,6 +1,6 @@
-use config::{ConfigError, Config, File};
-use serde::Deserialize;
 use crate::genes::{Activation, ActivationStrategy, WeightDistribution};
+use config::{Config, ConfigError, File};
+use serde::Deserialize;
 
 #[derive(Deserialize, Default)]
 pub struct Parameters {
@@ -14,7 +14,7 @@ pub struct Parameters {
 pub struct Setup {
     pub population: usize,
     pub dimension: Dimension,
-    pub output_activation: Activation
+    pub output_activation: Activation,
 }
 
 #[derive(Deserialize, Default)]
@@ -22,7 +22,7 @@ pub struct Reproduction {
     pub offspring_from_crossover: f64,
     pub offspring_from_crossover_interspecies: f64,
     pub surviving: f64,
-    pub stale_after: usize
+    pub stale_after: usize,
 }
 
 #[derive(Deserialize, Default)]
@@ -40,7 +40,7 @@ pub struct Mutation {
     pub gene_node: f64,
     pub gene_connection: f64,
     pub activation_strategy: ActivationStrategy,
-    pub activation_change: f64
+    pub activation_change: f64,
 }
 
 #[derive(Deserialize, Default)]
@@ -72,6 +72,11 @@ mod tests {
     fn read_parameters() {
         let parameters = Parameters::new("src/Config.toml").unwrap();
 
-        assert_eq!(parameters.reproduction.offspring_from_crossover_interspecies, 0.001)
+        assert_eq!(
+            parameters
+                .reproduction
+                .offspring_from_crossover_interspecies,
+            0.001
+        )
     }
 }

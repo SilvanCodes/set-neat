@@ -1,11 +1,11 @@
-use set_neat::{Neat, Genome, Progress, Solution};
-use favannat::network::{activations, Fabricator, Evaluator};
 use favannat::matrix::fabricator::MatrixFabricator;
-use gym::{State, SpaceData};
-use ndarray::{Axis, stack};
+use favannat::network::{activations, Evaluator, Fabricator};
+use gym::{SpaceData, State};
+use ndarray::{stack, Axis};
+use set_neat::{Genome, Neat, Progress, Solution};
 
-use std::time::Instant;
 use std::fs;
+use std::time::Instant;
 
 pub const RUNS: usize = 3;
 pub const STEPS: usize = 1600;
@@ -30,7 +30,11 @@ fn main() {
                 // add bias input
                 let output = evaluator.evaluate(stack![Axis(0), observations, [1.0]]);
 
-                let State { observation, is_done, reward } = env.step(&SpaceData::BOX(output)).unwrap();
+                let State {
+                    observation,
+                    is_done,
+                    reward,
+                } = env.step(&SpaceData::BOX(output)).unwrap();
                 recent_observation = observation;
                 total_reward += reward;
 
@@ -38,7 +42,6 @@ fn main() {
                     // println!("finished with reward {} after {} steps", reward, step);
                     break;
                 }
-                
             }
             fitness += total_reward;
         }
@@ -57,19 +60,31 @@ fn main() {
     ).expect("cant read file");
     let winner: Genome = serde_json::from_str(&winner_json).unwrap(); */
 
-    if let Some(winner) = neat.run().filter_map(|evaluation| {
-        match evaluation {
-            Progress(report) => {println!("{:#?}", report); None},
-            Solution(genome) => Some(genome)
-        }
-    }).next() {
+    if let Some(winner) = neat
+        .run()
+        .filter_map(|evaluation| match evaluation {
+            Progress(report) => {
+                println!("{:#?}", report);
+                None
+            }
+            Solution(genome) => Some(genome),
+        })
+        .next()
+    {
         fs::write(
             format!("examples/winner_{}.json", ENV),
-            serde_json::to_string(&winner).unwrap()
-        ).expect("Unable to write file");
+            serde_json::to_string(&winner).unwrap(),
+        )
+        .expect("Unable to write file");
 
         let secs = now.elapsed().as_millis();
-        println!("winning genome ({},{}) after {} seconds: {:?}", winner.node_genes.len(), winner.connection_genes.len(), secs as f64 / 1000.0, winner);
+        println!(
+            "winning genome ({},{}) after {} seconds: {:?}",
+            winner.node_genes.len(),
+            winner.connection_genes.len(),
+            secs as f64 / 1000.0,
+            winner
+        );
         let evaluator = MatrixFabricator::fabricate(&winner).unwrap();
         println!("as evaluator {:#?}", evaluator);
 
@@ -87,7 +102,11 @@ fn main() {
             // add bias input
             let output = evaluator.evaluate(stack![Axis(0), observations, [1.0]]);
 
-            let State { observation, is_done, .. } = env.step(&SpaceData::BOX(output)).unwrap();
+            let State {
+                observation,
+                is_done,
+                ..
+            } = env.step(&SpaceData::BOX(output)).unwrap();
             recent_observation = observation;
             done = is_done;
         }

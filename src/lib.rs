@@ -1,12 +1,12 @@
-pub mod genome;
-mod genes;
 pub mod context;
-mod species;
+mod genes;
+pub mod genome;
 pub mod parameters;
 mod runtime;
+mod species;
 
-use crate::runtime::Runtime;
 use crate::parameters::Parameters;
+use crate::runtime::Runtime;
 // re-exports
 pub use crate::genome::Genome;
 pub use crate::runtime::Evaluation::{Progress, Solution};

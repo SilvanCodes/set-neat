@@ -1,15 +1,13 @@
+use super::activations::{self, Activation};
+use super::Id;
+use crate::context::Context;
 use favannat::network::NodeLike;
 use rand_distr::{Distribution, Standard};
 use std::borrow::Borrow;
-use std::hash::Hasher;
 use std::hash::Hash;
-use super::Id;
-use super::activations::{self, Activation};
-use crate::context::Context;
+use std::hash::Hasher;
 
-
-
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(PartialEq, Eq, Hash, Clone, Debug, Serialize, Deserialize)]
 pub enum NodeKind {
@@ -28,7 +26,7 @@ impl Default for NodeKind {
 pub struct NodeGene {
     pub id: Id,
     pub kind: NodeKind,
-    pub activation: Activation
+    pub activation: Activation,
 }
 
 impl NodeGene {
@@ -36,7 +34,7 @@ impl NodeGene {
         NodeGene {
             id,
             kind: kind.unwrap_or_default(),
-            activation: activation.unwrap_or_default()
+            activation: activation.unwrap_or_default(),
         }
     }
 
@@ -44,7 +42,7 @@ impl NodeGene {
         NodeGene {
             id,
             kind: NodeKind::Input,
-            activation: Default::default()
+            activation: Default::default(),
         }
     }
 
@@ -52,7 +50,7 @@ impl NodeGene {
         NodeGene {
             id,
             kind: NodeKind::Output,
-            activation: activation.unwrap_or_default()
+            activation: activation.unwrap_or_default(),
         }
     }
 
@@ -78,7 +76,7 @@ impl NodeLike for NodeGene {
             Activation::Linear => activations::LINEAR,
             Activation::Sigmoid => activations::SIGMOID,
             Activation::Gaussian => activations::GAUSSIAN,
-            Activation::Tanh => activations::TANH
+            Activation::Tanh => activations::TANH,
         }
     }
 }
