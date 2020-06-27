@@ -1,6 +1,6 @@
 [setup]
 population = 150 # number of networks
-activation = "Tanh"
+output_activation = "Tanh"
 
 [setup.dimension]
 input = 5 # number inputs
@@ -19,6 +19,7 @@ weight = 0.8 # chance of mutating all weights of a genome
 weight_random = 0.1 # chance that a mutated weight is replaced by a totally random one
 weight_perturbation = 2.0 # amount of perturbation (step up or down)
 weight_distribution = "Uniform" # probability distribution of perturbation
+activation_strategy = "FixedTanh"
 
 [compatability]
 target_species = 15 # number of desired species

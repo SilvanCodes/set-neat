@@ -1,5 +1,4 @@
 // std imports
-use crate::genes::weights::Perturbator;
 use std::ops::RangeFrom;
 use std::collections::HashMap;
 // external imports
@@ -7,7 +6,7 @@ use rand::{SeedableRng, Rng};
 use rand::rngs::{ThreadRng, SmallRng};
 // crate imports
 use crate::parameters::Parameters;
-use crate::genes::Id;
+use crate::genes::{Id, Perturbator};
 
 
 pub struct IdIter<'a> {
@@ -72,21 +71,7 @@ impl Context {
         self.id_gen = id..;
     }
 
-    // checks if same structure evolved already and return corresponding id
     pub fn get_id(&mut self) -> Id {
-        /* if let Some(connection_id) = connection_id {
-            if self.cached_node_genes.contains_key(&connection_id) {
-                *self.cached_node_genes.get(&connection_id).unwrap()
-            } else {
-                let new_id = Id(self.id_gen.next().unwrap());
-                self.cached_node_genes.insert(connection_id, new_id);
-                new_id
-            }
-            /* *self.cached_node_genes.entry(connection_id)
-                .or_insert(Id(self.id_gen.next().unwrap())) */
-        } else {
-            Id(self.id_gen.next().unwrap())
-        } */
         self.id_gen.next().map(Id).unwrap()
     }
 
@@ -98,6 +83,7 @@ impl Context {
         self.weight_pertubator.sample(&mut self.small_rng)
     }
 
+    // checks if same structure evolved already and return corresponding id
     pub fn get_id_iter(&mut self, connection_id: (Id, Id)) -> IdIter {
         if self.cached_node_genes.contains_key(&connection_id) {
             IdIter::new(self.cached_node_genes.get_mut(&connection_id).unwrap(), &mut self.id_gen)

@@ -1,4 +1,4 @@
-// crate imports
+use std::collections::HashSet;
 use crate::context::Context;
 use crate::parameters::Parameters;
 use crate::genome::Genome;
@@ -58,17 +58,23 @@ impl Species {
 
     pub fn compatability_distance(genome_0: &Genome, genome_1: &Genome, c1: f64, c2: f64) -> f64 {
         let mut weight_difference = 0.0;
+        let mut nodes_to_check = HashSet::new();
         
         let matching_genes_count = genome_0.connection_genes
             .intersection(&genome_1.connection_genes)
-            .inspect(|connection_gene| weight_difference += connection_gene.weight.difference(
-                &genome_1.connection_genes.get(connection_gene).unwrap().weight
-            ))
+            .inspect(|connection_gene| {
+                let matching_connection_gene = genome_1.connection_genes.get(connection_gene).unwrap();
+                weight_difference += connection_gene.weight.difference(&matching_connection_gene.weight);
+                nodes_to_check.insert(connection_gene.input);
+                nodes_to_check.insert(connection_gene.output);
+            })
             .count();
 
         let different_genes_count = genome_0.connection_genes
             .symmetric_difference(&genome_1.connection_genes)
             .count();
+        
+        // TODO: add term for activation function difference
 
         let n = genome_0.connection_genes.len().min(genome_1.connection_genes.len()) as f64;
 
@@ -82,14 +88,14 @@ impl Species {
 mod tests {
     use super::Species;
     use crate::genome::Genome;
-    use crate::genes::{Id, node::{NodeGene, NodeKind}, connection::ConnectionGene, weights::Weight};
+    use crate::genes::{Id, NodeGene, ConnectionGene, Weight};
 
     #[test]
     fn compatability_distance_same_genome() {
         let genome_0 = Genome {
             node_genes: vec![
-                NodeGene::new(Id(0), Some(NodeKind::Input), None),
-                NodeGene::new(Id(1), Some(NodeKind::Output), None),
+                NodeGene::input(Id(0)),
+                NodeGene::output(Id(1), None),
             ],
             connection_genes: vec![
                 ConnectionGene::new(Id(0), Id(1), None)
@@ -108,8 +114,8 @@ mod tests {
     fn compatability_distance_different_weight_genome() {
         let genome_0 = Genome {
             node_genes: vec![
-                NodeGene::new(Id(0), Some(NodeKind::Input), None),
-                NodeGene::new(Id(1), Some(NodeKind::Output), None),
+                NodeGene::input(Id(0)),
+                NodeGene::output(Id(1), None),
             ],
             connection_genes: vec![
                 ConnectionGene::new(Id(0), Id(1), Some(Weight(1.0))),
@@ -133,8 +139,8 @@ mod tests {
     fn compatability_distance_different_connection_genome() {
         let genome_0 = Genome {
             node_genes: vec![
-                NodeGene::new(Id(0), Some(NodeKind::Input), None),
-                NodeGene::new(Id(1), Some(NodeKind::Output), None),
+                NodeGene::input(Id(0)),
+                NodeGene::output(Id(1), None),
             ],
             connection_genes: vec![
                 ConnectionGene::new(Id(0), Id(1), Some(Weight(1.0))),

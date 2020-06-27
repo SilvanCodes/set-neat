@@ -30,7 +30,7 @@ fn main() {
 
     let neat = Neat::new("examples/XOR.toml", fitness_function, 15.0);
 
-    let mut millis_elapsed_in_run = Vec::new();
+    /* let mut millis_elapsed_in_run = Vec::new();
     let mut connections_in_winner_in_run = Vec::new();
     let mut nodes_in_winner_in_run = Vec::new();
 
@@ -61,9 +61,9 @@ fn main() {
         num_runs, total_millis / num_runs / 1000.0,
         total_nodes as f64 / num_runs,
         total_connections as f64 / num_runs
-    );
+    ); */
 
-    /* let now = Instant::now();
+    let now = Instant::now();
 
     if let Some(winner) = neat.run().filter_map(|evaluation| {
         match evaluation {
@@ -74,8 +74,8 @@ fn main() {
         let secs = now.elapsed().as_millis();
         println!("winning genome ({},{}) after {} seconds: {:?}",winner.node_genes.len(), winner.connection_genes.len(), secs as f64 / 1000.0, winner);
         let evaluator = MatrixFabricator::fabricate(&winner).unwrap();
-        println!("as evaluator {:#?}", evaluator);    
-    } */
+        println!("as evaluator {:#?}", evaluator);
+    }
 }
 
 #[cfg(test)]

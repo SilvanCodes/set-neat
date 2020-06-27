@@ -1,13 +1,41 @@
+use rand::random;
 use serde::{Deserialize, Serialize};
 use rand::Rng;
 use rand_distr::{Distribution, Standard};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
+pub enum ActivationStrategy {
+    FixedLinear,
+    FixedSigmoid,
+    FixedTanh,
+    FixedGaussian,
+    Random
+}
+
+impl Default for ActivationStrategy {
+    fn default() -> Self {
+        ActivationStrategy::FixedTanh
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Activation {
     Linear,
     Sigmoid,
     Tanh,
     Gaussian,
+}
+
+impl Activation {
+    pub fn new(strategy: &ActivationStrategy) -> Self {
+        match strategy {
+            ActivationStrategy::FixedLinear => Activation::Linear,
+            ActivationStrategy::FixedSigmoid => Activation::Sigmoid,
+            ActivationStrategy::FixedTanh => Activation::Tanh,
+            ActivationStrategy::FixedGaussian => Activation::Gaussian,
+            ActivationStrategy::Random => random()
+        }
+    }
 }
 
 impl Default for Activation {

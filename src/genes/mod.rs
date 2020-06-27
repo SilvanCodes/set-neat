@@ -1,7 +1,12 @@
-pub mod node;
-pub mod connection;
-pub mod activations;
-pub mod weights;
+mod node;
+mod connection;
+mod activations;
+mod weights;
+
+pub use node::NodeGene;
+pub use connection::ConnectionGene;
+pub use weights::{Weight, WeightDistribution, Perturbator};
+pub use activations::{Activation, ActivationStrategy};
 
 use serde::{Serialize, Deserialize};
 

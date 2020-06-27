@@ -3,12 +3,12 @@ use favannat::network::NetLike;
 use crate::parameters::Parameters;
 use std::collections::HashSet;
 // external imports
-use rand::distributions::{Distribution, Uniform};
+use rand_distr::{Distribution, Uniform};
 use rand::seq::SliceRandom;
 use serde::{Serialize, Deserialize};
 // crate imports
 use crate::context::Context;
-use crate::genes::{node::{NodeGene, NodeKind}, connection::ConnectionGene, weights::Weight};
+use crate::genes::{NodeGene, ConnectionGene, Weight, Activation};
 
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -20,16 +20,22 @@ pub struct Genome {
 
 impl NetLike<NodeGene, ConnectionGene> for Genome {
     fn nodes(&self) -> Vec<&NodeGene> {
-        self.node_genes.iter().collect()
+        self.node_genes.iter()
+            .collect()
     }
     fn edges(&self) -> Vec<&ConnectionGene> {
-        self.connection_genes.iter().collect()
+        self.connection_genes.iter()
+            .collect()
     }
     fn inputs(&self) -> Vec<&NodeGene> {
-        self.node_genes.iter().filter(|node_gene|node_gene.kind == NodeKind::Input).collect()
+        self.node_genes.iter()
+            .filter(|node_gene| node_gene.is_input())
+            .collect()
     }
     fn outputs(&self) -> Vec<&NodeGene> {
-        self.node_genes.iter().filter(|node_gene| node_gene.kind == NodeKind::Output).collect()
+        self.node_genes.iter()
+        .filter(|node_gene| node_gene.is_output())
+            .collect()
     }
 }
 
@@ -38,10 +44,10 @@ impl Genome {
     pub fn new(context: &mut Context, parameters: &Parameters) -> Self {
         let mut node_genes = Vec::new();
         for _ in 0..parameters.setup.dimension.input {
-            node_genes.push(NodeGene::new(context.get_id(), Some(NodeKind::Input), None))
+            node_genes.push(NodeGene::input(context.get_id()))
         }
         for _ in 0..parameters.setup.dimension.output {
-            node_genes.push(NodeGene::new(context.get_id(), Some(NodeKind::Output), Some(parameters.setup.activation.clone())))
+            node_genes.push(NodeGene::output(context.get_id(), Some(parameters.setup.output_activation)))
         }
 
         Genome {
@@ -61,16 +67,18 @@ impl Genome {
 
     pub fn init(&mut self) {
         // fully connects inputs and outputs
-        for input in self.node_genes.iter().filter(|node| node.kind == NodeKind::Input) {
-            for output in self.node_genes.iter().filter(|node| node.kind == NodeKind::Output) {
-                self.connection_genes.insert(
-                    ConnectionGene::new(
-                        input.id,
-                        output.id,
-                        None
-                    )
-                );
-            }
+        for input in self.node_genes.iter()
+            .filter(|node_gene| node_gene.is_input()) {
+                for output in self.node_genes.iter()
+                    .filter(|node_gene| node_gene.is_output()) {
+                        self.connection_genes.insert(
+                            ConnectionGene::new(
+                                input.id,
+                                output.id,
+                                None
+                            )
+                        );
+                }
         }
     }
 
@@ -97,7 +105,11 @@ impl Genome {
 
         // mutate node gene
         if context.gamble(parameters.mutation.gene_node) {
-            self.add_node(context);
+            self.add_node(context, parameters);
+        }
+
+        if context.gamble(parameters.mutation.activation_change) {
+            self.alter_activation(context);
         }
     }
 
@@ -141,57 +153,67 @@ impl Genome {
 
 // private API
 impl Genome {
+    pub fn alter_activation(&mut self, context: &mut Context) {
+        self.node_genes.as_mut_slice().shuffle(&mut context.small_rng);
+
+        self.node_genes.iter_mut()
+            .find(|node_gene| !node_gene.is_output())
+            .map(|node| node.alter_activation(context));
+    } 
+
     // TODO: reject recurrent connections if set in settings
     pub fn add_connection(&mut self, context: &mut Context) -> Result<(), &'static str> {
         // println!("add_connection called");
         // shuffle node genes for randomly picking some
         self.node_genes.as_mut_slice().shuffle(&mut context.small_rng);
 
-        for possible_start_node_gene in self.node_genes.iter().filter(|node_gene| node_gene.kind != NodeKind::Output) {
-            if let Some(possible_end_node_gene) = self.node_genes.iter()
-                .find(|&node_gene| node_gene != possible_start_node_gene
-                                  && node_gene.kind != NodeKind::Input
-                                  && !self.are_connected(&possible_start_node_gene, node_gene)
-                                  && !self.would_form_cycle(possible_start_node_gene, node_gene)
-            ) {
-                // add new connection
-                self.connection_genes.insert(
-                    ConnectionGene::new(
-                        possible_start_node_gene.id,
-                        possible_end_node_gene.id,
-                        None
-                    )
-                );
+        for possible_start_node_gene in self.node_genes.iter()
+            .filter(|node_gene| !node_gene.is_output()) {
+                if let Some(possible_end_node_gene) = self.node_genes.iter()
+                    .find(|&node_gene| node_gene != possible_start_node_gene
+                                    && !node_gene.is_input()
+                                    && !self.are_connected(&possible_start_node_gene, node_gene)
+                                    && !self.would_form_cycle(possible_start_node_gene, node_gene)
+                ) {
+                    // add new connection
+                    self.connection_genes.insert(
+                        ConnectionGene::new(
+                            possible_start_node_gene.id,
+                            possible_end_node_gene.id,
+                            None
+                        )
+                    );
 
-                return Ok(())
-            }
+                    return Ok(())
+                }
             // no possible connection end present
         }
         Err("no connection possible")
     }
 
-    pub fn add_node(&mut self, context: &mut Context) {
+    pub fn add_node(&mut self, context: &mut Context, parameters: &Parameters) {
         // println!("add_node called");
         let between = Uniform::from(0..self.connection_genes.len());
 
         // select an connection gene and split
-        let mut random_connection_gene = self.connection_genes
-            .iter()
+        let mut random_connection_gene = self.connection_genes.iter()
             .nth(between.sample(&mut context.small_rng))
             .unwrap()
             .clone();
 
 
         let id = context.get_id_iter(random_connection_gene.id())
-            .filter(|&id| self.node_genes.iter().find(|node| node.id == id).is_none())
-            .next()
+            .find(|&id| self.node_genes.iter()
+                .find(|node| node.id == id)
+                .is_none()
+            )
             .unwrap();
         
         // construct new node gene
         let new_node_gene_0 = NodeGene::new(
             id,
             None,
-            None
+            Some(Activation::new(&parameters.mutation.activation_strategy))
         );
 
         // insert connection pointing to new node
@@ -262,9 +284,28 @@ impl Genome {
 #[cfg(test)]
 mod tests {
     use crate::context::Context;
-    use crate::genes::{node::{NodeGene, NodeKind}, connection::ConnectionGene, Id};
+    use crate::genes::{Id, NodeGene, ConnectionGene};
     use crate::Parameters;
     use super::Genome;
+
+    #[test]
+    fn alter_activation() {
+        let mut parameters: Parameters = Default::default(); 
+        parameters.mutation.weight_perturbation = 1.0;
+        let mut context = Context::new(&parameters);
+
+        parameters.setup.dimension.input = 1;
+        parameters.setup.dimension.output = 1;
+
+        let mut genome = Genome::new(&mut context, &parameters);
+
+        let old_activation = genome.node_genes[0].activation.clone();
+        
+        genome.node_genes[0].alter_activation(&mut context);
+
+        assert_ne!(genome.node_genes[0].activation, old_activation);
+
+    }
 
     #[test]
     fn add_random_connection() {
@@ -321,7 +362,7 @@ mod tests {
         let mut genome = Genome::new(&mut context, &parameters);
 
         genome.init();
-        genome.add_node(&mut context);
+        genome.add_node(&mut context, &parameters);
 
         println!("{:?}", genome);
 
@@ -344,11 +385,11 @@ mod tests {
         let mut genome_1 = Genome::from(&genome_0);
 
         // mutate genome_0
-        genome_0.add_node(&mut context);
+        genome_0.add_node(&mut context, &parameters);
 
         // mutate genome_1
-        genome_1.add_node(&mut context);
-        genome_1.add_node(&mut context);
+        genome_1.add_node(&mut context, &parameters);
+        genome_1.add_node(&mut context, &parameters);
 
         println!("genome_0 {:?}", genome_0);
         println!("genome_1 {:?}", genome_1);
@@ -380,10 +421,10 @@ mod tests {
         genome_1.fitness = 1.0;
 
         // mutate genome_0
-        genome_0.add_node(&mut context);
+        genome_0.add_node(&mut context, &parameters);
 
         // mutate genome_1
-        genome_1.add_node(&mut context);
+        genome_1.add_node(&mut context, &parameters);
         genome_1.add_connection(&mut context).unwrap();
 
         println!("genome_0 {:?}", genome_0);
@@ -427,7 +468,7 @@ mod tests {
         genome_0.init();
 
         // mutate genome_0
-        genome_0.add_node(&mut context);
+        genome_0.add_node(&mut context, &parameters);
 
         let result = genome_0.would_form_cycle(&genome_0.node_genes[1], &genome_0.node_genes[0]);
 
@@ -450,10 +491,10 @@ mod tests {
 
         let mut genome0 = Genome {
             node_genes: vec![
-                NodeGene::new(Id(0), Some(NodeKind::Input), None),
-                NodeGene::new(Id(1), Some(NodeKind::Output), None),
-                NodeGene::new(Id(2), Some(NodeKind::Hidden), None),
-                NodeGene::new(Id(3), Some(NodeKind::Hidden), None)
+                NodeGene::input(Id(0)),
+                NodeGene::output(Id(1), None),
+                NodeGene::new(Id(2), None, None),
+                NodeGene::new(Id(3), None, None)
             ],
             connection_genes: vec![
                 ConnectionGene::new(Id(0), Id(2), None),

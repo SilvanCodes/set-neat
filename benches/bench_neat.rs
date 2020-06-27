@@ -87,7 +87,7 @@ pub fn add_node_to_genome_benchmark(c: &mut Criterion) {
 
     genome_0.init();
 
-    c.bench_function("add node to genome", |b| b.iter(|| genome_0.add_node(&mut context)));
+    c.bench_function("add node to genome", |b| b.iter(|| genome_0.add_node(&mut context, &parameters)));
 }
 
 criterion_group!(benches,

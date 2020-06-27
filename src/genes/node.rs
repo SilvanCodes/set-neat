@@ -1,9 +1,12 @@
 use favannat::network::NodeLike;
+use rand_distr::{Distribution, Standard};
 use std::borrow::Borrow;
 use std::hash::Hasher;
 use std::hash::Hash;
 use super::Id;
 use super::activations::{self, Activation};
+use crate::context::Context;
+
 
 
 use serde::{Serialize, Deserialize};
@@ -13,6 +16,12 @@ pub enum NodeKind {
     Input,
     Output,
     Hidden,
+}
+
+impl Default for NodeKind {
+    fn default() -> Self {
+        NodeKind::Hidden
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -26,9 +35,37 @@ impl NodeGene {
     pub fn new(id: Id, kind: Option<NodeKind>, activation: Option<Activation>) -> Self {
         NodeGene {
             id,
-            kind: kind.unwrap_or(NodeKind::Hidden),
+            kind: kind.unwrap_or_default(),
             activation: activation.unwrap_or_default()
         }
+    }
+
+    pub fn input(id: Id) -> Self {
+        NodeGene {
+            id,
+            kind: NodeKind::Input,
+            activation: Default::default()
+        }
+    }
+
+    pub fn output(id: Id, activation: Option<Activation>) -> Self {
+        NodeGene {
+            id,
+            kind: NodeKind::Output,
+            activation: activation.unwrap_or_default()
+        }
+    }
+
+    pub fn is_input(&self) -> bool {
+        self.kind == NodeKind::Input
+    }
+
+    pub fn is_output(&self) -> bool {
+        self.kind == NodeKind::Output
+    }
+
+    pub fn alter_activation(&mut self, context: &mut Context) {
+        self.activation = Standard.sample(&mut context.small_rng);
     }
 }
 

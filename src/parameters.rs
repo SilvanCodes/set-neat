@@ -1,7 +1,6 @@
-use crate::genes::weights::WeightDistribution;
 use config::{ConfigError, Config, File};
 use serde::Deserialize;
-use crate::genes::activations::Activation;
+use crate::genes::{Activation, ActivationStrategy, WeightDistribution};
 
 #[derive(Deserialize, Default)]
 pub struct Parameters {
@@ -15,7 +14,7 @@ pub struct Parameters {
 pub struct Setup {
     pub population: usize,
     pub dimension: Dimension,
-    pub activation: Activation
+    pub output_activation: Activation
 }
 
 #[derive(Deserialize, Default)]
@@ -40,6 +39,8 @@ pub struct Mutation {
     pub weight_distribution: WeightDistribution,
     pub gene_node: f64,
     pub gene_connection: f64,
+    pub activation_strategy: ActivationStrategy,
+    pub activation_change: f64
 }
 
 #[derive(Deserialize, Default)]
