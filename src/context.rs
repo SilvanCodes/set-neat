@@ -85,12 +85,8 @@ impl Context {
 
     // checks if same structure evolved already and return corresponding id
     pub fn get_id_iter(&mut self, connection_id: (Id, Id)) -> IdIter {
-        if self.cached_node_genes.contains_key(&connection_id) {
-            IdIter::new(self.cached_node_genes.get_mut(&connection_id).unwrap(), &mut self.id_gen)
-        } else {
-            self.cached_node_genes.insert(connection_id, Vec::new());
-            IdIter::new(self.cached_node_genes.get_mut(&connection_id).unwrap(), &mut self.id_gen)
-        }
+        let cache_entry = self.cached_node_genes.entry(connection_id).or_insert_with(Vec::new);
+        IdIter::new(cache_entry, &mut self.id_gen)
     }
 }
 

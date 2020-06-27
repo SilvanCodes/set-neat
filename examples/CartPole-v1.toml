@@ -20,6 +20,7 @@ weight_random = 0.1 # chance that a mutated weight is replaced by a totally rand
 weight_perturbation = 2.0 # amount of perturbation (step up or down)
 weight_distribution = "Uniform" # probability distribution of perturbation
 activation_strategy = "FixedTanh"
+activation_change = 0.0
 
 [compatability]
 target_species = 15 # number of desired species

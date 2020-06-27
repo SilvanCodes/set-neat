@@ -213,7 +213,7 @@ impl<'a> Runtime<'a> {
 
         if total_fitness == 0.0 {
             // remove species with no members
-            self.species.retain(|species| species.members.len() > 0);
+            self.species.retain(|species| !species.members.is_empty());
             offspring_ratio = self.neat.parameters.setup.population as f64 / self.species.len() as f64;
         } else {
             offspring_ratio = self.neat.parameters.setup.population as f64 / total_fitness;

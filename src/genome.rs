@@ -156,9 +156,10 @@ impl Genome {
     pub fn alter_activation(&mut self, context: &mut Context) {
         self.node_genes.as_mut_slice().shuffle(&mut context.small_rng);
 
-        self.node_genes.iter_mut()
-            .find(|node_gene| !node_gene.is_output())
-            .map(|node| node.alter_activation(context));
+        if let Some(node) = self.node_genes.iter_mut()
+            .find(|node_gene| !node_gene.is_output()) {
+                node.alter_activation(context)
+            }
     } 
 
     // TODO: reject recurrent connections if set in settings
@@ -244,8 +245,7 @@ impl Genome {
     fn are_connected(&self, node_gene_start: &NodeGene, node_gene_end: &NodeGene) -> bool {
         self.connection_genes
             .iter()
-            .find(|connection_gene| connection_gene.input == node_gene_start.id && connection_gene.output == node_gene_end.id)
-            .is_some()
+            .any(|connection_gene| connection_gene.input == node_gene_start.id && connection_gene.output == node_gene_end.id)
     }
 
     // can only operate when no cycles present yet, which is assumed
