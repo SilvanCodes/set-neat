@@ -1,10 +1,15 @@
 [setup]
 population = 250 # number of networks
-output_activation = "Tanh"
 
 [setup.dimension]
 input = 4 # number inputs
 output = 1 # number outputs
+
+[initialization]
+output = "Tanh" # activation function of output nodes
+activations = ["Tanh"] # pool of activation functions to choose from
+connections = 1.0 # percent of inputs fully connected to outputs
+weights = "Random" # initial value of weights
 
 [reproduction]
 offspring_from_crossover = 0.75 # proportion of offspring that results from crossover
@@ -19,7 +24,6 @@ weight = 0.8 # chance of mutating all weights of a genome
 weight_random = 0.1 # chance that a mutated weight is replaced by a totally random one
 weight_perturbation = 1.0 # amount of perturbation (step up or down, uniformly distibuted)
 weight_distribution = "Uniform" # probability distribution of perturbation
-activation_strategy = "FixedTanh"
 activation_change = 0.0
 
 [compatability]

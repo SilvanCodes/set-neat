@@ -41,23 +41,46 @@ impl Default for WeightDistribution {
     }
 }
 
-pub enum Perturbator {
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum WeightInitialization {
+    Fixed(f64),
+    Strategy(String),
+}
+
+impl WeightInitialization {
+    pub fn init(&self) -> Weight {
+        match self {
+            WeightInitialization::Fixed(value) => Weight(*value),
+            WeightInitialization::Strategy(strategy) if strategy == "Random" => Weight(random::<f64>() * 2.0 - 1.0),
+            WeightInitialization::Strategy(_) => Weight(random::<f64>() * 2.0 - 1.0),
+        }
+    }
+}
+
+impl Default for WeightInitialization {
+    fn default() -> Self {
+        WeightInitialization::Strategy("Random".into())
+    }
+}
+
+pub enum WeightPerturbator {
     Uniform(Uniform<f64>),
     Normal(Normal<f64>),
 }
 
-impl Perturbator {
+impl WeightPerturbator {
     pub fn new(kind: &WeightDistribution, range: f64) -> Self {
         match kind {
-            WeightDistribution::Uniform => Perturbator::Uniform(Uniform::new(-range, range)),
-            WeightDistribution::Normal => Perturbator::Normal(Normal::new(0.0, range).unwrap()),
+            WeightDistribution::Uniform => WeightPerturbator::Uniform(Uniform::new(-range, range)),
+            WeightDistribution::Normal => WeightPerturbator::Normal(Normal::new(0.0, range).unwrap()),
         }
     }
 
     pub fn sample(&mut self, rng: &mut SmallRng) -> f64 {
         match self {
-            Perturbator::Uniform(dist) => dist.sample(rng),
-            Perturbator::Normal(dist) => dist.sample(rng),
+            WeightPerturbator::Uniform(dist) => dist.sample(rng),
+            WeightPerturbator::Normal(dist) => dist.sample(rng),
         }
     }
 }

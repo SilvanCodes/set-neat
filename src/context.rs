@@ -5,7 +5,7 @@ use std::ops::RangeFrom;
 use rand::rngs::{SmallRng, ThreadRng};
 use rand::{Rng, SeedableRng};
 // crate imports
-use crate::genes::{Id, Perturbator};
+use crate::genes::{Id, WeightPerturbator};
 use crate::parameters::Parameters;
 
 pub struct IdIter<'a> {
@@ -44,7 +44,7 @@ pub struct Context {
     pub compatability_threshold: f64,
     pub last_num_species: usize,
     pub small_rng: SmallRng,
-    pub weight_pertubator: Perturbator,
+    pub weight_pertubator: WeightPerturbator,
 }
 
 impl Context {
@@ -55,7 +55,7 @@ impl Context {
             compatability_threshold: parameters.compatability.threshold,
             last_num_species: 0,
             small_rng: SmallRng::from_rng(&mut ThreadRng::default()).unwrap(),
-            weight_pertubator: Perturbator::new(
+            weight_pertubator: WeightPerturbator::new(
                 &parameters.mutation.weight_distribution,
                 parameters.mutation.weight_perturbation,
             ),

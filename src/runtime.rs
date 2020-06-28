@@ -62,8 +62,8 @@ impl<'a> Runtime<'a> {
         };
 
         // setup fully connected input -> output
-        let mut initial_genome = Genome::new(&mut runtime.context, &neat.parameters);
-        initial_genome.init();
+        let initial_genome = Genome::new(&mut runtime.context, &neat.parameters);
+        // initial_genome.init();
 
         runtime.populate(&initial_genome);
 
@@ -101,6 +101,7 @@ impl<'a> Runtime<'a> {
     fn populate(&mut self, genome: &Genome) {
         for _ in 0..self.neat.parameters.setup.population {
             let mut other_genome = Genome::from(genome);
+            other_genome.init_with(&mut self.context, &self.neat.parameters);
             other_genome.mutate(&mut self.context, &self.neat.parameters);
             self.population.push(other_genome);
         }

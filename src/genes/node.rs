@@ -1,8 +1,6 @@
 use super::activations::{self, Activation};
 use super::Id;
-use crate::context::Context;
 use favannat::network::NodeLike;
-use rand_distr::{Distribution, Standard};
 use std::hash::Hash;
 use std::hash::Hasher;
 
@@ -61,8 +59,8 @@ impl NodeGene {
         self.kind == NodeKind::Output
     }
 
-    pub fn alter_activation(&mut self, context: &mut Context) {
-        self.activation = Standard.sample(&mut context.small_rng);
+    pub fn update_activation(&mut self, activation: Option<Activation>) {
+        activation.map(|activation| self.activation = activation);
     }
 }
 

@@ -4,9 +4,10 @@ use favannat::network::NetLike;
 use std::collections::HashSet;
 // external imports
 use rand::Rng;
+use rand::seq::{IteratorRandom, SliceRandom};
 use serde::{Deserialize, Serialize};
 // crate imports
-use crate::genes::{Activation, ConnectionGene, NodeGene, Weight};
+use crate::genes::{ConnectionGene, NodeGene, Weight};
 use crate::Context;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -47,7 +48,7 @@ impl Genome {
         for _ in 0..parameters.setup.dimension.output {
             node_genes.insert(NodeGene::output(
                 context.get_id(),
-                Some(parameters.setup.output_activation),
+                Some(parameters.initialization.output),
             ));
         }
 
@@ -72,6 +73,7 @@ impl Genome {
             .node_genes
             .iter()
             .filter(|node_gene| node_gene.is_input())
+            // .take(1)
         {
             for output in self
                 .node_genes
@@ -80,6 +82,30 @@ impl Genome {
             {
                 self.connection_genes
                     .insert(ConnectionGene::new(input.id, output.id, None));
+            }
+        }
+    }
+
+    pub fn init_with(&mut self, context: &mut Context, parameters: &Parameters) {
+        // fully connects inputs and outputs
+        for input in self
+            .node_genes
+            .iter()
+            .filter(|node_gene| node_gene.is_input())
+            // make iterator wrap
+            .cycle()
+            // randomly offest into the iterator
+            .skip((context.small_rng.gen::<f64>() * self.node_genes.len() as f64).floor() as usize)
+            // connect configured percent of inputs to outputs
+            .take((parameters.initialization.connections * parameters.setup.dimension.input as f64).ceil() as usize)
+        {
+            for output in self
+                .node_genes
+                .iter()
+                .filter(|node_gene| node_gene.is_output())
+            {
+                assert!(self.connection_genes
+                    .insert(ConnectionGene::new(input.id, output.id, None)));
             }
         }
     }
@@ -103,7 +129,7 @@ impl Genome {
 
         // mutate connection gene
         if context.gamble(parameters.mutation.gene_connection) {
-            self.add_connection(context).unwrap_or_default();
+            self.add_connection(context, parameters).unwrap_or_default();
         }
 
         // mutate node gene
@@ -112,7 +138,7 @@ impl Genome {
         }
 
         if context.gamble(parameters.mutation.activation_change) {
-            self.alter_activation(context);
+            self.alter_activation(context, parameters);
         }
     }
 
@@ -164,7 +190,7 @@ impl Genome {
 
 // private API
 impl Genome {
-    pub fn alter_activation(&mut self, context: &mut Context) {
+    pub fn alter_activation(&mut self, context: &mut Context, parameters: &Parameters) {
         if let Some(node) = self
             .node_genes
             .iter()
@@ -173,13 +199,21 @@ impl Genome {
             .find(|node_gene| !node_gene.is_output())
         {
             let mut updated = node.clone();
-            updated.alter_activation(context);
+        
+            updated.update_activation(
+                parameters.initialization.activations
+                    .iter()
+                    .filter(|&&activation| activation != updated.activation)
+                    .choose(&mut context.small_rng)
+                    .cloned()
+            );
+
             self.node_genes.replace(updated);
         }
     }
 
     // TODO: reject recurrent connections if set in settings
-    pub fn add_connection(&mut self, context: &mut Context) -> Result<(), &'static str> {
+    pub fn add_connection(&mut self, context: &mut Context, parameters: &Parameters) -> Result<(), &'static str> {
         for possible_start_node_gene in self
             .node_genes
             .iter()
@@ -198,11 +232,11 @@ impl Genome {
                     && !self.would_form_cycle(possible_start_node_gene, node_gene)
             }) {
                 // add new connection
-                self.connection_genes.insert(ConnectionGene::new(
+                assert!(self.connection_genes.insert(ConnectionGene::new(
                     possible_start_node_gene.id,
                     possible_end_node_gene.id,
-                    None,
-                ));
+                    Some(parameters.initialization.weights.init()),
+                )));
 
                 return Ok(());
             }
@@ -216,12 +250,9 @@ impl Genome {
         let mut random_connection_gene = self
             .connection_genes
             .iter()
-            .nth(
-                (context.small_rng.gen::<f64>() * self.connection_genes.len() as f64).floor()
-                    as usize,
-            )
-            .unwrap()
-            .clone();
+            .choose(&mut context.small_rng)
+            .cloned()
+            .unwrap();
 
         let id = context
             .get_id_iter(random_connection_gene.id())
@@ -232,23 +263,23 @@ impl Genome {
         let new_node_gene_0 = NodeGene::new(
             id,
             None,
-            Some(Activation::new(&parameters.mutation.activation_strategy)),
+            parameters.initialization.activations.choose(&mut context.small_rng).cloned(),
         );
 
-        // insert connection pointing to new node
-        self.connection_genes.insert(ConnectionGene::new(
+        // insert new connection pointing to new node
+        assert!(self.connection_genes.insert(ConnectionGene::new(
             random_connection_gene.input,
             new_node_gene_0.id,
             Some(Weight(1.0)),
-        ));
-        // insert connection pointing from new node
-        self.connection_genes.insert(ConnectionGene::new(
+        )));
+        // insert new connection pointing from new node
+        assert!(self.connection_genes.insert(ConnectionGene::new(
             new_node_gene_0.id,
             random_connection_gene.output,
             Some(random_connection_gene.weight),
-        ));
+        )));
         // insert new node into genome
-        self.node_genes.insert(new_node_gene_0);
+        assert!(self.node_genes.insert(new_node_gene_0));
 
         // update weight to zero to 'deactivate' connnection
         random_connection_gene.weight = Weight(0.0);
@@ -308,16 +339,14 @@ mod tests {
         parameters.mutation.weight_perturbation = 1.0;
         let mut context = Context::new(&parameters);
 
-        parameters.setup.dimension.input = 1;
+        parameters.setup.dimension.input = 0;
         parameters.setup.dimension.output = 1;
 
         let mut genome = Genome::new(&mut context, &parameters);
 
         let old_activation = genome.node_genes.iter().nth(0).unwrap().activation.clone();
 
-        let mut updated = genome.node_genes.iter().nth(0).unwrap().clone();
-        updated.alter_activation(&mut context);
-        genome.node_genes.replace(updated);
+        genome.alter_activation(&mut context, &parameters);
 
         assert_ne!(
             genome.node_genes.iter().nth(0).unwrap().activation,
@@ -336,7 +365,7 @@ mod tests {
 
         let mut genome = Genome::new(&mut context, &parameters);
 
-        let result = genome.add_connection(&mut context).is_ok();
+        let result = genome.add_connection(&mut context, &parameters).is_ok();
 
         println!("{:?}", genome);
 
@@ -355,8 +384,8 @@ mod tests {
 
         let mut genome = Genome::new(&mut context, &parameters);
 
-        let result_0 = genome.add_connection(&mut context).is_ok();
-        if let Err(message) = genome.add_connection(&mut context) {
+        let result_0 = genome.add_connection(&mut context, &parameters).is_ok();
+        if let Err(message) = genome.add_connection(&mut context, &parameters) {
             assert_eq!(message, "no connection possible");
         } else {
             assert!(false);
@@ -443,7 +472,7 @@ mod tests {
 
         // mutate genome_1
         genome_1.add_node(&mut context, &parameters);
-        genome_1.add_connection(&mut context).unwrap();
+        genome_1.add_connection(&mut context, &parameters).unwrap();
 
         println!("genome_0 {:?}", genome_0);
         println!("genome_1 {:?}", genome_1);

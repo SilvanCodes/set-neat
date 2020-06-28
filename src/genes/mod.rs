@@ -6,7 +6,7 @@ mod weights;
 pub use activations::{Activation, ActivationStrategy};
 pub use connection::ConnectionGene;
 pub use node::NodeGene;
-pub use weights::{Perturbator, Weight, WeightDistribution};
+pub use weights::{WeightPerturbator, Weight, WeightDistribution, WeightInitialization};
 
 use serde::{Deserialize, Serialize};
 

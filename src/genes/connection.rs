@@ -1,5 +1,5 @@
 use super::Id;
-use crate::genes::weights::Weight;
+use super::Weight;
 use std::hash::Hash;
 use std::hash::Hasher;
 

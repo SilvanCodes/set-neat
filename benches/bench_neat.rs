@@ -78,7 +78,7 @@ pub fn add_connection_to_genome_benchmark(c: &mut Criterion) {
     let mut genome_0 = Genome::new(&mut context, &parameters);
 
     c.bench_function("add connection to genome", |b| {
-        b.iter(|| genome_0.add_connection(&mut context))
+        b.iter(|| genome_0.add_connection(&mut context, &parameters))
     });
 }
 
