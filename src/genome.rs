@@ -1,14 +1,10 @@
-// std imports
-use crate::Parameters;
-use favannat::network::NetLike;
 use std::collections::HashSet;
-// external imports
-use rand::Rng;
+use favannat::network::NetLike;
 use rand::seq::{IteratorRandom, SliceRandom};
+use rand::Rng;
 use serde::{Deserialize, Serialize};
-// crate imports
 use crate::genes::{ConnectionGene, NodeGene, Weight};
-use crate::Context;
+use crate::{Context, Parameters};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Genome {
@@ -73,7 +69,7 @@ impl Genome {
             .node_genes
             .iter()
             .filter(|node_gene| node_gene.is_input())
-            // .take(1)
+        // .take(1)
         {
             for output in self
                 .node_genes
@@ -97,14 +93,18 @@ impl Genome {
             // randomly offest into the iterator
             .skip((context.small_rng.gen::<f64>() * self.node_genes.len() as f64).floor() as usize)
             // connect configured percent of inputs to outputs
-            .take((parameters.initialization.connections * parameters.setup.dimension.input as f64).ceil() as usize)
+            .take(
+                (parameters.initialization.connections * parameters.setup.dimension.input as f64)
+                    .ceil() as usize,
+            )
         {
             for output in self
                 .node_genes
                 .iter()
                 .filter(|node_gene| node_gene.is_output())
             {
-                assert!(self.connection_genes
+                assert!(self
+                    .connection_genes
                     .insert(ConnectionGene::new(input.id, output.id, None)));
             }
         }
@@ -137,7 +137,7 @@ impl Genome {
             self.add_node(context, parameters);
         }
 
-        if context.gamble(parameters.mutation.activation_change) {
+        if parameters.initialization.activations.len() > 1 && context.gamble(parameters.mutation.activation_change) {
             self.alter_activation(context, parameters);
         }
     }
@@ -186,6 +186,10 @@ impl Genome {
             fitness: 0.0,
         }
     }
+
+    pub fn unroll(&self) -> Genome {
+        Genome::from(self)
+    }
 }
 
 // private API
@@ -199,13 +203,15 @@ impl Genome {
             .find(|node_gene| !node_gene.is_output())
         {
             let mut updated = node.clone();
-        
+
             updated.update_activation(
-                parameters.initialization.activations
+                parameters
+                    .initialization
+                    .activations
                     .iter()
                     .filter(|&&activation| activation != updated.activation)
                     .choose(&mut context.small_rng)
-                    .cloned()
+                    .cloned(),
             );
 
             self.node_genes.replace(updated);
@@ -213,7 +219,11 @@ impl Genome {
     }
 
     // TODO: reject recurrent connections if set in settings
-    pub fn add_connection(&mut self, context: &mut Context, parameters: &Parameters) -> Result<(), &'static str> {
+    pub fn add_connection(
+        &mut self,
+        context: &mut Context,
+        parameters: &Parameters,
+    ) -> Result<(), &'static str> {
         for possible_start_node_gene in self
             .node_genes
             .iter()
@@ -263,7 +273,11 @@ impl Genome {
         let new_node_gene_0 = NodeGene::new(
             id,
             None,
-            parameters.initialization.activations.choose(&mut context.small_rng).cloned(),
+            parameters
+                .initialization
+                .activations
+                .choose(&mut context.small_rng)
+                .cloned(),
         );
 
         // insert new connection pointing to new node
@@ -330,7 +344,7 @@ impl Genome {
 mod tests {
     use super::Genome;
     use crate::context::Context;
-    use crate::genes::{ConnectionGene, Id, NodeGene};
+    use crate::genes::{ConnectionGene, Id, NodeGene, Activation};
     use crate::Parameters;
 
     #[test]
@@ -339,8 +353,9 @@ mod tests {
         parameters.mutation.weight_perturbation = 1.0;
         let mut context = Context::new(&parameters);
 
-        parameters.setup.dimension.input = 0;
-        parameters.setup.dimension.output = 1;
+        parameters.setup.dimension.input = 1;
+        parameters.setup.dimension.output = 0;
+        parameters.initialization.activations = vec![ Activation::Absolute, Activation::Cosine ];
 
         let mut genome = Genome::new(&mut context, &parameters);
 

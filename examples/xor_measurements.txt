@@ -1,0 +1,110 @@
+# vary surviving
+
+[setup]
+population = 150 # number of networks
+
+[setup.dimension]
+input = 3 # number inputs
+output = 1 # number outputs
+
+[initialization]
+output = "Sigmoid" # activation function of output nodes
+activations = [
+    "Linear",
+    "Sigmoid",
+    "Tanh",
+    "Gaussian",
+    "Step",
+    "Sine",
+    "Cosine",
+    "Inverse",
+    "Absolute",
+    "Relu",
+    "Squared",
+] # pool of activation functions to choose from
+connections = 1.0 # percent of inputs fully connected to outputs
+weights = "Random" # initial value of weights
+
+[reproduction]
+offspring_from_crossover = 0.75 # proportion of offspring that results from crossover
+offspring_from_crossover_interspecies = 0.001 # proportion of crossover that is interspecies
+surviving = 0.15 # allow the top x percent of species to survive and reproduce
+stale_after = 25 # number of generations allowed without improvement (stale species are reproduced only by the top performing member)
+
+[mutation]
+gene_node = 0.03 # chance of adding a new node gene
+gene_connection = 0.05 # chance of adding a new connection gene
+weight = 0.8 # chance of mutating all weights of a genome
+weight_random = 0.1 # chance that a mutated weight is replaced by a totally random one
+weight_perturbation = 3.0 # amount of perturbation (step up or down, uniformly distibuted)
+weight_distribution = "Normal"
+activation_change = 0.04
+
+[compatability]
+target_species = 15 # number of desired species
+threshold = 1.0 # difference above threshold is considered incompatible
+threshold_delta = 0.1 # adjust threshold by x if num species unequal target species
+factor_genes = 1.0 # factor for percent of different genes
+factor_weights = 1.0 # weight difference factor
+factor_activations = 1.0 # factor for percent of different activations
+
+
+did 100 runs in 2.2129299999999996 seconds / 5.09 nodes average / 6.23 connections / 3563.15 generations per run (0.100 surviving)
+did 100 runs in 2.1468200000000000 seconds / 5.10 nodes average / 6.30 connections / 3407.27 generations per run (0.125 surviving)
+did 100 runs in 1.7382300000000000 seconds / 5.07 nodes average / 6.18 connections / 2739.09 generations per run (0.150 surviving)
+did 100 runs in 2.3993900000000000 seconds / 5.14 nodes average / 6.37 connections / 3734.37 generations per run (0.175 surviving)
+did 100 runs in 1.9330699999999998 seconds / 5.07 nodes average / 6.17 connections / 2996.42 generations per run (0.200 surviving)
+did 100 runs in 2.1197199999999996 seconds / 5.07 nodes average / 6.20 connections / 3254.15 generations per run (0.250 surviving)
+did 100 runs in 2.2751799999999998 seconds / 5.05 nodes average / 6.15 connections / 3428.92 generations per run (0.300 surviving)
+
+# vary population
+
+[setup]
+population = 50 # number of networks
+
+[setup.dimension]
+input = 3 # number inputs
+output = 1 # number outputs
+
+[initialization]
+output = "Sigmoid" # activation function of output nodes
+activations = [
+    "Linear",
+    "Sigmoid",
+    "Tanh",
+    "Gaussian",
+    "Step",
+    "Sine",
+    "Cosine",
+    "Inverse",
+    "Absolute",
+    "Relu",
+    "Squared",
+] # pool of activation functions to choose from
+connections = 1.0 # percent of inputs fully connected to outputs
+weights = "Random" # initial value of weights
+
+[reproduction]
+offspring_from_crossover = 0.75 # proportion of offspring that results from crossover
+offspring_from_crossover_interspecies = 0.001 # proportion of crossover that is interspecies
+surviving = 0.15 # allow the top x percent of species to survive and reproduce
+stale_after = 25 # number of generations allowed without improvement (stale species are reproduced only by the top performing member)
+
+[mutation]
+gene_node = 0.03 # chance of adding a new node gene
+gene_connection = 0.05 # chance of adding a new connection gene
+weight = 0.8 # chance of mutating all weights of a genome
+weight_random = 0.1 # chance that a mutated weight is replaced by a totally random one
+weight_perturbation = 3.0 # amount of perturbation (step up or down, uniformly distibuted)
+weight_distribution = "Normal"
+activation_change = 0.04
+
+[compatability]
+target_species = 5 # number of desired species
+threshold = 1.0 # difference above threshold is considered incompatible
+threshold_delta = 0.1 # adjust threshold by x if num species unequal target species
+factor_genes = 1.0 # factor for percent of different genes
+factor_weights = 1.0 # weight difference factor
+factor_activations = 1.0 # factor for percent of different activations
+
+did 100 runs in 1.8565699999999998 seconds / 5.32 nodes average / 6.84 connections / 9639.97 generations per run (population/target 50/5)

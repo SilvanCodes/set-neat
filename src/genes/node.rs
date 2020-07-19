@@ -74,6 +74,13 @@ impl NodeLike for NodeGene {
             Activation::Sigmoid => activations::SIGMOID,
             Activation::Gaussian => activations::GAUSSIAN,
             Activation::Tanh => activations::TANH,
+            Activation::Step => activations::STEP,
+            Activation::Sine => activations::SINE,
+            Activation::Cosine => activations::COSINE,
+            Activation::Inverse => activations::INVERSE,
+            Activation::Absolute => activations::ABSOLUTE,
+            Activation::Relu => activations::RELU,
+            Activation::Squared => activations::SQUARED,
         }
     }
 }

@@ -4,10 +4,11 @@ use gym::{SpaceData, State};
 use ndarray::{stack, Axis};
 use set_neat::{Genome, Neat, Progress, Solution};
 
+use std::time::SystemTime;
 use std::fs;
 use std::time::Instant;
 
-pub const RUNS: usize = 3;
+pub const RUNS: usize = 5;
 pub const STEPS: usize = 1600;
 pub const ENV: &str = "BipedalWalker-v3";
 
@@ -49,7 +50,7 @@ fn main() {
         fitness / RUNS as f64
     };
 
-    let neat = Neat::new(&format!("examples/{}.toml", ENV), fitness_function, 300.0);
+    let neat = Neat::new(&format!("examples/{}/config.toml", ENV), fitness_function, 100.0);
 
     let now = Instant::now();
 
@@ -72,8 +73,13 @@ fn main() {
         .next()
     {
         fs::write(
-            format!("examples/winner_{}.json", ENV),
+            format!("examples/{}/winner_{:?}.json", ENV, SystemTime::now()),
             serde_json::to_string(&winner).unwrap(),
+        )
+        .expect("Unable to write file");
+        fs::write(
+            format!("examples/{}/winner_parameters__{:?}.json", ENV, SystemTime::now()),
+            serde_json::to_string(&neat.parameters).unwrap(),
         )
         .expect("Unable to write file");
 

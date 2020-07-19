@@ -12,15 +12,16 @@ use crate::Neat;
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Report {
     pub num_generation: usize,
-    num_species: usize,
-    num_species_stale: usize,
-    num_offpring: usize,
-    num_offspring_from_crossover: usize,
-    num_offspring_from_crossover_interspecies: usize,
-    milliseconds_elapsed_reproducing: u128,
-    milliseconds_elapsed_speciation: u128,
-    milliseconds_elapsed_evaluation: u128,
-    top_fitness: f64,
+    pub num_species: usize,
+    pub num_species_stale: usize,
+    pub num_offpring: usize,
+    pub num_offspring_from_crossover: usize,
+    pub num_offspring_from_crossover_interspecies: usize,
+    pub milliseconds_elapsed_reproducing: u128,
+    pub milliseconds_elapsed_speciation: u128,
+    pub milliseconds_elapsed_evaluation: u128,
+    pub compatability_threshold: f64,
+    pub top_fitness: f64,
 }
 
 pub struct Runtime<'a> {
@@ -162,13 +163,15 @@ impl<'a> Runtime<'a> {
         } else if self.species.len() < parameters.compatability.target_species
             && self.species.len() <= context.last_num_species
         {
-            context.compatability_threshold -= parameters.compatability.threshold_delta;
+            // use threshold_delta as lower cap of compatability_threshold
+            context.compatability_threshold = parameters.compatability.threshold_delta.max(context.compatability_threshold - parameters.compatability.threshold_delta);
         }
 
         // remember number of species of last generation
         context.last_num_species = self.species.len();
 
         // collect statistics
+        self.statistics.compatability_threshold = context.compatability_threshold;
         self.statistics.num_species_stale = len_before_threshold - self.species.len();
         self.statistics.milliseconds_elapsed_speciation = now.elapsed().as_millis();
     }
@@ -302,6 +305,15 @@ impl<'a> Runtime<'a> {
         for genome in &mut self.population {
             genome.mutate(context, parameters);
         }
+
+        // bring back champions
+        self.population.extend(
+            all_species
+                .iter()
+                .filter(|species| species.members.len() >= 5)
+                .flat_map(|species| species.members.iter().take(1))
+                .cloned()
+        );
 
         // clear species members
         for species in &mut self.species {

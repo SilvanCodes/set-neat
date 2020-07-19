@@ -1,8 +1,8 @@
 use crate::genes::{Activation, WeightDistribution, WeightInitialization};
 use config::{Config, ConfigError, File};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Default)]
+#[derive(Deserialize, Serialize, Default)]
 pub struct Parameters {
     pub setup: Setup,
     pub initialization: Initialization,
@@ -11,13 +11,13 @@ pub struct Parameters {
     pub compatability: Compatability,
 }
 
-#[derive(Deserialize, Default)]
+#[derive(Deserialize, Serialize, Default)]
 pub struct Setup {
     pub population: usize,
     pub dimension: Dimension,
 }
 
-#[derive(Deserialize, Default)]
+#[derive(Deserialize, Serialize, Default)]
 pub struct Initialization {
     #[serde(default)]
     pub output: Activation,
@@ -28,7 +28,7 @@ pub struct Initialization {
     pub weights: WeightInitialization,
 }
 
-#[derive(Deserialize, Default)]
+#[derive(Deserialize, Serialize, Default)]
 pub struct Reproduction {
     pub offspring_from_crossover: f64,
     pub offspring_from_crossover_interspecies: f64,
@@ -36,13 +36,13 @@ pub struct Reproduction {
     pub stale_after: usize,
 }
 
-#[derive(Deserialize, Default)]
+#[derive(Deserialize, Serialize, Default)]
 pub struct Dimension {
     pub input: usize,
     pub output: usize,
 }
 
-#[derive(Deserialize, Default)]
+#[derive(Deserialize, Serialize, Default)]
 pub struct Mutation {
     pub weight: f64,
     pub weight_random: f64,
@@ -55,7 +55,7 @@ pub struct Mutation {
     pub activation_change: f64,
 }
 
-#[derive(Deserialize, Default)]
+#[derive(Deserialize, Serialize, Default)]
 pub struct Compatability {
     pub target_species: usize,
     pub threshold: f64,

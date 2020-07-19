@@ -1,7 +1,7 @@
-use favannat::network::{Fabricator, Evaluator};
 use favannat::matrix::fabricator::MatrixFabricator;
-use set_neat::{Neat, Genome, Progress, Solution};
+use favannat::network::{Evaluator, Fabricator};
 use ndarray::array;
+use set_neat::{Genome, Neat, Progress, Solution};
 use std::time::Instant;
 
 fn main() {
@@ -13,11 +13,11 @@ fn main() {
 
         match MatrixFabricator::fabricate(genome) {
             Ok(evaluator) => {
-                result_0 = evaluator.evaluate(array![1.0, 1.0, 0.0]);// 2.0 + 0.5;
-                result_1 = evaluator.evaluate(array![1.0, 1.0, 1.0]);// 2.0 + 0.5;
-                result_2 = evaluator.evaluate(array![1.0, 0.0, 1.0]);// 2.0 + 0.5;
-                result_3 = evaluator.evaluate(array![1.0, 0.0, 0.0]);// 2.0 + 0.5;
-            },
+                result_0 = evaluator.evaluate(array![1.0, 1.0, 0.0]); // 2.0 + 0.5;
+                result_1 = evaluator.evaluate(array![1.0, 1.0, 1.0]); // 2.0 + 0.5;
+                result_2 = evaluator.evaluate(array![1.0, 0.0, 1.0]); // 2.0 + 0.5;
+                result_3 = evaluator.evaluate(array![1.0, 0.0, 0.0]); // 2.0 + 0.5;
+            }
             Err(e) => {
                 println!("error fabricating genome: {:?} {:?}", genome, e);
                 panic!("")
@@ -25,7 +25,11 @@ fn main() {
         }
 
         // calculate fitness
-        (4.0 - ((1.0 - result_0[0]) + (0.0 - result_1[0]).abs() + (1.0 - result_2[0]) + (0.0 - result_3[0]).abs())).powi(2)
+        (4.0 - ((1.0 - result_0[0])
+            + (0.0 - result_1[0]).abs()
+            + (1.0 - result_2[0])
+            + (0.0 - result_3[0]).abs()))
+        .powi(2)
     }
 
     let neat = Neat::new("examples/XOR.toml", fitness_function, 15.0);
@@ -39,20 +43,28 @@ fn main() {
         let now = Instant::now();
         let mut generations = 0;
 
-        if let Some(winner) = neat.run().filter_map(|evaluation| {
-            match evaluation {
+        if let Some(winner) = neat
+            .run()
+            .filter_map(|evaluation| match evaluation {
                 Progress(report) => {
                     generations = report.num_generation;
                     None
-                },
-                Solution(genome) => Some(genome)
-            }
-        }).next() {
+                }
+                Solution(genome) => Some(genome),
+            })
+            .next()
+        {
             millis_elapsed_in_run.push(now.elapsed().as_millis() as f64);
             connections_in_winner_in_run.push(winner.connection_genes.len());
             nodes_in_winner_in_run.push(winner.node_genes.len());
             generations_till_winner_in_run.push(generations);
-            println!("finished run {} in {} seconds ({}, {})", i, millis_elapsed_in_run.last().unwrap() / 1000.0, winner.node_genes.len(), winner.connection_genes.len());
+            println!(
+                "finished run {} in {} seconds ({}, {})",
+                i,
+                millis_elapsed_in_run.last().unwrap() / 1000.0,
+                winner.node_genes.len(),
+                winner.connection_genes.len()
+            );
         }
     }
 
@@ -65,7 +77,8 @@ fn main() {
 
     println!(
         "did {} runs in {} seconds / {} nodes average / {} connections / {} generations per run",
-        num_runs, total_millis / num_runs / 1000.0,
+        num_runs,
+        total_millis / num_runs / 1000.0,
         total_nodes as f64 / num_runs,
         total_connections as f64 / num_runs,
         total_generations as f64 / num_runs
@@ -82,7 +95,7 @@ fn main() {
         let secs = now.elapsed().as_millis();
         println!("winning genome ({},{}) after {} seconds: {:?}",winner.node_genes.len(), winner.connection_genes.len(), secs as f64 / 1000.0, winner);
         let evaluator = MatrixFabricator::fabricate(&winner).unwrap();
-        println!("as evaluator {:#?}", evaluator);    
+        println!("as evaluator {:#?}", evaluator);
     } */
 }
 
@@ -95,7 +108,12 @@ mod tests {
         let result_2: Vec<f64> = vec![1.0];
         let result_3: Vec<f64> = vec![0.0];
 
-        let result = (4.0 - ((1.0 - result_0[0]) + (0.0 - result_1[0]).abs() + (1.0 - result_2[0]) + (0.0 - result_3[0]).abs())).powi(2);
+        let result = (4.0
+            - ((1.0 - result_0[0])
+                + (0.0 - result_1[0]).abs()
+                + (1.0 - result_2[0])
+                + (0.0 - result_3[0]).abs()))
+        .powi(2);
 
         println!("result {:?}", result);
 
@@ -109,7 +127,12 @@ mod tests {
         let result_2: Vec<f64> = vec![0.0];
         let result_3: Vec<f64> = vec![1.0];
 
-        let result = (4.0 - ((1.0 - result_0[0]) + (0.0 - result_1[0]).abs() + (1.0 - result_2[0]) + (0.0 - result_3[0]).abs())).powi(2);
+        let result = (4.0
+            - ((1.0 - result_0[0])
+                + (0.0 - result_1[0]).abs()
+                + (1.0 - result_2[0])
+                + (0.0 - result_3[0]).abs()))
+        .powi(2);
 
         println!("result {:?}", result);
 

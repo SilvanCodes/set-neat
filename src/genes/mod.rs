@@ -3,10 +3,10 @@ mod connection;
 mod node;
 mod weights;
 
-pub use activations::{Activation, ActivationStrategy};
+pub use activations::Activation;
 pub use connection::ConnectionGene;
 pub use node::NodeGene;
-pub use weights::{WeightPerturbator, Weight, WeightDistribution, WeightInitialization};
+pub use weights::{Weight, WeightDistribution, WeightInitialization, WeightPerturbator};
 
 use serde::{Deserialize, Serialize};
 

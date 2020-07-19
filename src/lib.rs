@@ -13,7 +13,7 @@ pub use crate::runtime::Evaluation::{Progress, Solution};
 pub use crate::runtime::Runtime;
 
 pub struct Neat {
-    parameters: Parameters,
+    pub parameters: Parameters,
     fitness_function: fn(&Genome) -> f64,
     required_fitness: f64,
 }

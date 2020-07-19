@@ -14,8 +14,12 @@ impl Default for Weight {
 }
 
 impl Weight {
+    pub fn abs(&self) -> f64 {
+        self.0.abs()
+    }
+
     pub fn difference(&self, other: &Weight) -> f64 {
-        (self.0 - other.0).abs()
+        (self.0 - other.0).abs() / ((self.0.abs() + other.0.abs()) )
     }
 
     #[inline]
@@ -52,7 +56,9 @@ impl WeightInitialization {
     pub fn init(&self) -> Weight {
         match self {
             WeightInitialization::Fixed(value) => Weight(*value),
-            WeightInitialization::Strategy(strategy) if strategy == "Random" => Weight(random::<f64>() * 2.0 - 1.0),
+            WeightInitialization::Strategy(strategy) if strategy == "Random" => {
+                Weight(random::<f64>() * 2.0 - 1.0)
+            }
             WeightInitialization::Strategy(_) => Weight(random::<f64>() * 2.0 - 1.0),
         }
     }
@@ -73,7 +79,9 @@ impl WeightPerturbator {
     pub fn new(kind: &WeightDistribution, range: f64) -> Self {
         match kind {
             WeightDistribution::Uniform => WeightPerturbator::Uniform(Uniform::new(-range, range)),
-            WeightDistribution::Normal => WeightPerturbator::Normal(Normal::new(0.0, range).unwrap()),
+            WeightDistribution::Normal => {
+                WeightPerturbator::Normal(Normal::new(0.0, range).unwrap())
+            }
         }
     }
 

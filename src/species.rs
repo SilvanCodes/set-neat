@@ -66,20 +66,24 @@ impl Species {
         c2: f64,
         c3: f64,
     ) -> f64 {
-        let mut weight_difference = 0.0;
+        let mut weight_difference_total = 0.0;
         let mut activation_difference = 0.0;
 
         let matching_genes_count = genome_0
             .connection_genes
             .intersection(&genome_1.connection_genes)
             .inspect(|connection_gene| {
-                weight_difference += connection_gene.weight.difference(
-                    &genome_1
-                        .connection_genes
-                        .get(connection_gene)
-                        .unwrap()
-                        .weight,
+                let matching_gene = genome_1
+                    .connection_genes
+                    .get(connection_gene)
+                    .unwrap();
+                let weight_difference = connection_gene.weight.difference(
+                    &matching_gene.weight,
                 );
+                if !weight_difference.is_nan() {
+                    weight_difference_total += weight_difference;
+                }
+
             })
             .count();
 
@@ -87,8 +91,6 @@ impl Species {
             .connection_genes
             .symmetric_difference(&genome_1.connection_genes)
             .count();
-
-        // TODO: add term for activation function difference
 
         let matching_nodes_count = genome_0
             .node_genes
@@ -100,15 +102,17 @@ impl Species {
             })
             .count();
 
-        let n = genome_0
+        /* let n = genome_0
             .connection_genes
             .len()
             .min(genome_1.connection_genes.len()) as f64;
-
-        // distance formula from paper (modified)
-        c1 * different_genes_count as f64 / n
-            + c2 * weight_difference / matching_genes_count as f64
-            + c3 * activation_difference / matching_nodes_count as f64
+        */
+        // percent of different genes, considering unique genes
+        c1 * different_genes_count as f64 / (matching_genes_count + different_genes_count) as f64
+        // average of weight differences
+        + c2 * weight_difference_total / matching_genes_count as f64
+        // average of activation differences
+        + c3 * activation_difference / matching_nodes_count as f64
     }
 }
 
