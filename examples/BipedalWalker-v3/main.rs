@@ -1,14 +1,14 @@
-use favannat::matrix::fabricator::MatrixFabricator;
-use favannat::network::{activations, Evaluator, Fabricator};
+use favannat::matrix::fabricator::StatefulMatrixFabricator;
+use favannat::network::{StatefulEvaluator, StatefulFabricator};
 use gym::{SpaceData, State};
 use ndarray::{stack, Axis};
-use set_neat::{Genome, Neat, Progress, Solution};
+use set_neat::{Genome, Neat, Progress, Solution, activations};
 
 use std::time::SystemTime;
 use std::fs;
 use std::time::Instant;
 
-pub const RUNS: usize = 5;
+pub const RUNS: usize = 1;
 pub const STEPS: usize = 1600;
 pub const ENV: &str = "BipedalWalker-v3";
 
@@ -17,7 +17,7 @@ fn main() {
         let gym = gym::GymClient::default();
         let env = gym.make(ENV);
 
-        let evaluator = MatrixFabricator::fabricate(genome).unwrap();
+        let mut evaluator = StatefulMatrixFabricator::fabricate(genome).unwrap();
         let mut fitness = 0.0;
 
         for _ in 0..RUNS {
@@ -50,11 +50,11 @@ fn main() {
         fitness / RUNS as f64
     };
 
-    let neat = Neat::new(&format!("examples/{}/config.toml", ENV), fitness_function, 100.0);
+    let neat = Neat::new(&format!("examples/{}/config.toml", ENV), fitness_function, 300.0);
 
     let now = Instant::now();
 
-    println!("starting training ...");
+    println!("starting training: {:#?}", neat.parameters);
 
     /* let winner_json = fs::read_to_string(
         format!("examples/winner_{}.json", ENV)
@@ -72,13 +72,14 @@ fn main() {
         })
         .next()
     {
+        let time_stamp = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs();
         fs::write(
-            format!("examples/{}/winner_{:?}.json", ENV, SystemTime::now()),
+            format!("examples/{}/winner_{:?}.json", ENV, time_stamp),
             serde_json::to_string(&winner).unwrap(),
         )
         .expect("Unable to write file");
         fs::write(
-            format!("examples/{}/winner_parameters__{:?}.json", ENV, SystemTime::now()),
+            format!("examples/{}/winner_{}_parameters.json", ENV, time_stamp),
             serde_json::to_string(&neat.parameters).unwrap(),
         )
         .expect("Unable to write file");
@@ -91,7 +92,7 @@ fn main() {
             secs as f64 / 1000.0,
             winner
         );
-        let evaluator = MatrixFabricator::fabricate(&winner).unwrap();
+        let mut evaluator = StatefulMatrixFabricator::fabricate(&winner).unwrap();
         println!("as evaluator {:#?}", evaluator);
 
         let gym = gym::GymClient::default();

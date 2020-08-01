@@ -1,8 +1,8 @@
-use favannat::matrix::fabricator::MatrixFabricator;
-use favannat::network::{activations, Evaluator, Fabricator};
+use favannat::matrix::fabricator::StatefulMatrixFabricator;
+use favannat::network::{StatefulEvaluator, StatefulFabricator};
 use gym::{SpaceData, State};
 use ndarray::{stack, Axis};
-use set_neat::{Genome, Neat, Progress, Solution};
+use set_neat::{Genome, Neat, Progress, Solution, activations};
 
 use std::fs;
 use std::time::Instant;
@@ -16,7 +16,7 @@ fn main() {
         let gym = gym::GymClient::default();
         let env = gym.make(ENV);
 
-        let evaluator = MatrixFabricator::fabricate(genome).unwrap();
+        let mut evaluator = StatefulMatrixFabricator::fabricate(genome).unwrap();
         let mut fitness = 0.0;
 
         for _ in 0..RUNS {
@@ -81,7 +81,7 @@ fn main() {
             secs as f64 / 1000.0,
             winner
         );
-        let evaluator = MatrixFabricator::fabricate(&winner).unwrap();
+        let mut evaluator = StatefulMatrixFabricator::fabricate(&winner).unwrap();
         println!("as evaluator {:#?}", evaluator);
 
         let gym = gym::GymClient::default();

@@ -1,5 +1,5 @@
 use std::mem;
-use std::time::Instant;
+use std::time::{Instant, SystemTime};
 
 use rand::seq::SliceRandom;
 use rayon::prelude::*;
@@ -11,17 +11,19 @@ use crate::Neat;
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Report {
+    pub compatability_threshold: f64,
+    pub fitness_average: f64,
+    pub fitness_peak: f64,
     pub num_generation: usize,
-    pub num_species: usize,
-    pub num_species_stale: usize,
     pub num_offpring: usize,
     pub num_offspring_from_crossover: usize,
     pub num_offspring_from_crossover_interspecies: usize,
+    pub num_species: usize,
+    pub num_species_stale: usize,
+    pub milliseconds_elapsed_evaluation: u128,
     pub milliseconds_elapsed_reproducing: u128,
     pub milliseconds_elapsed_speciation: u128,
-    pub milliseconds_elapsed_evaluation: u128,
-    pub compatability_threshold: f64,
-    pub top_fitness: f64,
+    pub time_stamp: u64,
 }
 
 pub struct Runtime<'a> {
@@ -157,15 +159,19 @@ impl<'a> Runtime<'a> {
 
         // check if num species near target species
         if self.species.len() > parameters.compatability.target_species
-            && self.species.len() >= context.last_num_species
+            // && self.species.len() >= context.last_num_species
         {
-            context.compatability_threshold += parameters.compatability.threshold_delta;
+            context.compatability_threshold += parameters.compatability.threshold_delta * (self.species.len() as f64 / parameters.compatability.target_species as f64).powi(2);
         } else if self.species.len() < parameters.compatability.target_species
-            && self.species.len() <= context.last_num_species
+            // && self.species.len() <= context.last_num_species
         {
-            // use threshold_delta as lower cap of compatability_threshold
-            context.compatability_threshold = parameters.compatability.threshold_delta.max(context.compatability_threshold - parameters.compatability.threshold_delta);
+            context.compatability_threshold -= parameters.compatability.threshold_delta * (parameters.compatability.target_species as f64 / self.species.len() as f64).powi(2);
         }
+        // use threshold_delta as lower cap of compatability_threshold
+        context.compatability_threshold = parameters.compatability.threshold_delta.max(context.compatability_threshold);
+
+        // maybe scale in relation to diff
+        // context.compatability_threshold *= self.species.len() as f64 / parameters.compatability.target_species as f64;
 
         // remember number of species of last generation
         context.last_num_species = self.species.len();
@@ -189,6 +195,8 @@ impl<'a> Runtime<'a> {
         // dbg!(&fitnesses);
 
         let maximum = fitnesses.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b));
+
+        let average = fitnesses.iter().sum::<f64>() / fitnesses.len() as f64;
 
         // check if some net is sufficient
         if maximum > self.neat.required_fitness {
@@ -215,7 +223,8 @@ impl<'a> Runtime<'a> {
         }
 
         self.statistics.milliseconds_elapsed_evaluation = now.elapsed().as_millis();
-        self.statistics.top_fitness = maximum;
+        self.statistics.fitness_peak = maximum;
+        self.statistics.fitness_average = average;
         None
     }
 
@@ -328,6 +337,7 @@ impl<'a> Runtime<'a> {
     }
 
     fn reset_generational_statistics(&mut self) {
+        self.statistics.time_stamp = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs();
         self.statistics.num_offspring_from_crossover = 0;
         self.statistics.num_offspring_from_crossover_interspecies = 0;
         self.statistics.num_species_stale = 0;
@@ -473,7 +483,7 @@ mod tests {
 
         runtime.evaluate();
 
-        assert_eq!(runtime.statistics.top_fitness, -1.0);
+        assert_eq!(runtime.statistics.fitness_peak, -1.0);
         assert_eq!(runtime.population[0].fitness, 0.0);
         assert_eq!(runtime.population[1].fitness, 0.0);
     }

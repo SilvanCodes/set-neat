@@ -27,11 +27,12 @@ weights = "Random" # initial value of weights
 offspring_from_crossover = 0.75 # proportion of offspring that results from crossover
 offspring_from_crossover_interspecies = 0.001 # proportion of crossover that is interspecies
 surviving = 0.2 # allow the top x percent of species to survive and reproduce
-stale_after = 25 # number of generations allowed without improvement (stale species are reproduced only by the top performing member)
+stale_after = 15 # number of generations allowed without improvement (stale species are reproduced only by the top performing member)
 
 [mutation]
 gene_node = 0.03 # chance of adding a new node gene
 gene_connection = 0.05 # chance of adding a new connection gene
+recurrent = 0.0 # chanche of a new connection being a recurrent one
 weight = 0.8 # chance of mutating all weights of a genome
 weight_random = 0.1 # chance that a mutated weight is replaced by a totally random one
 weight_perturbation = 3.0 # amount of perturbation (step up or down, uniformly distibuted)
@@ -40,8 +41,8 @@ activation_change = 0.05
 
 [compatability]
 target_species = 15 # number of desired species
-threshold = 1.5 # difference above threshold is considered incompatible
-threshold_delta = 0.1 # adjust threshold by x if num species unequal target species
+threshold = 1.0 # difference above threshold is considered incompatible
+threshold_delta = 0.005 # adjust threshold by x if num species unequal target species
 factor_genes = 2.5 # factor for percent of different genes
-factor_weights = 1.5 # weight difference factor
+factor_weights = 1.0 # weight difference factor
 factor_activations = 0.5 # factor for percent of different activations

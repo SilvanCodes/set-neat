@@ -12,7 +12,7 @@ fn main() {
     let env = gym.make(ENV);
 
     let winner_json =
-        fs::read_to_string(format!("examples/winner_{}.json", ENV)).expect("cant read file");
+        fs::read_to_string(format!("examples/{}/winner_SystemTime { tv_sec: 1595179237, tv_nsec: 209278355 }.json", ENV)).expect("cant read file");
     let winner: Genome = serde_json::from_str(&winner_json).unwrap();
 
     let evaluator = MatrixFabricator::fabricate(&winner).unwrap();

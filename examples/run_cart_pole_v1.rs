@@ -1,8 +1,8 @@
 use favannat::matrix::fabricator::MatrixFabricator;
-use favannat::network::{activations, Evaluator, Fabricator};
+use favannat::network::{Evaluator, Fabricator};
 use gym::{SpaceData, State};
 use ndarray::{stack, Axis};
-use set_neat::Genome;
+use set_neat::{Genome, activations};
 
 use std::fs;
 

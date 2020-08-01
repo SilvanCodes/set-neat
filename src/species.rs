@@ -85,12 +85,35 @@ impl Species {
                 }
 
             })
-            .count();
+            .count() as f64;
+
+        let recurrent_matching_genes_count = genome_0
+            .recurrent_connection_genes
+            .intersection(&genome_1.recurrent_connection_genes)
+            .inspect(|connection_gene| {
+                let matching_gene = genome_1
+                    .recurrent_connection_genes
+                    .get(connection_gene)
+                    .unwrap();
+                let weight_difference = connection_gene.weight.difference(
+                    &matching_gene.weight,
+                );
+                if !weight_difference.is_nan() {
+                    weight_difference_total += weight_difference;
+                }
+
+            })
+            .count() as f64;
 
         let different_genes_count = genome_0
             .connection_genes
             .symmetric_difference(&genome_1.connection_genes)
-            .count();
+            .count() as f64;
+
+        let recurrent_different_genes_count = genome_0
+            .recurrent_connection_genes
+            .symmetric_difference(&genome_1.recurrent_connection_genes)
+            .count() as f64;
 
         let matching_nodes_count = genome_0
             .node_genes
@@ -100,19 +123,22 @@ impl Species {
                     activation_difference += 1.0;
                 }
             })
-            .count();
+            .count() as f64;
 
         /* let n = genome_0
             .connection_genes
             .len()
             .min(genome_1.connection_genes.len()) as f64;
         */
+        let matching_genes_count_total = matching_genes_count + recurrent_matching_genes_count;
+        let different_genes_count_total = different_genes_count + recurrent_different_genes_count;
+
         // percent of different genes, considering unique genes
-        c1 * different_genes_count as f64 / (matching_genes_count + different_genes_count) as f64
+        c1 * different_genes_count_total / (matching_genes_count_total + different_genes_count_total)
         // average of weight differences
-        + c2 * weight_difference_total / matching_genes_count as f64
+        + c2 * weight_difference_total / matching_genes_count_total
         // average of activation differences
-        + c3 * activation_difference / matching_nodes_count as f64
+        + c3 * activation_difference / matching_nodes_count
     }
 }
 
@@ -121,6 +147,7 @@ mod tests {
     use super::Species;
     use crate::genes::{ConnectionGene, Id, NodeGene, Weight};
     use crate::genome::Genome;
+    use std::collections::HashSet;
 
     #[test]
     fn compatability_distance_same_genome() {
@@ -133,6 +160,7 @@ mod tests {
                 .iter()
                 .cloned()
                 .collect(),
+            recurrent_connection_genes: HashSet::new(),
             fitness: 0.0,
         };
 
@@ -154,6 +182,7 @@ mod tests {
                 .iter()
                 .cloned()
                 .collect(),
+            recurrent_connection_genes: HashSet::new(),
             fitness: 0.0,
         };
 
@@ -182,6 +211,7 @@ mod tests {
                 .iter()
                 .cloned()
                 .collect(),
+            recurrent_connection_genes: HashSet::new(),
             fitness: 0.0,
         };
 

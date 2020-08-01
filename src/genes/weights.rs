@@ -19,7 +19,7 @@ impl Weight {
     }
 
     pub fn difference(&self, other: &Weight) -> f64 {
-        (self.0 - other.0).abs() / ((self.0.abs() + other.0.abs()) )
+        (self.0 - other.0).abs() / (self.0.abs() + other.0.abs())
     }
 
     #[inline]

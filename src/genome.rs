@@ -1,37 +1,71 @@
+use crate::genes::Id;
 use std::collections::HashSet;
-use favannat::network::NetLike;
+use std::collections::HashMap;
+use favannat::network::{NetLike, Recurrent};
 use rand::seq::{IteratorRandom, SliceRandom};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-use crate::genes::{ConnectionGene, NodeGene, Weight};
+use crate::genes::{ConnectionGene, NodeGene, Weight, Activation};
 use crate::{Context, Parameters};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Genome {
     pub node_genes: HashSet<NodeGene>,
     pub connection_genes: HashSet<ConnectionGene>,
+    pub recurrent_connection_genes: HashSet<ConnectionGene>,
     pub fitness: f64,
 }
 
 impl NetLike<NodeGene, ConnectionGene> for Genome {
     fn nodes(&self) -> Vec<&NodeGene> {
-        self.node_genes.iter().collect()
+        let mut nodes: Vec<&NodeGene> = self.node_genes.iter().collect();
+
+        nodes.sort_unstable();
+        nodes
     }
     fn edges(&self) -> Vec<&ConnectionGene> {
-        self.connection_genes.iter().collect()
+        let mut edges: Vec<&ConnectionGene> = self.connection_genes.iter().collect();
+
+        edges.sort_unstable();
+        edges
     }
     fn inputs(&self) -> Vec<&NodeGene> {
-        self.node_genes
+        let mut inputs: Vec<&NodeGene> = self.node_genes
             .iter()
             .filter(|node_gene| node_gene.is_input())
-            .collect()
+            .collect();
+
+        inputs.sort_unstable();
+        inputs
     }
     fn outputs(&self) -> Vec<&NodeGene> {
-        self.node_genes
+        let mut outputs: Vec<&NodeGene> = self.node_genes
             .iter()
             .filter(|node_gene| node_gene.is_output())
-            .collect()
+            .collect();
+
+        outputs.sort_unstable();
+        outputs
     }
+}
+
+impl Recurrent<NodeGene, ConnectionGene> for Genome {
+    type Net = Genome;
+
+    fn unroll(&self) -> Self::Net {
+        self.unroll()
+    }
+
+    fn memory(&self) -> usize {
+        let mut sources: Vec<Id> = self.recurrent_connection_genes
+            .iter()
+            .map(|connection| connection.input)
+            .collect();
+        sources.sort_unstable();
+        sources.dedup();
+        sources.len()
+    }
+
 }
 
 // public API
@@ -51,6 +85,7 @@ impl Genome {
         Genome {
             node_genes,
             connection_genes: HashSet::new(),
+            recurrent_connection_genes: HashSet::new(),
             fitness: 0.0,
         }
     }
@@ -59,8 +94,13 @@ impl Genome {
         Genome {
             node_genes: genome.node_genes.clone(),
             connection_genes: genome.connection_genes.clone(),
+            recurrent_connection_genes: genome.recurrent_connection_genes.clone(),
             fitness: 0.0,
         }
+    }
+
+    pub fn len(&self) -> usize {
+        self.connection_genes.len() + self.recurrent_connection_genes.len()
     }
 
     pub fn init(&mut self) {
@@ -69,7 +109,6 @@ impl Genome {
             .node_genes
             .iter()
             .filter(|node_gene| node_gene.is_input())
-        // .take(1)
         {
             for output in self
                 .node_genes
@@ -87,11 +126,11 @@ impl Genome {
         for input in self
             .node_genes
             .iter()
-            .filter(|node_gene| node_gene.is_input())
             // make iterator wrap
             .cycle()
             // randomly offest into the iterator
             .skip((context.small_rng.gen::<f64>() * self.node_genes.len() as f64).floor() as usize)
+            .filter(|node_gene| node_gene.is_input())
             // connect configured percent of inputs to outputs
             .take(
                 (parameters.initialization.connections * parameters.setup.dimension.input as f64)
@@ -146,7 +185,7 @@ impl Genome {
         // self is fitter if it has higher fitness or in case of equal fitness has fewer genes
         let self_is_fitter = self.fitness > partner.fitness
             || ((self.fitness - partner.fitness).abs() < f64::EPSILON
-                && self.connection_genes.len() < partner.connection_genes.len());
+                && self.len() < partner.len());
 
         // gamble for matching genes
         let mut offspring_connection_genes: HashSet<ConnectionGene> = self
@@ -157,6 +196,19 @@ impl Genome {
                     gene_self.clone()
                 } else {
                     partner.connection_genes.get(&gene_self).unwrap().clone()
+                }
+            })
+            .collect();
+
+        // gamble for matching recurrent genes
+        let mut offspring_recurrent_connection_genes: HashSet<ConnectionGene> = self
+            .recurrent_connection_genes
+            .intersection(&partner.recurrent_connection_genes)
+            .map(|gene_self| {
+                if context.gamble(0.5) {
+                    gene_self.clone()
+                } else {
+                    partner.recurrent_connection_genes.get(&gene_self).unwrap().clone()
                 }
             })
             .collect();
@@ -173,6 +225,18 @@ impl Genome {
                 .cloned()
         });
 
+        // add different recurrent genes
+        offspring_recurrent_connection_genes.extend(if self_is_fitter {
+            self.recurrent_connection_genes
+                .difference(&partner.recurrent_connection_genes)
+                .cloned()
+        } else {
+            partner
+                .recurrent_connection_genes
+                .difference(&self.recurrent_connection_genes)
+                .cloned()
+        });
+
         // select required nodes
         let offspring_node_genes: HashSet<NodeGene> = if self_is_fitter {
             self.node_genes.clone()
@@ -183,12 +247,43 @@ impl Genome {
         Genome {
             node_genes: offspring_node_genes,
             connection_genes: offspring_connection_genes,
+            recurrent_connection_genes: offspring_recurrent_connection_genes,
             fitness: 0.0,
         }
     }
 
     pub fn unroll(&self) -> Genome {
-        Genome::from(self)
+        let mut unrolled_genome = Genome::from(self);
+
+        // maps recurrent connection input to wrapped actual input
+        let mut unroll_map: HashMap<Id, Id> = HashMap::new();
+        let mut tmp_ids = (0..usize::MAX).rev();
+
+        for recurrent_connection in &self.recurrent_connection_genes {
+            let recurrent_input = unroll_map.entry(recurrent_connection.input).or_insert_with(|| {
+                let recurrent_input_id = Id(tmp_ids.next().unwrap());
+
+                let recurrent_input = NodeGene::input(recurrent_input_id);
+                let recurrent_output = NodeGene::output(Id(tmp_ids.next().unwrap()), Some(Activation::Linear));
+
+                // used to carry value into next evaluation
+                let outward_wrapping_connection = ConnectionGene::new(recurrent_connection.input, recurrent_output.id, Some(Weight(1.0)));
+
+                // add nodes for wrapping
+                unrolled_genome.node_genes.insert(recurrent_input);
+                unrolled_genome.node_genes.insert(recurrent_output);
+
+                // add outward wrapping connection
+                unrolled_genome.connection_genes.insert(outward_wrapping_connection);
+
+                recurrent_input_id
+            });
+
+            let inward_wrapping_connection = ConnectionGene::new(*recurrent_input, recurrent_connection.output, Some(recurrent_connection.weight));
+
+            unrolled_genome.connection_genes.insert(inward_wrapping_connection);
+        }
+        unrolled_genome
     }
 }
 
@@ -218,12 +313,13 @@ impl Genome {
         }
     }
 
-    // TODO: reject recurrent connections if set in settings
     pub fn add_connection(
         &mut self,
         context: &mut Context,
         parameters: &Parameters,
     ) -> Result<(), &'static str> {
+        let is_recurrent = context.gamble(parameters.mutation.recurrent);
+
         for possible_start_node_gene in self
             .node_genes
             .iter()
@@ -238,16 +334,23 @@ impl Genome {
             if let Some(possible_end_node_gene) = self.node_genes.iter().find(|&node_gene| {
                 node_gene != possible_start_node_gene
                     && !node_gene.is_input()
-                    && !self.are_connected(&possible_start_node_gene, node_gene)
-                    && !self.would_form_cycle(possible_start_node_gene, node_gene)
+                    && !self.are_connected(&possible_start_node_gene, node_gene, is_recurrent)
+                    && (is_recurrent || !self.would_form_cycle(possible_start_node_gene, node_gene))
             }) {
-                // add new connection
-                assert!(self.connection_genes.insert(ConnectionGene::new(
-                    possible_start_node_gene.id,
-                    possible_end_node_gene.id,
-                    Some(parameters.initialization.weights.init()),
-                )));
-
+                if is_recurrent {
+                    assert!(self.recurrent_connection_genes.insert(ConnectionGene::new(
+                        possible_start_node_gene.id,
+                        possible_end_node_gene.id,
+                        Some(parameters.initialization.weights.init()),
+                    )));
+                } else {
+                    // add new feed-forward connection
+                    assert!(self.connection_genes.insert(ConnectionGene::new(
+                        possible_start_node_gene.id,
+                        possible_end_node_gene.id,
+                        Some(parameters.initialization.weights.init()),
+                    )));
+                }
                 return Ok(());
             }
             // no possible connection end present
@@ -301,11 +404,12 @@ impl Genome {
     }
 
     // check if to nodes are connected
-    fn are_connected(&self, node_gene_start: &NodeGene, node_gene_end: &NodeGene) -> bool {
-        self.connection_genes.iter().any(|connection_gene| {
-            connection_gene.input == node_gene_start.id
-                && connection_gene.output == node_gene_end.id
-        })
+    fn are_connected(&self, node_gene_start: &NodeGene, node_gene_end: &NodeGene, recurrent: bool) -> bool {
+        if recurrent {
+            self.recurrent_connection_genes.contains(&ConnectionGene::new(node_gene_start.id, node_gene_end.id, None))
+        } else {
+            self.connection_genes.contains(&ConnectionGene::new(node_gene_start.id, node_gene_end.id, None))
+        }
     }
 
     // can only operate when no cycles present yet, which is assumed
@@ -573,7 +677,7 @@ mod tests {
         // genomes with equal fitness (0.0 in this case)
         // "mirrored" structure as simplest example
 
-        let mut genome0 = Genome {
+        let mut genome_0 = Genome {
             node_genes: vec![
                 NodeGene::input(Id(0)),
                 NodeGene::output(Id(1), None),
@@ -592,22 +696,23 @@ mod tests {
             .iter()
             .cloned()
             .collect(),
+            recurrent_connection_genes: HashSet::new(),
             fitness: 0.0,
         };
 
-        let mut genome1 = Genome::from(&genome0);
+        let mut genome_1 = Genome::from(&genome_0);
 
         // insert connectio one way in genome0
-        genome0
+        genome_0
             .connection_genes
             .insert(ConnectionGene::new(Id(2), Id(3), None));
 
         // insert connection the other way in genome1
-        genome1
+        genome_1
             .connection_genes
             .insert(ConnectionGene::new(Id(3), Id(2), None));
 
-        let offspring = genome0.crossover(&genome1, &mut context);
+        let offspring = genome_0.crossover(&genome_1, &mut context);
 
         println!("offspring {:?}", offspring);
 
@@ -623,5 +728,32 @@ mod tests {
                 )
             }
         }
+    }
+
+    #[test]
+    fn unroll_genome() {
+        let mut parameters: Parameters = Default::default();
+        parameters.mutation.weight_perturbation = 1.0;
+        let mut context = Context::new(&parameters);
+
+        parameters.setup.dimension.input = 1;
+        parameters.setup.dimension.output = 1;
+        parameters.mutation.recurrent = 1.0;
+
+        let mut genome_0 = Genome::new(&mut context, &parameters);
+
+        genome_0.init();
+
+        // should add recurrent connection from input to output
+        assert!(genome_0.add_connection(&mut context, &parameters).is_ok());
+        // dont add same connection twice
+        assert!(genome_0.add_connection(&mut context, &parameters).is_err());
+
+        assert_eq!(genome_0.recurrent_connection_genes.len(), 1);
+
+        let genome_1 = genome_0.unroll();
+
+        assert_eq!(genome_1.node_genes.len(), 4);
+        assert_eq!(genome_1.connection_genes.len(), 3);
     }
 }

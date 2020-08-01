@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use super::activations::{self, Activation};
 use super::Id;
 use favannat::network::NodeLike;
@@ -60,7 +61,7 @@ impl NodeGene {
     }
 
     pub fn update_activation(&mut self, activation: Option<Activation>) {
-        activation.map(|activation| self.activation = activation);
+        if let Some(activation) = activation { self.activation = activation }
     }
 }
 
@@ -104,3 +105,15 @@ impl PartialEq<Id> for NodeGene {
 }
 
 impl Eq for NodeGene {}
+
+impl PartialOrd for NodeGene {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.id.cmp(&other.id))
+    }
+}
+
+impl Ord for NodeGene {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.id.cmp(&other.id)
+    }
+}

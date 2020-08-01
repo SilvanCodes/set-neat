@@ -21,6 +21,7 @@ surviving = 0.25 # allow the top x percent of species to survive and reproduce
 [mutation]
 gene_node = 0.03 # chance of adding a new node gene
 gene_connection = 0.05 # chance of adding a new connection gene
+recurrent = 0.0
 weight = 0.8 # chance of mutating all weights of a genome
 weight_random = 0.1 # chance that a mutated weight is replaced by a totally random one
 weight_perturbation = 3.0 # amount of perturbation (step up or down)

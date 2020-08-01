@@ -1,4 +1,4 @@
-mod activations;
+pub mod activations;
 mod connection;
 mod node;
 mod weights;
@@ -10,5 +10,5 @@ pub use weights::{Weight, WeightDistribution, WeightInitialization, WeightPertur
 
 use serde::{Deserialize, Serialize};
 
-#[derive(PartialEq, Eq, Debug, Clone, Copy, Hash, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct Id(pub usize);

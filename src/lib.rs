@@ -6,6 +6,7 @@ mod runtime;
 mod species;
 
 // re-exports
+pub use crate::genes::activations;
 pub use crate::context::Context;
 pub use crate::genome::Genome;
 pub use crate::parameters::Parameters;
