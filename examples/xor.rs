@@ -6,6 +6,9 @@ use std::time::Instant;
 
 fn main() {
     fn fitness_function(genome: &Genome) -> f64 {
+        /* let result_rr0;
+        let result_rr1;
+        let result_rr2; */
         let result_0;
         let result_1;
         let result_2;
@@ -13,10 +16,31 @@ fn main() {
 
         match MatrixFabricator::fabricate(genome) {
             Ok(evaluator) => {
-                result_0 = evaluator.evaluate(array![1.0, 1.0, 0.0]); // 2.0 + 0.5;
-                result_1 = evaluator.evaluate(array![1.0, 1.0, 1.0]); // 2.0 + 0.5;
-                result_2 = evaluator.evaluate(array![1.0, 0.0, 1.0]); // 2.0 + 0.5;
-                result_3 = evaluator.evaluate(array![1.0, 0.0, 0.0]); // 2.0 + 0.5;
+                result_0 = evaluator.evaluate(array![1.0, 1.0, 0.0]);
+                result_1 = evaluator.evaluate(array![1.0, 1.0, 1.0]);
+                result_2 = evaluator.evaluate(array![1.0, 0.0, 1.0]);
+                result_3 = evaluator.evaluate(array![1.0, 0.0, 0.0]);
+
+                /* result_rr0 = [
+                    evaluator.evaluate(array![1.0, 1.0, 0.0]),
+                    evaluator.evaluate(array![1.0, 1.0, 1.0]),
+                    evaluator.evaluate(array![1.0, 0.0, 1.0]),
+                    evaluator.evaluate(array![1.0, 0.0, 0.0]),
+                ];
+
+                result_rr1 = [
+                    evaluator.evaluate(array![0.0, 1.0, 1.0]),
+                    evaluator.evaluate(array![1.0, 1.0, 1.0]),
+                    evaluator.evaluate(array![1.0, 1.0, 0.0]),
+                    evaluator.evaluate(array![0.0, 1.0, 0.0]),
+                ];
+
+                result_rr2 = [
+                    evaluator.evaluate(array![1.0, 0.0, 1.0]),
+                    evaluator.evaluate(array![1.0, 1.0, 1.0]),
+                    evaluator.evaluate(array![0.0, 1.0, 1.0]),
+                    evaluator.evaluate(array![0.0, 0.0, 1.0]),
+                ]; */
             }
             Err(e) => {
                 println!("error fabricating genome: {:?} {:?}", genome, e);
@@ -30,11 +54,29 @@ fn main() {
             + (1.0 - result_2[0])
             + (0.0 - result_3[0]).abs()))
         .powi(2)
+
+        /* let rr0 = (4.0 - ((1.0 - result_rr0[0][0])
+                + (0.0 - result_rr0[1][0]).abs()
+                + (1.0 - result_rr0[2][0])
+                + (0.0 - result_rr0[3][0]).abs()))
+        .powi(2);
+        let rr1 = (4.0 - ((1.0 - result_rr1[0][0])
+                + (0.0 - result_rr1[1][0]).abs()
+                + (1.0 - result_rr1[2][0])
+                + (0.0 - result_rr1[3][0]).abs()))
+        .powi(2);
+        let rr2 = (4.0 - ((1.0 - result_rr2[0][0])
+                + (0.0 - result_rr2[1][0]).abs()
+                + (1.0 - result_rr2[2][0])
+                + (0.0 - result_rr2[3][0]).abs()))
+        .powi(2);
+
+        (rr0 + rr1 + rr2) / 3.0 */
     }
 
-    let neat = Neat::new("examples/XOR.toml", fitness_function, 15.0);
+    let neat = Neat::new("examples/XOR.toml", fitness_function, 15.9);
 
-    let mut millis_elapsed_in_run = Vec::new();
+    /* let mut millis_elapsed_in_run = Vec::new();
     let mut connections_in_winner_in_run = Vec::new();
     let mut nodes_in_winner_in_run = Vec::new();
     let mut generations_till_winner_in_run = Vec::new();
@@ -82,21 +124,32 @@ fn main() {
         total_nodes as f64 / num_runs,
         total_connections as f64 / num_runs,
         total_generations as f64 / num_runs
-    );
+    ); */
 
-    /* let now = Instant::now();
+    let now = Instant::now();
 
-    if let Some(winner) = neat.run().filter_map(|evaluation| {
-        match evaluation {
-            Progress(report) => {println!("{:#?}", report); None},
-            Solution(genome) => Some(genome)
-        }
-    }).next() {
+    if let Some(winner) = neat
+        .run()
+        .filter_map(|evaluation| match evaluation {
+            Progress(report) => {
+                println!("{:#?}", report);
+                None
+            }
+            Solution(genome) => Some(genome),
+        })
+        .next()
+    {
         let secs = now.elapsed().as_millis();
-        println!("winning genome ({},{}) after {} seconds: {:?}",winner.node_genes.len(), winner.connection_genes.len(), secs as f64 / 1000.0, winner);
+        println!(
+            "winning genome ({},{}) after {} seconds: {:?}",
+            winner.node_genes.len(),
+            winner.connection_genes.len(),
+            secs as f64 / 1000.0,
+            winner
+        );
         let evaluator = MatrixFabricator::fabricate(&winner).unwrap();
         println!("as evaluator {:#?}", evaluator);
-    } */
+    }
 }
 
 #[cfg(test)]

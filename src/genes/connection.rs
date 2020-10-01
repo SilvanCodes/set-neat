@@ -1,6 +1,6 @@
-use std::cmp::Ordering;
 use super::Id;
 use super::Weight;
+use std::cmp::Ordering;
 use std::hash::Hash;
 use std::hash::Hasher;
 
@@ -57,13 +57,19 @@ impl Hash for ConnectionGene {
 
 impl PartialOrd for ConnectionGene {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.input.cmp(&other.input).then(self.output.cmp(&other.output)))
+        Some(
+            self.input
+                .cmp(&other.input)
+                .then(self.output.cmp(&other.output)),
+        )
     }
 }
 
 impl Ord for ConnectionGene {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.input.cmp(&other.input).then(self.output.cmp(&other.output))
+        self.input
+            .cmp(&other.input)
+            .then(self.output.cmp(&other.output))
     }
 }
 

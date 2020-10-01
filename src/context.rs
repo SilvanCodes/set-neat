@@ -25,6 +25,7 @@ impl<'a> Iterator for IdIter<'a> {
         } else {
             let id = self.gen.next().map(Id);
             self.ids.push(id.unwrap());
+            self.index += 1;
             id
         }
     }

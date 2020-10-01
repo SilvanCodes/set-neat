@@ -9,11 +9,13 @@ use crate::genome::Genome;
 use crate::species::Species;
 use crate::Neat;
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct Report {
+    pub top_performer: Genome,
     pub compatability_threshold: f64,
     pub fitness_average: f64,
     pub fitness_peak: f64,
+    pub fitness_min: f64,
     pub num_generation: usize,
     pub num_offpring: usize,
     pub num_offspring_from_crossover: usize,
@@ -49,7 +51,7 @@ impl<'a> Iterator for Runtime<'a> {
             self.reset_generational_statistics();
             self.speciate();
             self.reproduce();
-            Some(Evaluation::Progress(self.statistics))
+            Some(Evaluation::Progress(self.statistics.clone()))
         }
     }
 }
@@ -111,19 +113,10 @@ impl<'a> Runtime<'a> {
     }
 
     fn place_genome_into_species(&mut self, genome: Genome) {
-        let mut matching_species = None;
-
-        for species in &mut self.species {
-            // find matching species
-            if species.compatible(&genome, &self.neat.parameters, &self.context) {
-                matching_species = Some(species);
-                break;
-            }
-        }
-
         // place into matching species
-        if let Some(species) = matching_species {
-            species.members.push(genome);
+        if let Some(species_index) = self.find_best_fitting_species(&genome) {
+            // println!("FOUND MATCHING SPECIES");
+            self.species[species_index].members.push(genome);
         }
         // or open new species
         else {
@@ -131,7 +124,46 @@ impl<'a> Runtime<'a> {
         }
     }
 
+    fn compatability_distance(&self, genome_0: &Genome, genome_1: &Genome) -> f64 {
+        Species::compatability_distance(
+            genome_0,
+            genome_1,
+            self.neat.parameters.compatability.factor_genes,
+            self.neat.parameters.compatability.factor_weights,
+            self.neat.parameters.compatability.factor_activations,
+        )
+    }
+
+    fn find_best_fitting_species(&self, genome: &Genome) -> Option<usize> {
+        if self.species.is_empty() {
+            return None;
+        };
+
+        let initial = (
+            0,
+            self.compatability_distance(genome, &self.species[0].representative),
+        );
+
+        let fitting_species = self.species.iter().skip(1).enumerate().fold(
+            initial,
+            |best_fit, (position, species)| {
+                let distance = self.compatability_distance(genome, &species.representative);
+                if distance < best_fit.1 {
+                    (position, distance)
+                } else {
+                    best_fit
+                }
+            },
+        );
+
+        Some(fitting_species)
+            .filter(|(_, distance)| distance < &self.context.compatability_threshold)
+            .map(|(position, _)| position)
+    }
+
     fn speciate(&mut self) {
+        // MAYBE: update representative by most similar descendant ?
+
         let now = Instant::now();
 
         // clear population and sort into species
@@ -150,7 +182,10 @@ impl<'a> Runtime<'a> {
         // clear stale species
         let threshold = parameters.reproduction.stale_after;
         let len_before_threshold = self.species.len();
-        self.species.retain(|species| species.stale < threshold);
+        // keep at least one species
+        let mut i = 0;
+        self.species
+            .retain(|species| (i == 0 || species.stale < threshold, i += 1).0);
 
         // sort species by fitness in descending order
         self.species.sort_by(|species_0, species_1| {
@@ -158,20 +193,25 @@ impl<'a> Runtime<'a> {
         });
 
         // check if num species near target species
-        if self.species.len() > parameters.compatability.target_species
-            // && self.species.len() >= context.last_num_species
-        {
-            context.compatability_threshold += parameters.compatability.threshold_delta * (self.species.len() as f64 / parameters.compatability.target_species as f64).powi(2);
-        } else if self.species.len() < parameters.compatability.target_species
-            // && self.species.len() <= context.last_num_species
-        {
-            context.compatability_threshold -= parameters.compatability.threshold_delta * (parameters.compatability.target_species as f64 / self.species.len() as f64).powi(2);
+        match self.species.len() {
+            len if len > parameters.compatability.target_species => {
+                context.compatability_threshold += parameters.compatability.threshold_delta
+                    * (self.species.len() as f64 / parameters.compatability.target_species as f64)
+                // .powi(3);
+            }
+            len if len < parameters.compatability.target_species => {
+                context.compatability_threshold -= parameters.compatability.threshold_delta
+                    * (parameters.compatability.target_species as f64 / self.species.len() as f64)
+                // .powi(3);
+            }
+            _ => {}
         }
-        // use threshold_delta as lower cap of compatability_threshold
-        context.compatability_threshold = parameters.compatability.threshold_delta.max(context.compatability_threshold);
 
-        // maybe scale in relation to diff
-        // context.compatability_threshold *= self.species.len() as f64 / parameters.compatability.target_species as f64;
+        // use threshold_delta as lower cap of compatability_threshold
+        context.compatability_threshold = parameters
+            .compatability
+            .threshold_delta
+            .max(context.compatability_threshold);
 
         // remember number of species of last generation
         context.last_num_species = self.species.len();
@@ -198,15 +238,18 @@ impl<'a> Runtime<'a> {
 
         let average = fitnesses.iter().sum::<f64>() / fitnesses.len() as f64;
 
+        // allow exact comparison of floats as we got the value we are looking for from the same list we are searching
+        #[allow(clippy::float_cmp)]
+        let pos = fitnesses
+            .iter()
+            .position(|&fitness| fitness == maximum)
+            .unwrap();
+        let mut top_performer = self.population[pos].clone();
+
         // check if some net is sufficient
         if maximum > self.neat.required_fitness {
-            let pos = fitnesses
-                .iter()
-                .position(|&fitness| fitness == maximum)
-                .unwrap();
-            let mut winner = self.population[pos].clone();
-            winner.fitness = maximum;
-            return Some(winner);
+            top_performer.fitness = maximum;
+            return Some(top_performer);
         }
 
         // move all fitness values to zero baseline, when some negative
@@ -224,7 +267,9 @@ impl<'a> Runtime<'a> {
 
         self.statistics.milliseconds_elapsed_evaluation = now.elapsed().as_millis();
         self.statistics.fitness_peak = maximum;
+        self.statistics.fitness_min = minimum;
         self.statistics.fitness_average = average;
+        self.statistics.top_performer = top_performer;
         None
     }
 
@@ -232,7 +277,6 @@ impl<'a> Runtime<'a> {
         let now = Instant::now();
         let context = &mut self.context;
         let parameters = &self.neat.parameters;
-        let statistics = &mut self.statistics;
         let offspring_ratio; // expresses how much offspring one point of fitness is worth
 
         let total_fitness = self
@@ -274,40 +318,19 @@ impl<'a> Runtime<'a> {
             }
             .round() as usize;
 
-            let offspring_from_crossover_count = (offspring_count as f64
-                * parameters.reproduction.offspring_from_crossover)
-                .round() as usize;
-
-            self.population.extend(
-                allowed_members
-                    .iter()
-                    .cycle()
-                    .take(offspring_count)
-                    .enumerate()
-                    .map(|(count, &member)| {
-                        if count < offspring_from_crossover_count {
-                            if context.gamble(
-                                parameters
-                                    .reproduction
-                                    .offspring_from_crossover_interspecies,
-                            ) {
-                                statistics.num_offspring_from_crossover_interspecies += 1;
-                                member.crossover(
-                                    &all_species.choose(&mut context.small_rng).unwrap().members[0],
-                                    context,
-                                )
-                            } else {
-                                statistics.num_offspring_from_crossover += 1;
-                                member.crossover(
-                                    allowed_members.choose(&mut context.small_rng).unwrap(),
-                                    context,
-                                )
-                            }
-                        } else {
-                            member.clone()
-                        }
-                    }),
-            );
+            self.population
+                .extend(
+                    allowed_members
+                        .iter()
+                        .cycle()
+                        .take(offspring_count)
+                        .map(|member| {
+                            member.crossover(
+                                allowed_members.choose(&mut context.small_rng).unwrap(),
+                                context,
+                            )
+                        }),
+                );
         }
 
         // mutate the new population
@@ -315,13 +338,13 @@ impl<'a> Runtime<'a> {
             genome.mutate(context, parameters);
         }
 
-        // bring back champions
+        // always keep top performing member
         self.population.extend(
             all_species
                 .iter()
-                .filter(|species| species.members.len() >= 5)
+                // .filter(|species| species.members.len() >= 5)
                 .flat_map(|species| species.members.iter().take(1))
-                .cloned()
+                .cloned(),
         );
 
         // clear species members
@@ -337,7 +360,10 @@ impl<'a> Runtime<'a> {
     }
 
     fn reset_generational_statistics(&mut self) {
-        self.statistics.time_stamp = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs();
+        self.statistics.time_stamp = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
         self.statistics.num_offspring_from_crossover = 0;
         self.statistics.num_offspring_from_crossover_interspecies = 0;
         self.statistics.num_species_stale = 0;
@@ -369,11 +395,11 @@ mod tests {
         let mut genome_1 = Genome::from(&genome_0);
 
         // manipulate weight for genome distance to exceed threshold
-        let mut connection_gene_0 = genome_1.connection_genes.iter().nth(0).unwrap().clone();
+        let mut connection_gene_0 = genome_1.connection_genes.iter().next().unwrap().clone();
         connection_gene_0.weight.0 = 15.0;
         genome_0.connection_genes.replace(connection_gene_0);
 
-        let mut connection_gene_1 = genome_1.connection_genes.iter().nth(0).unwrap().clone();
+        let mut connection_gene_1 = genome_1.connection_genes.iter().next().unwrap().clone();
         connection_gene_1.weight.0 = -15.0;
         genome_1.connection_genes.replace(connection_gene_1);
 
@@ -392,7 +418,7 @@ mod tests {
         println!("species: {:?}", runtime.species);
 
         assert_eq!(runtime.species.len(), 2);
-        assert_eq!(runtime.species[0].fitness, 1.0);
+        assert!(runtime.species[0].fitness - 1.0 < f64::EPSILON);
         assert_eq!(runtime.population.len(), 0);
     }
 
@@ -426,9 +452,9 @@ mod tests {
 
         assert_eq!(runtime.species.len(), 1);
         // should have adjusted fitness
-        assert_eq!(runtime.species[0].members[0].fitness, 1.0);
+        assert!(runtime.species[0].members[0].fitness - 1.0 < f64::EPSILON);
         // should have averaged fitness
-        assert_eq!(runtime.species[0].fitness, 1.5);
+        assert!(runtime.species[0].fitness - 1.5 < f64::EPSILON);
     }
 
     #[test]
@@ -483,8 +509,8 @@ mod tests {
 
         runtime.evaluate();
 
-        assert_eq!(runtime.statistics.fitness_peak, -1.0);
-        assert_eq!(runtime.population[0].fitness, 0.0);
-        assert_eq!(runtime.population[1].fitness, 0.0);
+        assert!(runtime.statistics.fitness_peak - (-1.0) < f64::EPSILON);
+        assert!(runtime.population[0].fitness < f64::EPSILON);
+        assert!(runtime.population[1].fitness < f64::EPSILON);
     }
 }

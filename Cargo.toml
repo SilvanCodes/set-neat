@@ -22,8 +22,8 @@ blas = ["favannat/blas"]
 gym = { path = "../gym-rs" }
 criterion = "0.3"
 ndarray = "0.13.0"
-blas-src = { version = "0.2.0", default-features = false, features = ["openblas"] }
-openblas-src = { version = "0.6.0", default-features = false, features = ["cblas"] }
+# blas-src = { version = "0.2.0", default-features = false, features = ["openblas"] }
+# openblas-src = { version = "0.6.0", default-features = false, features = ["cblas"] }
 
 [[bench]]
 name = "bench_neat"

@@ -30,8 +30,6 @@ pub struct Initialization {
 
 #[derive(Deserialize, Serialize, Default, Debug)]
 pub struct Reproduction {
-    pub offspring_from_crossover: f64,
-    pub offspring_from_crossover_interspecies: f64,
     pub surviving: f64,
     pub stale_after: usize,
 }
@@ -89,8 +87,8 @@ mod tests {
         assert_eq!(
             parameters
                 .reproduction
-                .offspring_from_crossover_interspecies,
-            0.001
+                .stale_after,
+            15
         )
     }
 }

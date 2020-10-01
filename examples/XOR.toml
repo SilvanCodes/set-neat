@@ -8,24 +8,22 @@ output = 1 # number outputs
 [initialization]
 output = "Sigmoid" # activation function of output nodes
 activations = [
-    "Linear",
+    # "Linear",
     "Sigmoid",
-    "Tanh",
-    "Gaussian",
-    "Step",
-    "Sine",
-    "Cosine",
-    "Inverse",
-    "Absolute",
-    "Relu",
-    "Squared",
+    # "Tanh",
+    # "Gaussian",
+    # "Step",
+    # "Sine",
+    # "Cosine",
+    # "Inverse",
+    # "Absolute",
+    # "Relu",
+    # "Squared",
 ] # pool of activation functions to choose from
 connections = 1.0 # percent of inputs fully connected to outputs
 weights = "Random" # initial value of weights
 
 [reproduction]
-offspring_from_crossover = 0.75 # proportion of offspring that results from crossover
-offspring_from_crossover_interspecies = 0.001 # proportion of crossover that is interspecies
 surviving = 0.2 # allow the top x percent of species to survive and reproduce
 stale_after = 15 # number of generations allowed without improvement (stale species are reproduced only by the top performing member)
 
@@ -36,7 +34,7 @@ recurrent = 0.0 # chanche of a new connection being a recurrent one
 weight = 0.8 # chance of mutating all weights of a genome
 weight_random = 0.1 # chance that a mutated weight is replaced by a totally random one
 weight_perturbation = 3.0 # amount of perturbation (step up or down, uniformly distibuted)
-weight_distribution = "Normal"
+weight_distribution = "Uniform"
 activation_change = 0.05
 
 [compatability]

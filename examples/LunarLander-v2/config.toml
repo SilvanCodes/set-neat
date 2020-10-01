@@ -2,7 +2,7 @@
 population = 250 # number of networks
 
 [setup.dimension]
-input = 25 # number inputs
+input = 9 # number inputs
 output = 4 # number outputs
 
 [initialization]

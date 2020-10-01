@@ -69,51 +69,20 @@ impl Species {
         let mut weight_difference_total = 0.0;
         let mut activation_difference = 0.0;
 
-        let matching_genes_count = genome_0
-            .connection_genes
-            .intersection(&genome_1.connection_genes)
-            .inspect(|connection_gene| {
-                let matching_gene = genome_1
-                    .connection_genes
-                    .get(connection_gene)
-                    .unwrap();
-                let weight_difference = connection_gene.weight.difference(
-                    &matching_gene.weight,
-                );
+        let matching_genes_count_total = genome_0
+            .iter_all_matching_connections(genome_1)
+            .inspect(|(connection_gene_0, connection_gene_1)| {
+                let weight_difference = connection_gene_0
+                    .weight
+                    .difference(&connection_gene_1.weight);
                 if !weight_difference.is_nan() {
                     weight_difference_total += weight_difference;
                 }
-
             })
             .count() as f64;
 
-        let recurrent_matching_genes_count = genome_0
-            .recurrent_connection_genes
-            .intersection(&genome_1.recurrent_connection_genes)
-            .inspect(|connection_gene| {
-                let matching_gene = genome_1
-                    .recurrent_connection_genes
-                    .get(connection_gene)
-                    .unwrap();
-                let weight_difference = connection_gene.weight.difference(
-                    &matching_gene.weight,
-                );
-                if !weight_difference.is_nan() {
-                    weight_difference_total += weight_difference;
-                }
-
-            })
-            .count() as f64;
-
-        let different_genes_count = genome_0
-            .connection_genes
-            .symmetric_difference(&genome_1.connection_genes)
-            .count() as f64;
-
-        let recurrent_different_genes_count = genome_0
-            .recurrent_connection_genes
-            .symmetric_difference(&genome_1.recurrent_connection_genes)
-            .count() as f64;
+        let different_genes_count_total =
+            genome_0.iter_all_different_connections(genome_1).count() as f64;
 
         let matching_nodes_count = genome_0
             .node_genes
@@ -125,20 +94,45 @@ impl Species {
             })
             .count() as f64;
 
+        /* let different_nodes_count = genome_0
+        .node_genes
+        .symmetric_difference(&genome_1.node_genes)
+        .count() as f64; */
+
         /* let n = genome_0
             .connection_genes
             .len()
             .min(genome_1.connection_genes.len()) as f64;
         */
-        let matching_genes_count_total = matching_genes_count + recurrent_matching_genes_count;
-        let different_genes_count_total = different_genes_count + recurrent_different_genes_count;
+        // let matching_genes_count_total = matching_genes_count + recurrent_matching_genes_count;
+        // let different_genes_count_total = different_genes_count + recurrent_different_genes_count;
 
         // percent of different genes, considering unique genes
-        c1 * different_genes_count_total / (matching_genes_count_total + different_genes_count_total)
+        let difference = c1 * different_genes_count_total / (matching_genes_count_total + different_genes_count_total)
         // average of weight differences
-        + c2 * weight_difference_total / matching_genes_count_total
+        + if weight_difference_total > 0.0 { c2 * weight_difference_total / matching_genes_count_total } else { 0.0 }
         // average of activation differences
-        + c3 * activation_difference / matching_nodes_count
+        + c3 * activation_difference / matching_nodes_count;
+
+        if difference.is_nan() {
+            dbg!(c1);
+            dbg!(different_genes_count_total);
+            dbg!(matching_genes_count_total);
+            dbg!(different_genes_count_total);
+            dbg!(c2);
+            dbg!(weight_difference_total);
+            dbg!(matching_genes_count_total);
+            dbg!(c3);
+            dbg!(activation_difference);
+            dbg!(matching_nodes_count);
+            panic!("difference is nan");
+        } else {
+            difference
+        }
+
+        // neat python function
+        //(activation_difference + c1 * different_nodes_count) / genome_0.node_genes.len().max(genome_1.node_genes.len()) as f64
+        // + (weight_difference_total + c1 * different_genes_count_total) / (genome_0.connection_genes.len() + genome_0.recurrent_connection_genes.len()).max(genome_1.connection_genes.len() + genome_1.recurrent_connection_genes.len()) as f64
     }
 }
 
@@ -168,7 +162,7 @@ mod tests {
 
         let delta = Species::compatability_distance(&genome_0, &genome_1, 1.0, 0.4, 0.0);
 
-        assert_eq!(delta, 0.0);
+        assert!(delta < f64::EPSILON);
     }
 
     #[test]
@@ -197,7 +191,7 @@ mod tests {
 
         let delta = Species::compatability_distance(&genome_0, &genome_1, 0.0, 2.0, 0.0);
 
-        assert_eq!(delta, 2.0);
+        assert!(delta - 2.0 < f64::EPSILON);
     }
 
     #[test]
@@ -230,6 +224,6 @@ mod tests {
         let delta = Species::compatability_distance(&genome_0, &genome_1, 2.0, 0.0, 0.0);
 
         // factor 2 times 2 different genes
-        assert_eq!(delta, 2.0 * 2.0);
+        assert!(delta - 2.0 * 2.0 < f64::EPSILON);
     }
 }

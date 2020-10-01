@@ -1,19 +1,58 @@
 use crate::genes::Id;
-use std::collections::HashSet;
-use std::collections::HashMap;
+use crate::genes::{Activation, ConnectionGene, NodeGene, Weight};
+use crate::{Context, Parameters};
 use favannat::network::{NetLike, Recurrent};
 use rand::seq::{IteratorRandom, SliceRandom};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-use crate::genes::{ConnectionGene, NodeGene, Weight, Activation};
-use crate::{Context, Parameters};
+use std::collections::HashSet;
+use std::collections::{hash_set::SymmetricDifference, HashMap};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Genome {
     pub node_genes: HashSet<NodeGene>,
     pub connection_genes: HashSet<ConnectionGene>,
     pub recurrent_connection_genes: HashSet<ConnectionGene>,
     pub fitness: f64,
+}
+
+impl Genome {
+    pub fn iter_all_matching_connections<'a>(
+        &'a self,
+        other: &'a Genome,
+    ) -> impl Iterator<Item = (&'a ConnectionGene, &'a ConnectionGene)> {
+        // iterate feed-forward connections
+        self.connection_genes
+            .intersection(&other.connection_genes)
+            // we know item exists in other as we are iterating the intersection
+            .map(move |item_self| (item_self, other.connection_genes.get(item_self).unwrap()))
+            // chain with recurrent connections
+            .chain(
+                self.recurrent_connection_genes
+                    .intersection(&other.recurrent_connection_genes)
+                    // we know item exists in other as we are iterating the intersection
+                    .map(move |item_self| {
+                        (
+                            item_self,
+                            other.recurrent_connection_genes.get(item_self).unwrap(),
+                        )
+                    }),
+            )
+    }
+
+    pub fn iter_all_different_connections<'a>(
+        &'a self,
+        other: &'a Genome,
+    ) -> impl Iterator<Item = &ConnectionGene> {
+        // iterate feed-forward connections
+        self.connection_genes
+            .symmetric_difference(&other.connection_genes)
+            // chain with recurrent connections
+            .chain(
+                self.recurrent_connection_genes
+                    .symmetric_difference(&other.recurrent_connection_genes),
+            )
+    }
 }
 
 impl NetLike<NodeGene, ConnectionGene> for Genome {
@@ -30,7 +69,8 @@ impl NetLike<NodeGene, ConnectionGene> for Genome {
         edges
     }
     fn inputs(&self) -> Vec<&NodeGene> {
-        let mut inputs: Vec<&NodeGene> = self.node_genes
+        let mut inputs: Vec<&NodeGene> = self
+            .node_genes
             .iter()
             .filter(|node_gene| node_gene.is_input())
             .collect();
@@ -39,7 +79,8 @@ impl NetLike<NodeGene, ConnectionGene> for Genome {
         inputs
     }
     fn outputs(&self) -> Vec<&NodeGene> {
-        let mut outputs: Vec<&NodeGene> = self.node_genes
+        let mut outputs: Vec<&NodeGene> = self
+            .node_genes
             .iter()
             .filter(|node_gene| node_gene.is_output())
             .collect();
@@ -57,7 +98,8 @@ impl Recurrent<NodeGene, ConnectionGene> for Genome {
     }
 
     fn memory(&self) -> usize {
-        let mut sources: Vec<Id> = self.recurrent_connection_genes
+        let mut sources: Vec<Id> = self
+            .recurrent_connection_genes
             .iter()
             .map(|connection| connection.input)
             .collect();
@@ -65,7 +107,6 @@ impl Recurrent<NodeGene, ConnectionGene> for Genome {
         sources.dedup();
         sources.len()
     }
-
 }
 
 // public API
@@ -101,6 +142,10 @@ impl Genome {
 
     pub fn len(&self) -> usize {
         self.connection_genes.len() + self.recurrent_connection_genes.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.connection_genes.is_empty() && self.recurrent_connection_genes.is_empty()
     }
 
     pub fn init(&mut self) {
@@ -176,7 +221,9 @@ impl Genome {
             self.add_node(context, parameters);
         }
 
-        if parameters.initialization.activations.len() > 1 && context.gamble(parameters.mutation.activation_change) {
+        if parameters.initialization.activations.len() > 1
+            && context.gamble(parameters.mutation.activation_change)
+        {
             self.alter_activation(context, parameters);
         }
     }
@@ -208,7 +255,11 @@ impl Genome {
                 if context.gamble(0.5) {
                     gene_self.clone()
                 } else {
-                    partner.recurrent_connection_genes.get(&gene_self).unwrap().clone()
+                    partner
+                        .recurrent_connection_genes
+                        .get(&gene_self)
+                        .unwrap()
+                        .clone()
                 }
             })
             .collect();
@@ -260,28 +311,44 @@ impl Genome {
         let mut tmp_ids = (0..usize::MAX).rev();
 
         for recurrent_connection in &self.recurrent_connection_genes {
-            let recurrent_input = unroll_map.entry(recurrent_connection.input).or_insert_with(|| {
-                let recurrent_input_id = Id(tmp_ids.next().unwrap());
+            let recurrent_input =
+                unroll_map
+                    .entry(recurrent_connection.input)
+                    .or_insert_with(|| {
+                        let recurrent_input_id = Id(tmp_ids.next().unwrap());
 
-                let recurrent_input = NodeGene::input(recurrent_input_id);
-                let recurrent_output = NodeGene::output(Id(tmp_ids.next().unwrap()), Some(Activation::Linear));
+                        let recurrent_input = NodeGene::input(recurrent_input_id);
+                        let recurrent_output =
+                            NodeGene::output(Id(tmp_ids.next().unwrap()), Some(Activation::Linear));
 
-                // used to carry value into next evaluation
-                let outward_wrapping_connection = ConnectionGene::new(recurrent_connection.input, recurrent_output.id, Some(Weight(1.0)));
+                        // used to carry value into next evaluation
+                        let outward_wrapping_connection = ConnectionGene::new(
+                            recurrent_connection.input,
+                            recurrent_output.id,
+                            Some(Weight(1.0)),
+                        );
 
-                // add nodes for wrapping
-                unrolled_genome.node_genes.insert(recurrent_input);
-                unrolled_genome.node_genes.insert(recurrent_output);
+                        // add nodes for wrapping
+                        unrolled_genome.node_genes.insert(recurrent_input);
+                        unrolled_genome.node_genes.insert(recurrent_output);
 
-                // add outward wrapping connection
-                unrolled_genome.connection_genes.insert(outward_wrapping_connection);
+                        // add outward wrapping connection
+                        unrolled_genome
+                            .connection_genes
+                            .insert(outward_wrapping_connection);
 
-                recurrent_input_id
-            });
+                        recurrent_input_id
+                    });
 
-            let inward_wrapping_connection = ConnectionGene::new(*recurrent_input, recurrent_connection.output, Some(recurrent_connection.weight));
+            let inward_wrapping_connection = ConnectionGene::new(
+                *recurrent_input,
+                recurrent_connection.output,
+                Some(recurrent_connection.weight),
+            );
 
-            unrolled_genome.connection_genes.insert(inward_wrapping_connection);
+            unrolled_genome
+                .connection_genes
+                .insert(inward_wrapping_connection);
         }
         unrolled_genome
     }
@@ -404,11 +471,25 @@ impl Genome {
     }
 
     // check if to nodes are connected
-    fn are_connected(&self, node_gene_start: &NodeGene, node_gene_end: &NodeGene, recurrent: bool) -> bool {
+    fn are_connected(
+        &self,
+        node_gene_start: &NodeGene,
+        node_gene_end: &NodeGene,
+        recurrent: bool,
+    ) -> bool {
         if recurrent {
-            self.recurrent_connection_genes.contains(&ConnectionGene::new(node_gene_start.id, node_gene_end.id, None))
+            self.recurrent_connection_genes
+                .contains(&ConnectionGene::new(
+                    node_gene_start.id,
+                    node_gene_end.id,
+                    None,
+                ))
         } else {
-            self.connection_genes.contains(&ConnectionGene::new(node_gene_start.id, node_gene_end.id, None))
+            self.connection_genes.contains(&ConnectionGene::new(
+                node_gene_start.id,
+                node_gene_end.id,
+                None,
+            ))
         }
     }
 
@@ -448,8 +529,9 @@ impl Genome {
 mod tests {
     use super::Genome;
     use crate::context::Context;
-    use crate::genes::{ConnectionGene, Id, NodeGene, Activation};
+    use crate::genes::{Activation, ConnectionGene, Id, NodeGene};
     use crate::Parameters;
+    use std::collections::HashSet;
 
     #[test]
     fn alter_activation() {
@@ -459,7 +541,7 @@ mod tests {
 
         parameters.setup.dimension.input = 1;
         parameters.setup.dimension.output = 0;
-        parameters.initialization.activations = vec![ Activation::Absolute, Activation::Cosine ];
+        parameters.initialization.activations = vec![Activation::Absolute, Activation::Cosine];
 
         let mut genome = Genome::new(&mut context, &parameters);
 
