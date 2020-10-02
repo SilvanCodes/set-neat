@@ -5,8 +5,7 @@ use favannat::network::{NetLike, Recurrent};
 use rand::seq::{IteratorRandom, SliceRandom};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
-use std::collections::{hash_set::SymmetricDifference, HashMap};
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Genome {

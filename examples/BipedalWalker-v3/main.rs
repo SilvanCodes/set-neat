@@ -2,18 +2,21 @@ use favannat::matrix::fabricator::StatefulMatrixFabricator;
 use favannat::network::{StatefulEvaluator, StatefulFabricator};
 use gym::{SpaceData, State};
 use ndarray::{stack, Axis};
-use set_neat::{Genome, Neat, Progress, Solution, activations};
+use set_neat::{activations, Evaluation, Genome, Neat, Progress};
 
-use std::time::SystemTime;
+use log::{error, info, warn};
 use std::fs;
 use std::time::Instant;
+use std::time::SystemTime;
 
 pub const RUNS: usize = 1;
 pub const STEPS: usize = 1600;
 pub const ENV: &str = "BipedalWalker-v3";
 
 fn main() {
-    fn fitness_function(genome: &Genome) -> f64 {
+    log4rs::init_file(format!("examples/{}/config.yaml", ENV), Default::default()).unwrap();
+
+    fn fitness_function(genome: &Genome) -> Progress {
         let gym = gym::GymClient::default();
         let env = gym.make(ENV);
 
@@ -47,40 +50,55 @@ fn main() {
             fitness += total_reward;
         }
         env.close();
-        fitness / RUNS as f64
+
+        // normailze with run count
+        fitness /= RUNS as f64;
+
+        if fitness >= 300.0 {
+            Progress::Solution(genome.clone())
+        } else {
+            Progress::Fitness(fitness)
+        }
     };
 
-    let neat = Neat::new(&format!("examples/{}/config.toml", ENV), fitness_function, 300.0);
+    let neat = Neat::new(&format!("examples/{}/config.toml", ENV), fitness_function);
 
     let now = Instant::now();
 
-    println!("starting training: {:#?}", neat.parameters);
+    let time_stamp = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    info!("starting training: {:#?}", neat.parameters);
 
     /* let winner_json = fs::read_to_string(
         format!("examples/winner_{}.json", ENV)
     ).expect("cant read file");
     let winner: Genome = serde_json::from_str(&winner_json).unwrap(); */
 
+    fs::write(
+        format!("examples/{}/{}_parameters.json", ENV, time_stamp),
+        serde_json::to_string(&neat.parameters).unwrap(),
+    )
+    .expect("Unable to write file");
+
     if let Some(winner) = neat
         .run()
         .filter_map(|evaluation| match evaluation {
-            Progress(report) => {
-                println!("{:#?}", report);
+            Evaluation::Progress(report) => {
+                // info!(serde_json::to_string(&report).unwrap());
+
+                info!("{}", serde_json::to_string(&report).unwrap());
                 None
             }
-            Solution(genome) => Some(genome),
+            Evaluation::Solution(genome) => Some(genome),
         })
         .next()
     {
-        let time_stamp = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs();
         fs::write(
-            format!("examples/{}/winner_{:?}.json", ENV, time_stamp),
+            format!("examples/{}/{}_winner.json", ENV, time_stamp),
             serde_json::to_string(&winner).unwrap(),
-        )
-        .expect("Unable to write file");
-        fs::write(
-            format!("examples/{}/winner_{}_parameters.json", ENV, time_stamp),
-            serde_json::to_string(&neat.parameters).unwrap(),
         )
         .expect("Unable to write file");
 

@@ -36,3 +36,7 @@ threshold_delta = 0.3 # adjust threshold by x if num species unequal target spec
 factor_genes = 10.0 # factor for number of different genes
 factor_weights = 0.1 # weight difference factor
 factor_activations = 15.0
+
+[novelty]
+nearest_neighbors = 15
+archive_threshold = 3

@@ -1,4 +1,4 @@
-use favannat::matrix::fabricator::MatrixFabricator;
+/* use favannat::matrix::fabricator::MatrixFabricator;
 use favannat::network::{Evaluator, Fabricator};
 use ndarray::array;
 use set_neat::{Genome, Neat, Progress, Solution};
@@ -192,3 +192,4 @@ mod tests {
         assert_eq!(result, 0.0);
     }
 }
+ */

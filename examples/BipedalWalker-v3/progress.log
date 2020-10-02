@@ -1,0 +1,49 @@
+2020-10-01T19:24:50.597212558+02:00 - starting training: Parameters {
+    setup: Setup {
+        population: 250,
+        dimension: Dimension {
+            input: 25,
+            output: 4,
+        },
+    },
+    initialization: Initialization {
+        output: Tanh,
+        activations: [
+            Tanh,
+        ],
+        connections: 0.5,
+        weights: Strategy(
+            "Random",
+        ),
+    },
+    reproduction: Reproduction {
+        surviving: 0.2,
+        stale_after: 15,
+    },
+    mutation: Mutation {
+        weight: 0.9,
+        weight_random: 0.01,
+        weight_perturbation: 0.005,
+        weight_distribution: Uniform,
+        gene_node: 0.03,
+        gene_connection: 0.05,
+        recurrent: 0.1,
+        activation_change: 0.0,
+    },
+    compatability: Compatability {
+        target_species: 25,
+        threshold: 1.0,
+        threshold_delta: 0.1,
+        factor_weights: 1.5,
+        factor_genes: 2.5,
+        factor_activations: 0.5,
+    },
+    novelty: Novelty {
+        nearest_neighbors: 15,
+        archive_threshold: 3.0,
+    },
+}
+2020-10-01T19:27:02.404006673+02:00 - {"top_performer":{"node_genes":[],"connection_genes":[],"recurrent_connection_genes":[],"fitness":0.0},"compatability_threshold":1.404,"fitness_average":-134.5381695566026,"fitness_peak":-101.62870174677802,"fitness_min":-253.47873491846354,"num_generation":1,"num_offpring":341,"num_offspring_from_crossover":0,"num_offspring_from_crossover_interspecies":0,"num_species":98,"num_species_stale":0,"milliseconds_elapsed_evaluation":0,"milliseconds_elapsed_reproducing":3,"milliseconds_elapsed_speciation":201,"time_stamp":1601573090}
+2020-10-01T19:28:43.856481925+02:00 - {"top_performer":{"node_genes":[],"connection_genes":[],"recurrent_connection_genes":[],"fitness":0.0},"compatability_threshold":1.7959999999999998,"fitness_average":-124.12974508734807,"fitness_peak":-95.46315656321003,"fitness_min":-264.70726949146194,"num_generation":2,"num_offpring":330,"num_offspring_from_crossover":0,"num_offspring_from_crossover_interspecies":0,"num_species":76,"num_species_stale":0,"milliseconds_elapsed_evaluation":0,"milliseconds_elapsed_reproducing":5,"milliseconds_elapsed_speciation":354,"time_stamp":1601573222}
+2020-10-01T19:30:18.498542741+02:00 - {"top_performer":{"node_genes":[],"connection_genes":[],"recurrent_connection_genes":[],"fitness":0.0},"compatability_threshold":2.0999999999999996,"fitness_average":-119.73492318591657,"fitness_peak":-99.77502809338212,"fitness_min":-235.52195609909575,"num_generation":3,"num_offpring":317,"num_offspring_from_crossover":0,"num_offspring_from_crossover_interspecies":0,"num_species":65,"num_species_stale":0,"milliseconds_elapsed_evaluation":0,"milliseconds_elapsed_reproducing":6,"milliseconds_elapsed_speciation":426,"time_stamp":1601573323}
+2020-10-01T19:31:22.959957927+02:00 - {"top_performer":{"node_genes":[],"connection_genes":[],"recurrent_connection_genes":[],"fitness":0.0},"compatability_threshold":2.3599999999999994,"fitness_average":-115.55752307378478,"fitness_peak":-98.80240600048192,"fitness_min":-184.3612983741052,"num_generation":4,"num_offpring":310,"num_offspring_from_crossover":0,"num_offspring_from_crossover_interspecies":0,"num_species":55,"num_species_stale":0,"milliseconds_elapsed_evaluation":0,"milliseconds_elapsed_reproducing":6,"milliseconds_elapsed_speciation":352,"time_stamp":1601573418}

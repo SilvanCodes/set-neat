@@ -9,6 +9,7 @@ pub struct Parameters {
     pub reproduction: Reproduction,
     pub mutation: Mutation,
     pub compatability: Compatability,
+    pub novelty: Novelty,
 }
 
 #[derive(Deserialize, Serialize, Default, Debug)]
@@ -64,6 +65,12 @@ pub struct Compatability {
     pub factor_activations: f64,
 }
 
+#[derive(Deserialize, Serialize, Default, Debug)]
+pub struct Novelty {
+    pub nearest_neighbors: usize,
+    pub archive_threshold: f64,
+}
+
 impl Parameters {
     pub fn new(path: &str) -> Result<Self, ConfigError> {
         let mut s = Config::new();
@@ -84,11 +91,6 @@ mod tests {
     fn read_parameters() {
         let parameters = Parameters::new("src/Config.toml").unwrap();
 
-        assert_eq!(
-            parameters
-                .reproduction
-                .stale_after,
-            15
-        )
+        assert_eq!(parameters.reproduction.stale_after, 15)
     }
 }

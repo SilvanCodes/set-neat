@@ -1,12 +1,9 @@
-// std imports
-use std::collections::HashMap;
-use std::ops::RangeFrom;
-// external imports
-use rand::rngs::{SmallRng, ThreadRng};
-use rand::{Rng, SeedableRng};
-// crate imports
 use crate::genes::{Id, WeightPerturbator};
 use crate::parameters::Parameters;
+use rand::rngs::{SmallRng, ThreadRng};
+use rand::{Rng, SeedableRng};
+use std::collections::HashMap;
+use std::ops::RangeFrom;
 
 pub struct IdIter<'a> {
     index: usize,
@@ -43,7 +40,8 @@ pub struct Context {
     // keep track of nodes that evolved as result of splitting connection
     cached_node_genes: HashMap<(Id, Id), Vec<Id>>,
     pub compatability_threshold: f64,
-    pub last_num_species: usize,
+    pub archive_threshold: f64,
+    pub added_to_archive: usize,
     pub small_rng: SmallRng,
     pub weight_pertubator: WeightPerturbator,
 }
@@ -54,7 +52,8 @@ impl Context {
             id_gen: 0..,
             cached_node_genes: HashMap::new(),
             compatability_threshold: parameters.compatability.threshold,
-            last_num_species: 0,
+            archive_threshold: parameters.novelty.archive_threshold,
+            added_to_archive: 0,
             small_rng: SmallRng::from_rng(&mut ThreadRng::default()).unwrap(),
             weight_pertubator: WeightPerturbator::new(
                 &parameters.mutation.weight_distribution,

@@ -1,4 +1,4 @@
-use favannat::matrix::fabricator::MatrixFabricator;
+/* use favannat::matrix::fabricator::MatrixFabricator;
 use favannat::network::{Evaluator, Fabricator};
 use gym::{SpaceData, State};
 use ndarray::{stack, Axis};
@@ -134,3 +134,4 @@ fn main() {
         println!("finished");
     }
 }
+ */
