@@ -52,7 +52,7 @@ impl Context {
             id_gen: 0..,
             cached_node_genes: HashMap::new(),
             compatability_threshold: parameters.compatability.threshold,
-            archive_threshold: parameters.novelty.archive_threshold,
+            archive_threshold: 0.0,
             added_to_archive: 0,
             small_rng: SmallRng::from_rng(&mut ThreadRng::default()).unwrap(),
             weight_pertubator: WeightPerturbator::new(

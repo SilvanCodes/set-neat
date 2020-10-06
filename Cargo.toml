@@ -14,6 +14,7 @@ config = "0.9"
 rayon = "1.3"
 # favannat = { git = "https://github.com/SilvanCodes/favannat" }
 favannat = { path = "../favannat" }
+ndarray = "0.13.0"
 
 [features]
 blas = ["favannat/blas"]
@@ -21,7 +22,6 @@ blas = ["favannat/blas"]
 [dev-dependencies]
 gym = { path = "../gym-rs" }
 criterion = "0.3"
-ndarray = "0.13.0"
 log = "0.4.11"
 log4rs = "0.13.0"
 # blas-src = { version = "0.2.0", default-features = false, features = ["openblas"] }

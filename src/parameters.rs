@@ -68,7 +68,6 @@ pub struct Compatability {
 #[derive(Deserialize, Serialize, Default, Debug)]
 pub struct Novelty {
     pub nearest_neighbors: usize,
-    pub archive_threshold: f64,
 }
 
 impl Parameters {

@@ -1,3 +1,5 @@
+use ndarray::{arr1, Axis};
+
 use crate::context::Context;
 use crate::genome::Genome;
 use crate::parameters::Parameters;
@@ -68,16 +70,22 @@ impl Species {
     ) -> f64 {
         let mut weight_difference_total = 0.0;
         let mut activation_difference = 0.0;
+        let mut weight_differences = Vec::new();
 
         let matching_genes_count_total = genome_0
             .iter_all_matching_connections(genome_1)
             .inspect(|(connection_gene_0, connection_gene_1)| {
-                let weight_difference = connection_gene_0
+                /* let weight_difference = connection_gene_0
                     .weight
                     .difference(&connection_gene_1.weight);
                 if !weight_difference.is_nan() {
                     weight_difference_total += weight_difference;
-                }
+                } */
+                weight_differences.push(
+                    connection_gene_0
+                        .weight
+                        .difference(&connection_gene_1.weight),
+                );
             })
             .count() as f64;
 
@@ -107,10 +115,29 @@ impl Species {
         // let matching_genes_count_total = matching_genes_count + recurrent_matching_genes_count;
         // let different_genes_count_total = different_genes_count + recurrent_different_genes_count;
 
+        let weight_differences = arr1(&weight_differences);
+
+        let weight_differences_mean = *weight_differences
+            .mean_axis(Axis(0))
+            .unwrap()
+            .first()
+            .unwrap();
+        let weight_differences_std_dev = *weight_differences
+            .std_axis(Axis(0), 1.0)
+            .map(|&v| if v == 0.0 { 1.0 } else { v })
+            .first()
+            .unwrap();
+
+        let z_scores = weight_differences
+            .map(|weight| (weight - weight_differences_mean) / weight_differences_std_dev);
+
+        let z_scores_mean = *z_scores.mean_axis(Axis(0)).unwrap().first().unwrap();
+
         // percent of different genes, considering unique genes
         let difference = c1 * different_genes_count_total / (matching_genes_count_total + different_genes_count_total)
         // average of weight differences
-        + if weight_difference_total > 0.0 { c2 * weight_difference_total / matching_genes_count_total } else { 0.0 }
+        + (c2 * weight_differences.sum() / matching_genes_count_total)
+        // + if weight_difference_total > 0.0 { c2 * weight_difference_total / matching_genes_count_total } else { 0.0 }
         // average of activation differences
         + c3 * activation_difference / matching_nodes_count;
 
@@ -120,8 +147,13 @@ impl Species {
             dbg!(matching_genes_count_total);
             dbg!(different_genes_count_total);
             dbg!(c2);
-            dbg!(weight_difference_total);
-            dbg!(matching_genes_count_total);
+            // dbg!(weight_difference_total);
+            // dbg!(matching_genes_count_total);
+            dbg!(weight_differences);
+            dbg!(weight_differences_mean);
+            dbg!(weight_differences_std_dev);
+            dbg!(z_scores);
+            dbg!(z_scores_mean);
             dbg!(c3);
             dbg!(activation_difference);
             dbg!(matching_nodes_count);

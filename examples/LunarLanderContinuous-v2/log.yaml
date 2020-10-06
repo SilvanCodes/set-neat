@@ -4,17 +4,17 @@ appenders:
     kind: console
   progress:
     kind: file
-    path: "examples/LunarLander-v2/progress.log"
+    path: "examples/LunarLanderContinuous-v2/progress.log"
     encoder:
       pattern: "{m},{n}"
   parameters:
     kind: file
-    path: "examples/LunarLander-v2/parameters.log"
+    path: "examples/LunarLanderContinuous-v2/parameters.log"
     encoder:
       pattern: "{d} - {m}{n}"
   solutions:
     kind: file
-    path: "examples/LunarLander-v2/solutions.log"
+    path: "examples/LunarLanderContinuous-v2/solutions.log"
     encoder:
       pattern: "{d} - {m}{n}"
 root:

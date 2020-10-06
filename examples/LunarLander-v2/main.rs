@@ -2,7 +2,7 @@ use favannat::matrix::fabricator::StatefulMatrixFabricator;
 use favannat::network::{StatefulEvaluator, StatefulFabricator};
 use gym::{SpaceData, State};
 use ndarray::{array, stack, Axis};
-use rand::{distributions::WeightedIndex, prelude::SmallRng, prelude::ThreadRng, SeedableRng};
+use rand::{distributions::WeightedIndex, prelude::SmallRng, SeedableRng};
 use rand_distr::Distribution;
 use set_neat::{activations, Evaluation, Genome, Neat, Progress};
 
@@ -12,7 +12,7 @@ use std::time::SystemTime;
 use std::{env, fs};
 
 pub const RUNS: usize = 1;
-pub const VALIDATION_RUNS: usize = 3;
+pub const VALIDATION_RUNS: usize = 100;
 pub const ENV: &str = "LunarLander-v2";
 
 fn main() {
@@ -31,10 +31,45 @@ fn main() {
 fn train() {
     log4rs::init_file(format!("examples/{}/log.yaml", ENV), Default::default()).unwrap();
 
-    fn fitness_function(genome: &Genome) -> Progress {
+    let means;
+    let std_dev;
+    {
         let gym = gym::GymClient::default();
         let env = gym.make(ENV);
-        let mut rng = SmallRng::from_rng(&mut ThreadRng::default()).unwrap();
+
+        // collect samples for standard scaler
+        let samples = env.reset().unwrap().get_box().unwrap();
+
+        let mut samples = samples.insert_axis(Axis(0));
+
+        println!("sampling for scaler");
+        for i in 0..1000 {
+            println!("sampling {}", i);
+            let State { observation, .. } = env.step(&env.action_space().sample()).unwrap();
+
+            samples = stack![
+                Axis(0),
+                samples,
+                observation.get_box().unwrap().insert_axis(Axis(0))
+            ];
+        }
+        env.close();
+        println!("done sampling");
+
+        dbg!(&samples);
+
+        means = samples.mean_axis(Axis(0)).unwrap();
+        std_dev = samples.std_axis(Axis(0), 0.0);
+    }
+
+    dbg!(&means);
+
+    dbg!(&std_dev);
+
+    let fitness_function = move |genome: &Genome| -> Progress {
+        let gym = gym::GymClient::default();
+        let env = gym.make(ENV);
+        let mut rng = SmallRng::seed_from_u64(42);
 
         let mut evaluator = StatefulMatrixFabricator::fabricate(genome).unwrap();
         let mut fitness = 0.0;
@@ -50,13 +85,17 @@ fn train() {
         let mut final_observation = SpaceData::BOX(array![]);
 
         for _ in 0..RUNS {
+            // println!("setting up run..");
             let mut recent_observation = env.reset().expect("Unable to reset");
             let mut total_reward = 0.0;
 
             loop {
+                // println!("looping");
                 let mut observations = recent_observation.get_box().unwrap();
                 // normalize inputs
-                observations.mapv_inplace(activations::TANH);
+                // observations.mapv_inplace(activations::TANH);
+                observations -= &means;
+                observations /= &std_dev;
                 // add bias input
                 let output = evaluator.evaluate(stack![Axis(0), observations, [1.0]]);
 
@@ -91,6 +130,8 @@ fn train() {
 
         if fitness >= 200.0 {
             info!("hit task theshold, starting validation runs...");
+            // log possible solutions to file
+            info!(target: "app::solution", "{}", serde_json::to_string(genome).unwrap());
             fitness = 0.0;
             for _ in 0..VALIDATION_RUNS {
                 let mut recent_observation = env.reset().expect("Unable to reset");
@@ -119,6 +160,7 @@ fn train() {
                 }
                 fitness += total_reward;
             }
+            info!("finished validation runs with {} average fitness", fitness);
             if fitness >= 200.0 {
                 return Progress::Solution(genome.clone());
             }
@@ -129,7 +171,10 @@ fn train() {
         Progress::Novelty(state)
     };
 
-    let neat = Neat::new(&format!("examples/{}/config.toml", ENV), fitness_function);
+    let neat = Neat::new(
+        &format!("examples/{}/config.toml", ENV),
+        Box::new(fitness_function),
+    );
 
     let now = Instant::now();
 
@@ -140,8 +185,6 @@ fn train() {
         .filter_map(|evaluation| match evaluation {
             Evaluation::Progress(report) => {
                 info!(target: "app::progress", "{}", serde_json::to_string(&report).unwrap());
-                // TODO: save report
-                // TODO: render top_performer
                 if report.fitness_peak > report.archive_threshold {
                     showcase(report.top_performer);
                 }
@@ -180,7 +223,7 @@ fn train() {
 fn showcase(genome: Genome) {
     let gym = gym::GymClient::default();
     let env = gym.make(ENV);
-    let mut rng = SmallRng::from_rng(&mut ThreadRng::default()).unwrap();
+    let mut rng = SmallRng::seed_from_u64(42);
 
     let mut evaluator = StatefulMatrixFabricator::fabricate(&genome).unwrap();
 
@@ -217,5 +260,6 @@ fn showcase(genome: Genome) {
         total_reward += reward;
         done = is_done;
     }
+    env.close();
     println!("finished with reward: {}", total_reward);
 }

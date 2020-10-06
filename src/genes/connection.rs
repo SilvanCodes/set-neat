@@ -4,8 +4,6 @@ use std::cmp::Ordering;
 use std::hash::Hash;
 use std::hash::Hasher;
 
-use favannat::network::EdgeLike;
-
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -26,18 +24,6 @@ impl ConnectionGene {
 
     pub fn id(&self) -> (Id, Id) {
         (self.input, self.output)
-    }
-}
-
-impl EdgeLike for ConnectionGene {
-    fn start(&self) -> usize {
-        self.input.0
-    }
-    fn end(&self) -> usize {
-        self.output.0
-    }
-    fn weight(&self) -> f64 {
-        self.weight.0
     }
 }
 

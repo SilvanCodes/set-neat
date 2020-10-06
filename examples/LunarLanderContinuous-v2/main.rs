@@ -9,11 +9,9 @@ use std::time::Instant;
 use std::time::SystemTime;
 use std::{env, fs};
 
-pub const RUNS: usize = 3;
+pub const RUNS: usize = 1;
 pub const VALIDATION_RUNS: usize = 100;
-pub const STEPS: usize = 1600;
-pub const ENV: &str = "BipedalWalker-v3";
-pub const REQUIRED_FITNESS: f64 = 300.0;
+pub const ENV: &str = "LunarLanderContinuous-v2";
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -51,15 +49,10 @@ fn standard_scaler() -> (Array1<f64>, Array1<f64>) {
     env.close();
     println!("done sampling");
 
-    let mut std_dev = samples.std_axis(Axis(0), 0.0);
-
-    std_dev.map_inplace(|v| {
-        if *v == 0.0 {
-            *v = 1.0
-        }
-    });
-
-    dbg!(samples.mean_axis(Axis(0)).unwrap(), std_dev)
+    (
+        samples.mean_axis(Axis(0)).unwrap(),
+        samples.std_axis(Axis(0), 0.0),
+    )
 }
 
 fn train() {
@@ -67,12 +60,17 @@ fn train() {
 
     let (means, std_dev) = standard_scaler();
 
+    dbg!(&means);
+
+    dbg!(&std_dev);
+
     let fitness_function = move |genome: &Genome| -> Progress {
         let gym = gym::GymClient::default();
         let env = gym.make(ENV);
 
         let mut evaluator = StatefulMatrixFabricator::fabricate(genome).unwrap();
         let mut fitness = 0.0;
+        let mut done = false;
 
         let mut final_observation = SpaceData::BOX(array![]);
 
@@ -81,14 +79,12 @@ fn train() {
             let mut recent_observation = env.reset().expect("Unable to reset");
             let mut total_reward = 0.0;
 
-            for _ in 0..STEPS {
+            loop {
                 // println!("looping");
                 let mut observations = recent_observation.get_box().unwrap();
-
                 // normalize inputs
                 observations -= &means;
                 observations /= &std_dev;
-
                 // add bias input
                 let output = evaluator.evaluate(stack![Axis(0), observations, [1.0]]);
 
@@ -109,6 +105,7 @@ fn train() {
             }
             fitness += total_reward;
         }
+        env.close();
 
         fitness /= RUNS as f64;
 
@@ -116,14 +113,14 @@ fn train() {
             dbg!(fitness);
         }
 
-        if fitness >= REQUIRED_FITNESS {
+        if fitness >= 200.0 {
             info!("hit task theshold, starting validation runs...");
             fitness = 0.0;
             for _ in 0..VALIDATION_RUNS {
                 let mut recent_observation = env.reset().expect("Unable to reset");
                 let mut total_reward = 0.0;
 
-                for _ in 0..STEPS {
+                while !done {
                     let mut observations = recent_observation.get_box().unwrap();
                     // normalize inputs
                     observations -= &means;
@@ -134,11 +131,12 @@ fn train() {
                     let State {
                         observation,
                         reward,
-                        ..
+                        is_done,
                     } = env.step(&SpaceData::BOX(output)).unwrap();
 
                     recent_observation = observation;
                     total_reward += reward;
+                    done = is_done;
                 }
                 fitness += total_reward;
             }
@@ -147,19 +145,14 @@ fn train() {
             genome.fitness = fitness;
             info!(target: "app::solutions", "{}", serde_json::to_string(&genome).unwrap());
             info!("finished validation runs with {} average fitness", fitness);
-            if fitness >= REQUIRED_FITNESS {
-                env.close();
-
+            if fitness >= 200.0 {
                 return Progress::Solution(genome);
             }
         }
-        env.close();
-
-        Progress::Fitness(fitness)
-        // let state = final_observation.get_box().unwrap().to_vec();
-        // Progress::Novelty(state)
-        // fitness = fitness.max(-150.0);
-        // Progress::Novelty(vec![fitness])
+        // Progress::Fitness(fitness)
+        let mut state = final_observation.get_box().unwrap().to_vec();
+        state.truncate(6);
+        Progress::Novelty(state)
     };
 
     let neat = Neat::new(
@@ -176,10 +169,7 @@ fn train() {
         .filter_map(|evaluation| match evaluation {
             Evaluation::Progress(report) => {
                 info!(target: "app::progress", "{}", serde_json::to_string(&report).unwrap());
-                /* if report.fitness_peak > report.archive_threshold {
-                    showcase(report.top_performer);
-                } */
-                if report.num_generation % 10 == 0 {
+                if report.fitness_peak > report.archive_threshold {
                     showcase(report.top_performer);
                 }
                 None
@@ -224,163 +214,27 @@ fn showcase(genome: Genome) {
 
     let mut recent_observation = env.reset().expect("Unable to reset");
     let mut total_reward = 0.0;
+    let mut done = false;
 
-    for _ in 0..STEPS {
+    while !done {
         env.render();
         let mut observations = recent_observation.get_box().unwrap();
-
         // normalize inputs
         observations -= &means;
         observations /= &std_dev;
-
         // add bias input
-        let input = stack![Axis(0), observations, [1.0]];
-        let output = evaluator.evaluate(input.clone());
+        let output = evaluator.evaluate(stack![Axis(0), observations, [1.0]]);
 
-        let (observation, reward) = match env.step(&SpaceData::BOX(output.clone())) {
-            Ok(State {
-                observation,
-                reward,
-                ..
-            }) => (observation, reward),
-            Err(err) => {
-                dbg!(input);
-                dbg!(output);
-                env.close();
-                panic!(err)
-            }
-        };
+        let State {
+            observation,
+            reward,
+            is_done,
+        } = env.step(&SpaceData::BOX(output)).unwrap();
 
         recent_observation = observation;
         total_reward += reward;
+        done = is_done;
     }
     env.close();
     println!("finished with reward: {}", total_reward);
 }
-
-/* fn main() {
-    log4rs::init_file(format!("examples/{}/config.yaml", ENV), Default::default()).unwrap();
-
-    fn fitness_function(genome: &Genome) -> Progress {
-        let gym = gym::GymClient::default();
-        let env = gym.make(ENV);
-
-        let mut evaluator = StatefulMatrixFabricator::fabricate(genome).unwrap();
-        let mut fitness = 0.0;
-
-        for _ in 0..RUNS {
-            let mut recent_observation = env.reset().expect("Unable to reset");
-            let mut total_reward = 0.0;
-
-            for _ in 0..STEPS {
-                let mut observations = recent_observation.get_box().unwrap();
-                // normalize inputs
-                observations.mapv_inplace(activations::TANH);
-                // add bias input
-                let output = evaluator.evaluate(stack![Axis(0), observations, [1.0]]);
-
-                let State {
-                    observation,
-                    is_done,
-                    reward,
-                } = env.step(&SpaceData::BOX(output)).unwrap();
-                recent_observation = observation;
-                total_reward += reward;
-
-                if is_done {
-                    // println!("finished with reward {} after {} steps", reward, step);
-                    break;
-                }
-            }
-            fitness += total_reward;
-        }
-        env.close();
-
-        // normailze with run count
-        fitness /= RUNS as f64;
-
-        if fitness >= 300.0 {
-            Progress::Solution(genome.clone())
-        } else {
-            Progress::Fitness(fitness)
-        }
-    };
-
-    let neat = Neat::new(&format!("examples/{}/config.toml", ENV), fitness_function);
-
-    let now = Instant::now();
-
-    let time_stamp = SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
-
-    info!("starting training: {:#?}", neat.parameters);
-
-    /* let winner_json = fs::read_to_string(
-        format!("examples/winner_{}.json", ENV)
-    ).expect("cant read file");
-    let winner: Genome = serde_json::from_str(&winner_json).unwrap(); */
-
-    fs::write(
-        format!("examples/{}/{}_parameters.json", ENV, time_stamp),
-        serde_json::to_string(&neat.parameters).unwrap(),
-    )
-    .expect("Unable to write file");
-
-    if let Some(winner) = neat
-        .run()
-        .filter_map(|evaluation| match evaluation {
-            Evaluation::Progress(report) => {
-                // info!(serde_json::to_string(&report).unwrap());
-
-                info!("{}", serde_json::to_string(&report).unwrap());
-                None
-            }
-            Evaluation::Solution(genome) => Some(genome),
-        })
-        .next()
-    {
-        fs::write(
-            format!("examples/{}/{}_winner.json", ENV, time_stamp),
-            serde_json::to_string(&winner).unwrap(),
-        )
-        .expect("Unable to write file");
-
-        let secs = now.elapsed().as_millis();
-        println!(
-            "winning genome ({},{}) after {} seconds: {:?}",
-            winner.node_genes.len(),
-            winner.connection_genes.len(),
-            secs as f64 / 1000.0,
-            winner
-        );
-        let mut evaluator = StatefulMatrixFabricator::fabricate(&winner).unwrap();
-        println!("as evaluator {:#?}", evaluator);
-
-        let gym = gym::GymClient::default();
-        let env = gym.make(ENV);
-
-        let mut recent_observation = env.reset().expect("Unable to reset");
-        let mut done = false;
-
-        while !done {
-            env.render();
-            let mut observations = recent_observation.get_box().unwrap();
-            // normalize inputs
-            observations.mapv_inplace(activations::TANH);
-            // add bias input
-            let output = evaluator.evaluate(stack![Axis(0), observations, [1.0]]);
-
-            let State {
-                observation,
-                is_done,
-                ..
-            } = env.step(&SpaceData::BOX(output)).unwrap();
-            recent_observation = observation;
-            done = is_done;
-        }
-        env.close();
-    }
-}
- */

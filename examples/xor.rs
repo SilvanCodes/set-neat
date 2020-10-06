@@ -1,11 +1,11 @@
-/* use favannat::matrix::fabricator::MatrixFabricator;
+use favannat::matrix::fabricator::MatrixFabricator;
 use favannat::network::{Evaluator, Fabricator};
 use ndarray::array;
-use set_neat::{Genome, Neat, Progress, Solution};
+use set_neat::{Evaluation, Genome, Neat, Progress};
 use std::time::Instant;
 
 fn main() {
-    fn fitness_function(genome: &Genome) -> f64 {
+    let fitness_function = |genome: &Genome| -> Progress {
         /* let result_rr0;
         let result_rr1;
         let result_rr2; */
@@ -49,11 +49,20 @@ fn main() {
         }
 
         // calculate fitness
-        (4.0 - ((1.0 - result_0[0])
-            + (0.0 - result_1[0]).abs()
-            + (1.0 - result_2[0])
-            + (0.0 - result_3[0]).abs()))
-        .powi(2)
+
+        let fitness = (4.0
+            - ((1.0 - result_0[0])
+                + (0.0 - result_1[0]).abs()
+                + (1.0 - result_2[0])
+                + (0.0 - result_3[0]).abs()))
+        .powi(2);
+
+        if fitness > 15.9 {
+            Progress::Solution(genome.clone())
+        } else {
+            Progress::Novelty(vec![fitness])
+            // Progress::Fitness(fitness)
+        }
 
         /* let rr0 = (4.0 - ((1.0 - result_rr0[0][0])
                 + (0.0 - result_rr0[1][0]).abs()
@@ -72,11 +81,11 @@ fn main() {
         .powi(2);
 
         (rr0 + rr1 + rr2) / 3.0 */
-    }
+    };
 
-    let neat = Neat::new("examples/XOR.toml", fitness_function, 15.9);
+    let neat = Neat::new("examples/XOR.toml", Box::new(fitness_function));
 
-    /* let mut millis_elapsed_in_run = Vec::new();
+    let mut millis_elapsed_in_run = Vec::new();
     let mut connections_in_winner_in_run = Vec::new();
     let mut nodes_in_winner_in_run = Vec::new();
     let mut generations_till_winner_in_run = Vec::new();
@@ -88,11 +97,11 @@ fn main() {
         if let Some(winner) = neat
             .run()
             .filter_map(|evaluation| match evaluation {
-                Progress(report) => {
+                Evaluation::Progress(report) => {
                     generations = report.num_generation;
                     None
                 }
-                Solution(genome) => Some(genome),
+                Evaluation::Solution(genome) => Some(genome),
             })
             .next()
         {
@@ -124,18 +133,18 @@ fn main() {
         total_nodes as f64 / num_runs,
         total_connections as f64 / num_runs,
         total_generations as f64 / num_runs
-    ); */
+    );
 
-    let now = Instant::now();
+    /* let now = Instant::now();
 
     if let Some(winner) = neat
         .run()
         .filter_map(|evaluation| match evaluation {
-            Progress(report) => {
+            Evaluation::Progress(report) => {
                 println!("{:#?}", report);
                 None
             }
-            Solution(genome) => Some(genome),
+            Evaluation::Solution(genome) => Some(genome),
         })
         .next()
     {
@@ -149,7 +158,7 @@ fn main() {
         );
         let evaluator = MatrixFabricator::fabricate(&winner).unwrap();
         println!("as evaluator {:#?}", evaluator);
-    }
+    } */
 }
 
 #[cfg(test)]
@@ -168,7 +177,7 @@ mod tests {
                 + (0.0 - result_3[0]).abs()))
         .powi(2);
 
-        println!("result {:?}", result);
+        println!("result {:?}", res/*  */ult);
 
         assert_eq!(result, 16.0);
     }
@@ -192,4 +201,3 @@ mod tests {
         assert_eq!(result, 0.0);
     }
 }
- */

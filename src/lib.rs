@@ -1,6 +1,8 @@
 mod context;
+mod favannat_impl;
 mod genes;
 mod genome;
+mod mutations;
 mod parameters;
 mod runtime;
 mod species;
@@ -15,12 +17,15 @@ pub use crate::runtime::{Evaluation, Progress};
 
 pub struct Neat {
     pub parameters: Parameters,
-    progress_function: fn(&Genome) -> Progress,
+    progress_function: Box<dyn Fn(&Genome) -> Progress + Send + Sync>,
 }
 
 // public API
 impl Neat {
-    pub fn new(path: &str, progress_function: fn(&Genome) -> Progress) -> Self {
+    pub fn new(
+        path: &str,
+        progress_function: Box<dyn Fn(&Genome) -> Progress + Send + Sync>,
+    ) -> Self {
         Neat {
             parameters: Parameters::new(path).unwrap(),
             progress_function,

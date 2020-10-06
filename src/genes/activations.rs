@@ -1,5 +1,3 @@
-use rand::Rng;
-use rand_distr::{Distribution, Standard};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -20,17 +18,6 @@ pub enum Activation {
 impl Default for Activation {
     fn default() -> Self {
         Activation::Tanh
-    }
-}
-
-impl Distribution<Activation> for Standard {
-    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Activation {
-        match rng.gen_range(0, 4) {
-            0 => Activation::Linear,
-            1 => Activation::Sigmoid,
-            2 => Activation::Tanh,
-            _ => Activation::Gaussian,
-        }
     }
 }
 

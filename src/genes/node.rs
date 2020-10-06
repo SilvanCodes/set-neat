@@ -1,7 +1,6 @@
-use std::cmp::Ordering;
-use super::activations::{self, Activation};
+use super::activations::Activation;
 use super::Id;
-use favannat::network::NodeLike;
+use std::cmp::Ordering;
 use std::hash::Hash;
 use std::hash::Hasher;
 
@@ -61,27 +60,8 @@ impl NodeGene {
     }
 
     pub fn update_activation(&mut self, activation: Option<Activation>) {
-        if let Some(activation) = activation { self.activation = activation }
-    }
-}
-
-impl NodeLike for NodeGene {
-    fn id(&self) -> usize {
-        self.id.0
-    }
-    fn activation(&self) -> fn(f64) -> f64 {
-        match self.activation {
-            Activation::Linear => activations::LINEAR,
-            Activation::Sigmoid => activations::SIGMOID,
-            Activation::Gaussian => activations::GAUSSIAN,
-            Activation::Tanh => activations::TANH,
-            Activation::Step => activations::STEP,
-            Activation::Sine => activations::SINE,
-            Activation::Cosine => activations::COSINE,
-            Activation::Inverse => activations::INVERSE,
-            Activation::Absolute => activations::ABSOLUTE,
-            Activation::Relu => activations::RELU,
-            Activation::Squared => activations::SQUARED,
+        if let Some(activation) = activation {
+            self.activation = activation
         }
     }
 }

@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+
+<style>
+    html,
+    body,
+    main {
+        height: 100%;
+        padding: 0;
+        margin: 0;
+    }
+
+    canvas {
+        width: 100%;
+        height: 100%;
+    }
+</style>
+
+<body>
+    <canvas id="myChart"></canvas>
+</body>
+
+</html>
+<script>
+    // const LOGFILE = 'progress-3_samples.log';
+    const LOGFILE = window.location.href.match(/(?<=\?=).*/)[0];
+
+    async function load() {
+        fetch(LOGFILE)
+            .then(response => response.text())
+            .then(logs => {
+                logs = JSON.parse(`[${logs.slice(0, -2)}]`)
+
+                let colors = [
+                    // "rgb(54, 162, 235)",
+                    "rgb(75, 192, 192)",
+                    "rgb(201, 203, 207)",
+                    "rgb(255, 159, 64)",
+                    "rgb(153, 102, 255)",
+                    "rgb(255, 99, 132)",
+                    "rgb(255, 205, 86)",
+                    "rgb(54, 162, 235)",
+                    "rgb(75, 192, 192)",
+                    "rgb(201, 203, 207)",
+                    "rgb(255, 159, 64)",
+                    "rgb(153, 102, 255)",
+                    "rgb(255, 99, 132)",
+                    "rgb(255, 205, 86)"
+                ];
+
+                let colors2 = [
+                    "rgb(255, 0, 0)",
+                    "rgb(0, 255, 0)"
+                ]
+
+                let keys = [/* 'compatability_threshold', */ 'archive_threshold', 'fitness_average', 'fitness_peak', 'fitness_min'];
+                let keys2 = ['num_species', 'num_offpring'];
+                let datasets = keys.map((key, idx) => ({
+                    label: key,
+                    // backgroundColor: colors[idx],
+                    borderColor: colors[idx],
+                    pointRadius: 1,
+                    borderWidth: 1,
+                    data: logs.map((log, idx) => ({
+                        x: log['num_generation'],
+                        y: log[key]
+                    })),
+                    yAxisID: 'y-axis-1',
+                    fill: false,
+                    lineTension: 0
+                }));
+
+                let datasets2 = keys2.map((key, idx) => ({
+                    label: key,
+                    // backgroundColor: colors[idx],
+                    borderColor: colors2[idx],
+                    pointRadius: 1,
+                    borderWidth: 1,
+                    data: logs.map((log, idx) => ({
+                        x: log['num_generation'],
+                        y: log[key]
+                    })),
+                    yAxisID: 'y-axis-2',
+                    fill: false,
+                    lineTension: 0
+                }));
+
+                datasets.push(...datasets2)
+
+                let labels = logs.map(log => log['num_generation']);
+
+                console.log(labels)
+                console.log(datasets)
+
+
+                var ctx = document.getElementById('myChart').getContext('2d');
+                window.myChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels,
+                        datasets
+                    },
+                    options: {
+                        responsive: true,
+                        title: {
+                            display: true,
+                            text: 'LunarLander-v2 training'
+                        },
+                        tooltips: {
+                            mode: 'nearest',
+                            intersect: false,
+                        },
+                        hover: {
+                            mode: 'nearest',
+                            intersect: false
+                        },
+                        scales: {
+                            xAxes: [{
+                                display: true,
+                                scaleLabel: {
+                                    display: true,
+                                    labelString: 'Generation'
+                                }
+                            }],
+                            yAxes: [{
+                                type: 'linear', // only linear but allow scale type registration. This allows extensions to exist solely for log scale for instance
+                                display: true,
+                                position: 'left',
+                                id: 'y-axis-1',
+                            }, {
+                                type: 'linear', // only linear but allow scale type registration. This allows extensions to exist solely for log scale for instance
+                                display: true,
+                                position: 'right',
+                                id: 'y-axis-2',
+
+                                // grid line settings
+                                gridLines: {
+                                    drawOnChartArea: false, // only want the grid lines for one axis to show up
+                                },
+                            }],
+                        }
+                    }
+                });
+            });
+
+    }
+
+</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.3/dist/Chart.min.js"></script>
+<script>
+    load()
+
+    setInterval(() => {
+        fetch(LOGFILE)
+            .then(response => response.text())
+            .then(logs => {
+                logs = JSON.parse(`[${logs.slice(0, -2)}]`)
+
+                // logs.splice(0, 40);
+
+                let keys = [/* 'compatability_threshold', */ 'archive_threshold', 'fitness_average', 'fitness_peak', 'fitness_min', 'num_species', 'num_offpring'];
+                let updata = keys.map((key, idx) => ({
+                    data: logs.map((log, idx) => ({
+                        x: log['num_generation'],
+                        y: log[key]
+                    }))
+                }));
+
+                let labels = logs.map(log => log['num_generation']);
+
+                console.log(updata)
+
+                myChart.data.labels.length = 0;
+                myChart.data.labels.push(...labels);
+
+                myChart.data.datasets.forEach((dataset, idx) => {
+                    dataset.data.length = 0;
+                    dataset.data.push(...updata[idx].data);
+                });
+
+                myChart.update();
+            });
+    }, 1000);
+
+</script>
+</html>

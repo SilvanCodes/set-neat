@@ -2,8 +2,8 @@
 population = 250 # number of networks
 
 [setup.dimension]
-input = 25 # number inputs
-output = 4 # number outputs
+input = 29 # number inputs
+output = 8 # number outputs
 
 [initialization]
 output = "Tanh" # activation function of output nodes
@@ -33,14 +33,14 @@ gene_connection = 0.05 # chance of adding a new connection gene
 recurrent = 0.1
 weight = 0.9 # chance of mutating all weights of a genome
 weight_random = 0.01 # chance that a mutated weight is replaced by a totally random one
-weight_perturbation = 0.005 # amount of perturbation (step up or down, normal distributed)
+weight_perturbation = 0.05 # amount of perturbation (step up or down, normal distributed)
 weight_distribution = "Uniform" # probability distribution of perturbation
 activation_change = 0.1
 
 [compatability]
 target_species = 25 # number of desired species
 threshold = 1.0 # difference above threshold is considered incompatible
-threshold_delta = 0.01 # adjust threshold by x if num species unequal target species
+threshold_delta = 0.001 # adjust threshold by x if num species unequal target species
 factor_genes = 2.0 # factor for percent of different genes
 factor_weights = 0.1 # weight difference factor
 factor_activations = 0.5 # factor for percent of different activations
