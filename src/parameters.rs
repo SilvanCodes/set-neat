@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Default, Debug)]
 pub struct Parameters {
+    pub required_fitness: f64,
     pub setup: Setup,
     pub initialization: Initialization,
     pub reproduction: Reproduction,

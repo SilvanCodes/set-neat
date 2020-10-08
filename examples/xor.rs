@@ -1,7 +1,7 @@
 use favannat::matrix::fabricator::MatrixFabricator;
 use favannat::network::{Evaluator, Fabricator};
 use ndarray::array;
-use set_neat::{Evaluation, Genome, Neat, Progress};
+use set_neat::{scores::Raw, Evaluation, Genome, Neat, Progress};
 use std::time::Instant;
 
 fn main() {
@@ -57,12 +57,8 @@ fn main() {
                 + (0.0 - result_3[0]).abs()))
         .powi(2);
 
-        if fitness > 15.9 {
-            Progress::Solution(genome.clone())
-        } else {
-            Progress::Novelty(vec![fitness])
-            // Progress::Fitness(fitness)
-        }
+        Progress::new(Raw::new(fitness), vec![fitness])
+        // Progress::Fitness(fitness)
 
         /* let rr0 = (4.0 - ((1.0 - result_rr0[0][0])
                 + (0.0 - result_rr0[1][0]).abs()
@@ -106,15 +102,15 @@ fn main() {
             .next()
         {
             millis_elapsed_in_run.push(now.elapsed().as_millis() as f64);
-            connections_in_winner_in_run.push(winner.connection_genes.len());
-            nodes_in_winner_in_run.push(winner.node_genes.len());
+            connections_in_winner_in_run.push(winner.feed_forward.len());
+            nodes_in_winner_in_run.push(winner.nodes().count());
             generations_till_winner_in_run.push(generations);
             println!(
                 "finished run {} in {} seconds ({}, {})",
                 i,
                 millis_elapsed_in_run.last().unwrap() / 1000.0,
-                winner.node_genes.len(),
-                winner.connection_genes.len()
+                winner.nodes().count(),
+                winner.feed_forward.len()
             );
         }
     }
@@ -151,8 +147,8 @@ fn main() {
         let secs = now.elapsed().as_millis();
         println!(
             "winning genome ({},{}) after {} seconds: {:?}",
-            winner.node_genes.len(),
-            winner.connection_genes.len(),
+            winner.nodes().count(),
+            winner.feed_forward.len(),
             secs as f64 / 1000.0,
             winner
         );

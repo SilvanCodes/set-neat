@@ -1,3 +1,5 @@
+required_fitness = 0.0
+
 [setup]
 population = 150 # number of networks
 output_activation = "Tanh"

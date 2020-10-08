@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ordering,
     hash::{Hash, Hasher},
@@ -5,16 +6,18 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use super::{Activation, Id};
+use super::{Activation, Gene, Id};
 
 pub trait NodeType {}
 
 pub trait NodeValue {}
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Deserialize, Serialize)]
 pub struct Node(pub Id, pub Activation);
 
 impl NodeValue for Node {}
+
+impl Gene for Node {}
 
 impl Node {
     pub fn id(&self) -> Id {
@@ -57,8 +60,8 @@ impl Ord for Node {
 macro_rules! makeNodeType {
     ( $( $name:ident ),* ) => {
         $(
-            #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
-            pub struct $name<T: NodeValue>(T);
+            #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Deserialize, Serialize)]
+            pub struct $name<T: NodeValue>(pub T);
 
             impl<T: NodeValue> NodeType for $name<T> {}
 

@@ -6,7 +6,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use super::{Id, Weight};
+use super::{Gene, Id, Weight};
 
 pub trait ConnectionType {}
 
@@ -16,10 +16,17 @@ pub trait ConnectionValue {}
 pub struct Connection(pub Id, pub Weight, pub Id);
 
 impl ConnectionValue for Connection {}
+impl Gene for Connection {}
 
 impl Connection {
     pub fn id(&self) -> (Id, Id) {
         (self.0, self.2)
+    }
+    pub fn input(&self) -> Id {
+        self.0
+    }
+    pub fn output(&self) -> Id {
+        self.2
     }
 }
 
@@ -52,7 +59,7 @@ impl Ord for Connection {
 macro_rules! makeConnectionType {
     ( $( $name:ident ),* ) => {
         $(
-            #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+            #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
             pub struct $name<T: ConnectionValue>(pub T);
 
             impl<T: ConnectionValue> ConnectionType for $name<T> {}

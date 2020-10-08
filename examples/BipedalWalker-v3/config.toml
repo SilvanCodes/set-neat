@@ -1,3 +1,5 @@
+mode = 1
+
 [setup]
 population = 250 # number of networks
 

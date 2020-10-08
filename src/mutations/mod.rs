@@ -1,4 +1,4 @@
-use crate::Genome;
+use crate::{Context, Genome};
 
 // needed mutations:
 // - weight mutation
@@ -6,7 +6,7 @@ use crate::Genome;
 // - connection mutation
 
 trait Mutation {
-    fn mutate(&mut self, genome: &mut Genome);
+    fn mutate(&mut self, genome: &mut Genome, context: &mut Context);
 }
 
 pub struct Mutations {

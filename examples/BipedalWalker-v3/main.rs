@@ -206,8 +206,8 @@ fn train() {
         let secs = now.elapsed().as_millis();
         info!(
             "winning genome ({},{}) after {} seconds: {:?}",
-            winner.node_genes.len(),
-            winner.connection_genes.len(),
+            winner.nodes().count(),
+            winner.feed_forward.len(),
             secs as f64 / 1000.0,
             winner
         );

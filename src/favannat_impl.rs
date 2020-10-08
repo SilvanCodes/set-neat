@@ -4,16 +4,20 @@ use favannat::network::{EdgeLike, NetLike, NodeLike, Recurrent};
 
 use crate::{
     activations::{self, Activation},
-    genes::{ConnectionGene, Id, NodeGene, Weight},
+    genes::{
+        connections::{Connection, FeedForward},
+        nodes::{Input, Node, Output},
+        Id, Weight,
+    },
     Genome,
 };
 
-impl NodeLike for NodeGene {
+impl NodeLike for Node {
     fn id(&self) -> usize {
-        self.id.0
+        self.id().0
     }
     fn activation(&self) -> fn(f64) -> f64 {
-        match self.activation {
+        match self.1 {
             Activation::Linear => activations::LINEAR,
             Activation::Sigmoid => activations::SIGMOID,
             Activation::Gaussian => activations::GAUSSIAN,
@@ -29,101 +33,83 @@ impl NodeLike for NodeGene {
     }
 }
 
-impl EdgeLike for ConnectionGene {
+impl EdgeLike for Connection {
     fn start(&self) -> usize {
-        self.input.0
+        self.input().0
     }
     fn end(&self) -> usize {
-        self.output.0
+        self.output().0
     }
     fn weight(&self) -> f64 {
-        self.weight.0
+        (self.1).0
     }
 }
 
-impl NetLike<NodeGene, ConnectionGene> for Genome {
-    fn nodes(&self) -> Vec<&NodeGene> {
-        let mut nodes: Vec<&NodeGene> = self.node_genes.iter().collect();
+impl NetLike<Node, Connection> for Genome {
+    fn nodes(&self) -> Vec<&Node> {
+        let mut nodes: Vec<&Node> = self.nodes().collect();
 
         nodes.sort_unstable();
         nodes
     }
-    fn edges(&self) -> Vec<&ConnectionGene> {
-        let mut edges: Vec<&ConnectionGene> = self.connection_genes.iter().collect();
-
-        edges.sort_unstable();
-        edges
+    fn edges(&self) -> Vec<&Connection> {
+        self.feed_forward.as_sorted_vec()
     }
-    fn inputs(&self) -> Vec<&NodeGene> {
-        let mut inputs: Vec<&NodeGene> = self
-            .node_genes
-            .iter()
-            .filter(|node_gene| node_gene.is_input())
-            .collect();
-
-        inputs.sort_unstable();
-        inputs
+    fn inputs(&self) -> Vec<&Node> {
+        self.inputs.as_sorted_vec()
     }
-    fn outputs(&self) -> Vec<&NodeGene> {
-        let mut outputs: Vec<&NodeGene> = self
-            .node_genes
-            .iter()
-            .filter(|node_gene| node_gene.is_output())
-            .collect();
-
-        outputs.sort_unstable();
-        outputs
+    fn outputs(&self) -> Vec<&Node> {
+        self.outputs.as_sorted_vec()
     }
 }
 
-impl Recurrent<NodeGene, ConnectionGene> for Genome {
+impl Recurrent<Node, Connection> for Genome {
     type Net = Genome;
 
     fn unroll(&self) -> Self::Net {
-        let mut unrolled_genome = Genome::from(self);
+        let mut unrolled_genome = self.clone();
 
         // maps recurrent connection input to wrapped actual input
         let mut unroll_map: HashMap<Id, Id> = HashMap::new();
         let mut tmp_ids = (0..usize::MAX).rev();
 
-        for recurrent_connection in &self.recurrent_connection_genes {
-            let recurrent_input =
-                unroll_map
-                    .entry(recurrent_connection.input)
-                    .or_insert_with(|| {
-                        let recurrent_input_id = Id(tmp_ids.next().unwrap());
+        for recurrent_connection in self.recurrent.iter() {
+            let recurrent_input = unroll_map
+                .entry(recurrent_connection.input())
+                .or_insert_with(|| {
+                    let recurrent_input_id = Id(tmp_ids.next().unwrap());
 
-                        let recurrent_input = NodeGene::input(recurrent_input_id);
-                        let recurrent_output =
-                            NodeGene::output(Id(tmp_ids.next().unwrap()), Some(Activation::Linear));
+                    let recurrent_input = Input(Node(recurrent_input_id, Activation::Linear));
+                    let recurrent_output =
+                        Output(Node(Id(tmp_ids.next().unwrap()), Activation::Linear));
 
-                        // used to carry value into next evaluation
-                        let outward_wrapping_connection = ConnectionGene::new(
-                            recurrent_connection.input,
-                            recurrent_output.id,
-                            Some(Weight(1.0)),
-                        );
+                    // used to carry value into next evaluation
+                    let outward_wrapping_connection = FeedForward(Connection(
+                        recurrent_connection.input(),
+                        Weight(1.0),
+                        recurrent_output.id(),
+                    ));
 
-                        // add nodes for wrapping
-                        unrolled_genome.node_genes.insert(recurrent_input);
-                        unrolled_genome.node_genes.insert(recurrent_output);
+                    // add nodes for wrapping
+                    unrolled_genome.inputs.insert(recurrent_input);
+                    unrolled_genome.outputs.insert(recurrent_output);
 
-                        // add outward wrapping connection
-                        unrolled_genome
-                            .connection_genes
-                            .insert(outward_wrapping_connection);
+                    // add outward wrapping connection
+                    unrolled_genome
+                        .feed_forward
+                        .insert(outward_wrapping_connection);
 
-                        recurrent_input_id
-                    });
+                    recurrent_input_id
+                });
 
-            let inward_wrapping_connection = ConnectionGene::new(
+            let inward_wrapping_connection = FeedForward(Connection(
                 *recurrent_input,
-                recurrent_connection.output,
-                Some(recurrent_connection.weight),
-            );
+                recurrent_connection.1,
+                recurrent_connection.output(),
+            ));
 
             unrolled_genome
-                .connection_genes
+                .feed_forward
                 .insert(inward_wrapping_connection);
         }
         unrolled_genome
@@ -131,9 +117,9 @@ impl Recurrent<NodeGene, ConnectionGene> for Genome {
 
     fn memory(&self) -> usize {
         let mut sources: Vec<Id> = self
-            .recurrent_connection_genes
+            .recurrent
             .iter()
-            .map(|connection| connection.input)
+            .map(|connection| connection.input())
             .collect();
         sources.sort_unstable();
         sources.dedup();
@@ -159,18 +145,18 @@ mod tests {
 
         let mut genome_0 = Genome::new(&mut context, &parameters);
 
-        genome_0.init();
+        genome_0.init(&mut context, &parameters);
 
         // should add recurrent connection from input to output
         assert!(genome_0.add_connection(&mut context, &parameters).is_ok());
         // dont add same connection twice
         assert!(genome_0.add_connection(&mut context, &parameters).is_err());
 
-        assert_eq!(genome_0.recurrent_connection_genes.len(), 1);
+        assert_eq!(genome_0.recurrent.len(), 1);
 
         let genome_1 = genome_0.unroll();
 
-        assert_eq!(genome_1.node_genes.len(), 4);
-        assert_eq!(genome_1.connection_genes.len(), 3);
+        assert_eq!(genome_1.hidden.len(), 2);
+        assert_eq!(genome_1.feed_forward.len(), 3);
     }
 }

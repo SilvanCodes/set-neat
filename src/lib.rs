@@ -4,7 +4,9 @@ mod genes;
 mod genome;
 mod mutations;
 mod parameters;
+mod population;
 mod runtime;
+pub mod scores;
 mod species;
 
 // re-exports
