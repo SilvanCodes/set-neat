@@ -2,27 +2,35 @@ use favannat::matrix::fabricator::StatefulMatrixFabricator;
 use favannat::network::{StatefulEvaluator, StatefulFabricator};
 use gym::{SpaceData, State};
 use ndarray::{array, stack, Array1, Axis};
-use set_neat::{Evaluation, Genome, Neat, Progress};
+use set_neat::{scores::Raw, Behavior, Evaluation, Genome, Neat, Progress};
 
 use log::info;
 use std::time::Instant;
 use std::time::SystemTime;
 use std::{env, fs};
 
-pub const RUNS: usize = 1;
+pub const RUNS: usize = 3;
 pub const VALIDATION_RUNS: usize = 100;
 pub const ENV: &str = "LunarLanderContinuous-v2";
+pub const REQUIRED_FITNESS: f64 = 200.0;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
 
     if args.get(1).is_some() {
-        let winner_json = fs::read_to_string(format!("examples/{}/winner_1601592694.json", ENV))
+        let winner_json = fs::read_to_string(format!("examples/{}/1602346227_winner.json", ENV))
             .expect("cant read file");
         let winner: Genome = serde_json::from_str(&winner_json).unwrap();
-        showcase(winner);
+        let scaler_json = fs::read_to_string(format!(
+            "examples/{}/1602346227_winner_standard_scaler.json",
+            ENV
+        ))
+        .expect("cant read file");
+        let standard_scaler: (Array1<f64>, Array1<f64>) =
+            serde_json::from_str(&scaler_json).unwrap();
+        showcase(standard_scaler, winner);
     } else {
-        train();
+        train(standard_scaler());
     }
 }
 
@@ -46,7 +54,6 @@ fn standard_scaler() -> (Array1<f64>, Array1<f64>) {
             observation.get_box().unwrap().insert_axis(Axis(0))
         ];
     }
-    env.close();
     println!("done sampling");
 
     (
@@ -55,14 +62,14 @@ fn standard_scaler() -> (Array1<f64>, Array1<f64>) {
     )
 }
 
-fn train() {
+fn train(standard_scaler: (Array1<f64>, Array1<f64>)) {
     log4rs::init_file(format!("examples/{}/log.yaml", ENV), Default::default()).unwrap();
 
-    let (means, std_dev) = standard_scaler();
+    let (means, std_dev) = standard_scaler.clone();
 
-    dbg!(&means);
+    // dbg!(&means);
 
-    dbg!(&std_dev);
+    // dbg!(&std_dev);
 
     let fitness_function = move |genome: &Genome| -> Progress {
         let gym = gym::GymClient::default();
@@ -70,7 +77,6 @@ fn train() {
 
         let mut evaluator = StatefulMatrixFabricator::fabricate(genome).unwrap();
         let mut fitness = 0.0;
-        let mut done = false;
 
         let mut final_observation = SpaceData::BOX(array![]);
 
@@ -105,7 +111,6 @@ fn train() {
             }
             fitness += total_reward;
         }
-        env.close();
 
         fitness /= RUNS as f64;
 
@@ -113,14 +118,14 @@ fn train() {
             dbg!(fitness);
         }
 
-        if fitness >= 200.0 {
+        if fitness >= REQUIRED_FITNESS {
             info!("hit task theshold, starting validation runs...");
-            fitness = 0.0;
+            let mut validation_fitness = 0.0;
             for _ in 0..VALIDATION_RUNS {
                 let mut recent_observation = env.reset().expect("Unable to reset");
                 let mut total_reward = 0.0;
 
-                while !done {
+                loop {
                     let mut observations = recent_observation.get_box().unwrap();
                     // normalize inputs
                     observations -= &means;
@@ -136,23 +141,43 @@ fn train() {
 
                     recent_observation = observation;
                     total_reward += reward;
-                    done = is_done;
+
+                    if is_done {
+                        // println!("finished with reward {} after {} steps", reward, step);
+                        final_observation = recent_observation;
+                        break;
+                    }
                 }
-                fitness += total_reward;
+                dbg!(total_reward);
+                validation_fitness += total_reward;
             }
+
+            validation_fitness /= VALIDATION_RUNS as f64;
             // log possible solutions to file
             let mut genome = genome.clone();
-            genome.fitness = fitness;
+            genome.fitness.raw = Raw::fitness(validation_fitness);
             info!(target: "app::solutions", "{}", serde_json::to_string(&genome).unwrap());
-            info!("finished validation runs with {} average fitness", fitness);
-            if fitness >= 200.0 {
-                return Progress::Solution(genome);
+            info!(
+                "finished validation runs with {} average fitness",
+                validation_fitness
+            );
+            if validation_fitness > REQUIRED_FITNESS {
+                let state = final_observation.get_box().unwrap().to_vec();
+                // state.truncate(6);
+                return Progress::Solution(
+                    Raw::fitness(validation_fitness),
+                    Behavior(state),
+                    genome,
+                );
             }
         }
+
+        // env.close();
+
         // Progress::Fitness(fitness)
-        let mut state = final_observation.get_box().unwrap().to_vec();
-        state.truncate(6);
-        Progress::Novelty(state)
+        let state = final_observation.get_box().unwrap().to_vec();
+        // state.truncate(6);
+        Progress::new(Raw::fitness(fitness), Behavior(state))
     };
 
     let neat = Neat::new(
@@ -169,8 +194,8 @@ fn train() {
         .filter_map(|evaluation| match evaluation {
             Evaluation::Progress(report) => {
                 info!(target: "app::progress", "{}", serde_json::to_string(&report).unwrap());
-                if report.fitness_peak > report.archive_threshold {
-                    showcase(report.top_performer);
+                if report.novelty.raw_maximum > report.archive_threshold {
+                    showcase(standard_scaler.clone(), report.top_performer);
                 }
                 None
             }
@@ -192,20 +217,31 @@ fn train() {
             serde_json::to_string(&neat.parameters).unwrap(),
         )
         .expect("Unable to write file");
+        fs::write(
+            format!(
+                "examples/{}/{}_winner_standard_scaler.json",
+                ENV, time_stamp
+            ),
+            serde_json::to_string(&standard_scaler).unwrap(),
+        )
+        .expect("Unable to write file");
 
         let secs = now.elapsed().as_millis();
         info!(
             "winning genome ({},{}) after {} seconds: {:?}",
-            winner.node_genes.len(),
-            winner.connection_genes.len(),
+            winner.nodes().count(),
+            winner.feed_forward.len(),
             secs as f64 / 1000.0,
             winner
         );
     }
 }
 
-fn showcase(genome: Genome) {
-    let (means, std_dev) = standard_scaler();
+fn showcase(standard_scaler: (Array1<f64>, Array1<f64>), genome: Genome) {
+    let (means, std_dev) = standard_scaler;
+
+    // dbg!(&means);
+    // dbg!(&std_dev);
 
     let gym = gym::GymClient::default();
     let env = gym.make(ENV);
@@ -235,6 +271,5 @@ fn showcase(genome: Genome) {
         total_reward += reward;
         done = is_done;
     }
-    env.close();
     println!("finished with reward: {}", total_reward);
 }

@@ -4,7 +4,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Default, Debug)]
 pub struct Parameters {
-    pub required_fitness: f64,
+    // pub required_fitness: f64,
+    pub seed: u64,
     pub setup: Setup,
     pub initialization: Initialization,
     pub reproduction: Reproduction,
@@ -44,7 +45,7 @@ pub struct Dimension {
 
 #[derive(Deserialize, Serialize, Default, Debug)]
 pub struct Mutation {
-    pub weight: f64,
+    // pub weight: f64,
     pub weight_random: f64,
     pub weight_perturbation: f64,
     #[serde(default)]
@@ -69,6 +70,8 @@ pub struct Compatability {
 #[derive(Deserialize, Serialize, Default, Debug)]
 pub struct Novelty {
     pub nearest_neighbors: usize,
+    pub impatience: usize,
+    pub demanded_increase_percent: f64,
 }
 
 impl Parameters {

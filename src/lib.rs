@@ -11,10 +11,15 @@ mod species;
 
 // re-exports
 pub use crate::context::Context;
-pub use crate::genes::activations;
+pub use crate::genes::{
+    activations,
+    connections::{Connection, FeedForward, Recurrent},
+    nodes::{Hidden, Input, Node, Output},
+    Activation, Genes, Id, Weight,
+};
 pub use crate::genome::Genome;
 pub use crate::parameters::Parameters;
-pub use crate::runtime::Runtime;
+pub use crate::runtime::{Behavior, Runtime};
 pub use crate::runtime::{Evaluation, Progress};
 
 pub struct Neat {

@@ -1,7 +1,5 @@
 use std::{mem, time::Instant};
 
-use rand::prelude::SliceRandom;
-
 use crate::{parameters::Compatability, species::Species, Context, Genome, Parameters};
 
 pub struct Population {
@@ -13,8 +11,12 @@ pub struct Population {
 struct PopulationContext {
     compatability_threshold: f64,
     threshold_delta: f64,
-    compatability_distance: Box<dyn Fn(&Genome, &Genome) -> f64>,
+    factor_genes: f64,
+    factor_weights: f64,
+    factor_activations: f64,
 }
+
+// uses setup/compatability/reproduction
 
 impl Population {
     pub fn new(context: &mut Context, parameters: &Parameters) -> Self {
@@ -23,6 +25,7 @@ impl Population {
 
         let mut individuals = Vec::new();
 
+        // generate initial, mutated individuals
         for _ in 0..parameters.setup.population {
             let mut other_genome = initial_genome.clone();
             other_genome.init(context, parameters);
@@ -37,38 +40,15 @@ impl Population {
             ..
         } = parameters.compatability;
 
-        let compatability_distance = Box::new(move |genome_0: &Genome, genome_1: &Genome| {
-            Species::compatability_distance(
-                genome_0,
-                genome_1,
-                factor_genes,
-                factor_weights,
-                factor_activations,
-            )
-        });
-
-        /* let mut compatabilities = Vec::new();
-
-        for individual_0 in &individuals {
-            for individual_1 in &individuals {
-                compatabilities.push((compatability_distance)(individual_0, individual_1))
-            }
-        }
-
-        let compatability_threshold = compatabilities.iter().sum::<f64>()
-            / compatabilities.len() as f64
-            / (parameters.compatability.target_species as f64 * 2.0);
-        // / 10.0;
-
-        let threshold_delta = compatability_threshold / 500.0; */
-
         Population {
             individuals,
             species: Vec::new(),
             context: PopulationContext {
                 compatability_threshold: parameters.compatability.threshold,
                 threshold_delta: parameters.compatability.threshold_delta,
-                compatability_distance,
+                factor_genes,
+                factor_weights,
+                factor_activations,
             },
         }
     }
@@ -93,7 +73,15 @@ impl Population {
         self.species
             .iter()
             // map to compatability distance
-            .map(|species| (self.context.compatability_distance)(genome, &species.representative))
+            .map(|species| {
+                Genome::compatability_distance(
+                    genome,
+                    &species.representative,
+                    self.context.factor_genes,
+                    self.context.factor_weights,
+                    self.context.factor_activations,
+                )
+            })
             .enumerate()
             // select minimum distance
             .min_by(|(_, distance_0), (_, distance_1)| distance_0.partial_cmp(distance_1).unwrap())
@@ -101,6 +89,31 @@ impl Population {
             .filter(|(_, distance)| distance < &self.context.compatability_threshold)
             // return species index
             .map(|(index, _)| index)
+    }
+
+    fn remove_stale_species(&mut self, context: &mut Context, parameters: &Parameters) {
+        // sort species by fitness in descending order
+        self.species
+            .sort_by(|species_0, species_1| species_1.score.partial_cmp(&species_0.score).unwrap());
+
+        // clear stale species
+        let threshold = parameters.reproduction.stale_after;
+        let len_before_threshold = self.species.len();
+        self.species = self
+            .species
+            .iter()
+            // keep at least one species
+            .take(1)
+            .chain(
+                self.species
+                    .iter()
+                    .skip(1)
+                    .filter(|species| species.stale < threshold),
+            )
+            .cloned()
+            .collect();
+
+        context.statistics.num_species_stale = len_before_threshold - self.species.len();
     }
 
     pub fn speciate(&mut self, context: &mut Context, parameters: &Parameters) {
@@ -113,26 +126,15 @@ impl Population {
             self.place_genome_into_species(genome);
         }
 
-        // sort members of species by adjusted fitness in descending order
+        // sort members of species and compute species score
         for species in &mut self.species {
-            species.adjust_fitness(context, parameters);
+            species.adjust(context, parameters);
         }
 
-        // clear stale species
-        let threshold = parameters.reproduction.stale_after;
-        let len_before_threshold = self.species.len();
-        // keep at least one species
-        let mut i = 0;
-        self.species
-            .retain(|species| (i == 0 || species.stale < threshold, i += 1).0);
-
-        // sort species by fitness in descending order
-        self.species
-            .sort_by(|species_0, species_1| species_1.score.partial_cmp(&species_0.score).unwrap());
+        self.remove_stale_species(context, parameters);
 
         // collect statistics
         context.statistics.compatability_threshold = self.context.compatability_threshold;
-        // context.statistics.num_species_stale = len_before_threshold - self.species.len();
         context.statistics.milliseconds_elapsed_speciation = now.elapsed().as_millis();
     }
 
@@ -141,12 +143,11 @@ impl Population {
         match self.species.len() {
             length if length > parameters.compatability.target_species => {
                 self.context.compatability_threshold += self.context.threshold_delta
-                    * (length as f64 / parameters.compatability.target_species as f64)
-                // .powi(3);
+                    * (length as f64 / parameters.compatability.target_species as f64).powi(2);
             }
             length if length < parameters.compatability.target_species => {
                 self.context.compatability_threshold -= self.context.threshold_delta
-                    * (parameters.compatability.target_species as f64 / length as f64)
+                    * (parameters.compatability.target_species as f64 / length as f64).powi(2);
             }
             _ => {}
         }
@@ -160,38 +161,32 @@ impl Population {
 
     pub fn reproduce(&mut self, context: &mut Context, parameters: &Parameters) {
         let now = Instant::now();
-        let offspring_ratio; // expresses how much offspring one point of fitness is worth
+        // expresses how much offspring one point of fitness is worth
+        let offspring_ratio;
 
         let total_fitness = self
             .species
             .iter()
             .fold(0.0, |sum, species| sum + species.score);
 
+        // if we can not differentiate species
         if total_fitness == 0.0 {
             // remove species with no members
             self.species.retain(|species| !species.members.is_empty());
+            // give everyone equal offspring
             offspring_ratio = parameters.setup.population as f64 / self.species.len() as f64;
-        } else {
+        }
+        // if we can differentiate species
+        else {
+            // give offspring in proportion to archived score
             offspring_ratio = parameters.setup.population as f64 / total_fitness;
             // remove species that do not qualify for offspring
             self.species
                 .retain(|species| species.score * offspring_ratio >= 1.0);
         }
 
-        let all_species = &self.species;
-
+        // iterate species, only ones that qualify for reproduction are left
         for species in &self.species {
-            // collect members that are allowed to reproduce
-            let allowed_members: Vec<&Genome> = species
-                .members
-                .iter()
-                // need to ceil due to choose + unwrap, i.e. at least one member
-                .take(
-                    (species.members.len() as f64 * parameters.reproduction.surviving).ceil()
-                        as usize,
-                )
-                .collect();
-
             // calculate offspring count for species
             let offspring_count = if total_fitness == 0.0 {
                 offspring_ratio
@@ -201,39 +196,15 @@ impl Population {
             .round() as usize;
 
             self.individuals
-                .extend(
-                    allowed_members
-                        .iter()
-                        .cycle()
-                        .take(offspring_count)
-                        .map(|member| {
-                            member.crossover(
-                                allowed_members.choose(&mut context.small_rng).unwrap(),
-                                context,
-                            )
-                        }),
-                );
+                .extend(species.reproduce(context, parameters, offspring_count));
         }
-
-        // mutate the new population
-        for genome in &mut self.individuals {
-            genome.mutate(context, parameters);
-        }
-
-        // always keep top performing member
-        self.individuals.extend(
-            all_species
-                .iter()
-                // .filter(|species| species.members.len() >= 5)
-                .flat_map(|species| species.members.iter().take(1))
-                .cloned(),
-        );
 
         // clear species members
         for species in &mut self.species {
             species.members.clear();
         }
 
+        // check on final species count
         self.adjust_threshold(parameters);
 
         // collect statistics

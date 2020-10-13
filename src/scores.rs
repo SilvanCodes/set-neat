@@ -8,27 +8,6 @@ pub trait ScoreValue {
     fn value(&self) -> Self::Value;
 }
 
-#[derive(Debug, Default, Clone, Deserialize, Serialize)]
-pub struct FitnessScore {
-    pub raw: Raw<Fitness>,
-    pub shifted: Shifted<Fitness>,
-    pub normalized: Normalized<Fitness>,
-    // pub adjusted: Adjusted<Fitness>,
-}
-
-impl FitnessScore {
-    pub fn new(raw: f64, baseline: f64, with: f64) -> Self {
-        let raw = Raw::new(raw);
-        let shifted = raw.shift(baseline);
-        let normalized = shifted.normalize(with);
-        Self {
-            raw,
-            shifted,
-            normalized,
-        }
-    }
-}
-
 #[derive(Debug, Default, Copy, Clone, Deserialize, Serialize, PartialEq)]
 pub struct Fitness(f64);
 
@@ -40,13 +19,56 @@ impl ScoreValue for Fitness {
     }
 }
 
-/* impl<U: ScoreValue, T: ScoreType + Deref<Target = U>> ScoreValue for T {
-    type Value = U::Value;
+#[derive(Debug, Default, Clone, Deserialize, Serialize)]
+pub struct FitnessScore {
+    pub raw: Raw<Fitness>,
+    pub shifted: Shifted<Fitness>,
+    pub normalized: Normalized<Fitness>,
+}
+
+impl FitnessScore {
+    pub fn new(raw: f64, baseline: f64, with: f64) -> Self {
+        let raw = Raw::fitness(raw);
+        let shifted = raw.shift(baseline);
+        let normalized = shifted.normalize(with);
+        Self {
+            raw,
+            shifted,
+            normalized,
+        }
+    }
+}
+
+#[derive(Debug, Default, Copy, Clone, Deserialize, Serialize, PartialEq)]
+pub struct Novelty(f64);
+
+impl ScoreValue for Novelty {
+    type Value = f64;
 
     fn value(&self) -> Self::Value {
-        self.deref().value()
+        self.0
     }
-} */
+}
+
+#[derive(Debug, Default, Clone, Deserialize, Serialize)]
+pub struct NoveltyScore {
+    pub raw: Raw<Novelty>,
+    pub shifted: Shifted<Novelty>,
+    pub normalized: Normalized<Novelty>,
+}
+
+impl NoveltyScore {
+    pub fn new(raw: f64, baseline: f64, with: f64) -> Self {
+        let raw = Raw::novelty(raw);
+        let shifted = raw.shift(baseline);
+        let normalized = shifted.normalize(with);
+        Self {
+            raw,
+            shifted,
+            normalized,
+        }
+    }
+}
 
 macro_rules! makeScoreType {
     ( $( $name:ident ),* ) => {
@@ -73,49 +95,58 @@ macro_rules! makeScoreType {
     };
 }
 
-makeScoreType!(Raw, Normalized, Adjusted, Shifted);
+makeScoreType!(Raw, Normalized, Shifted);
 
 impl Raw<Fitness> {
-    pub fn new(fitness: f64) -> Self {
+    pub fn fitness(fitness: f64) -> Self {
         Self(Fitness(fitness))
     }
     pub fn shift(self, baseline: f64) -> Shifted<Fitness> {
-        Shifted(Fitness((self.0).0 - baseline))
+        Shifted(Fitness(self.value() - baseline))
     }
 }
 
 impl Shifted<Fitness> {
     pub fn normalize(self, with: f64) -> Normalized<Fitness> {
-        Normalized(Fitness((self.0).0 / with))
+        Normalized(Fitness(self.value() / with))
     }
 }
 
-impl Normalized<Fitness> {
-    pub fn adjust(self, factor: f64) -> Adjusted<Fitness> {
-        Adjusted(Fitness((self.0).0 / factor))
+impl Raw<Novelty> {
+    pub fn novelty(novelty: f64) -> Self {
+        Self(Novelty(novelty))
+    }
+    pub fn shift(self, baseline: f64) -> Shifted<Novelty> {
+        Shifted(Novelty(self.value() - baseline))
+    }
+}
+
+impl Shifted<Novelty> {
+    pub fn normalize(self, with: f64) -> Normalized<Novelty> {
+        Normalized(Novelty(self.value() / with))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Adjusted, Fitness, Normalized, Raw, Shifted};
+    use super::{Fitness, Normalized, Raw, Shifted};
 
     #[test]
-    fn normalize_raw() {
-        let raw = Raw::new(1.0);
+    fn shift_raw() {
+        let raw = Raw::fitness(1.0);
 
-        let normalized = raw.shift(2.0);
+        let shifted = raw.shift(-2.0);
 
-        assert_eq!(normalized, Shifted(Fitness(3.0)))
+        assert_eq!(shifted, Shifted(Fitness(3.0)))
     }
 
     #[test]
-    fn adjust_normal() {
-        let normal = Normalized(Fitness(1.0));
+    fn normalize_shifted() {
+        let shifted = Shifted(Fitness(1.0));
 
-        let adjusted = normal.adjust(2.0);
+        let normalized = shifted.normalize(2.0);
 
-        assert_eq!(adjusted, Adjusted(Fitness(0.5)))
+        assert_eq!(normalized, Normalized(Fitness(0.5)))
     }
 
     /* #[test]

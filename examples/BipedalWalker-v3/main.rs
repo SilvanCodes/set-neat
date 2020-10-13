@@ -1,15 +1,15 @@
 use favannat::matrix::fabricator::StatefulMatrixFabricator;
 use favannat::network::{StatefulEvaluator, StatefulFabricator};
 use gym::{SpaceData, State};
-use ndarray::{array, stack, Array1, Axis};
-use set_neat::{Evaluation, Genome, Neat, Progress};
+use ndarray::{stack, Array1, Array2, Axis};
+use set_neat::{scores::Raw, Behavior, Evaluation, Genome, Neat, Progress};
 
-use log::info;
+use log::{error, info};
 use std::time::Instant;
 use std::time::SystemTime;
 use std::{env, fs};
 
-pub const RUNS: usize = 3;
+pub const RUNS: usize = 1;
 pub const VALIDATION_RUNS: usize = 100;
 pub const STEPS: usize = 1600;
 pub const ENV: &str = "BipedalWalker-v3";
@@ -22,9 +22,11 @@ fn main() {
         let winner_json = fs::read_to_string(format!("examples/{}/winner_1601592694.json", ENV))
             .expect("cant read file");
         let winner: Genome = serde_json::from_str(&winner_json).unwrap();
-        showcase(winner);
+        let standard_scaler: (Array1<f64>, Array1<f64>) =
+            serde_json::from_str(&winner_json).unwrap();
+        run(&winner, &standard_scaler, 1, STEPS, true);
     } else {
-        train();
+        train(standard_scaler());
     }
 }
 
@@ -48,69 +50,26 @@ fn standard_scaler() -> (Array1<f64>, Array1<f64>) {
             observation.get_box().unwrap().insert_axis(Axis(0))
         ];
     }
-    env.close();
     println!("done sampling");
 
     let mut std_dev = samples.std_axis(Axis(0), 0.0);
 
     std_dev.map_inplace(|v| {
         if *v == 0.0 {
-            *v = 1.0
+            *v = f64::EPSILON
         }
     });
 
     dbg!(samples.mean_axis(Axis(0)).unwrap(), std_dev)
 }
 
-fn train() {
+fn train(standard_scaler: (Array1<f64>, Array1<f64>)) {
     log4rs::init_file(format!("examples/{}/log.yaml", ENV), Default::default()).unwrap();
 
-    let (means, std_dev) = standard_scaler();
+    let standard_scaler_1 = standard_scaler.clone();
 
     let fitness_function = move |genome: &Genome| -> Progress {
-        let gym = gym::GymClient::default();
-        let env = gym.make(ENV);
-
-        let mut evaluator = StatefulMatrixFabricator::fabricate(genome).unwrap();
-        let mut fitness = 0.0;
-
-        let mut final_observation = SpaceData::BOX(array![]);
-
-        for _ in 0..RUNS {
-            // println!("setting up run..");
-            let mut recent_observation = env.reset().expect("Unable to reset");
-            let mut total_reward = 0.0;
-
-            for _ in 0..STEPS {
-                // println!("looping");
-                let mut observations = recent_observation.get_box().unwrap();
-
-                // normalize inputs
-                observations -= &means;
-                observations /= &std_dev;
-
-                // add bias input
-                let output = evaluator.evaluate(stack![Axis(0), observations, [1.0]]);
-
-                let State {
-                    observation,
-                    reward,
-                    is_done,
-                } = env.step(&SpaceData::BOX(output)).unwrap();
-
-                recent_observation = observation;
-                total_reward += reward;
-
-                if is_done {
-                    // println!("finished with reward {} after {} steps", reward, step);
-                    final_observation = recent_observation;
-                    break;
-                }
-            }
-            fitness += total_reward;
-        }
-
-        fitness /= RUNS as f64;
+        let (fitness, all_observations) = run(genome, &standard_scaler, RUNS, STEPS, false);
 
         if fitness > 0.0 {
             dbg!(fitness);
@@ -118,44 +77,51 @@ fn train() {
 
         if fitness >= REQUIRED_FITNESS {
             info!("hit task theshold, starting validation runs...");
-            fitness = 0.0;
-            for _ in 0..VALIDATION_RUNS {
-                let mut recent_observation = env.reset().expect("Unable to reset");
-                let mut total_reward = 0.0;
-
-                for _ in 0..STEPS {
-                    let mut observations = recent_observation.get_box().unwrap();
-                    // normalize inputs
-                    observations -= &means;
-                    observations /= &std_dev;
-                    // add bias input
-                    let output = evaluator.evaluate(stack![Axis(0), observations, [1.0]]);
-
-                    let State {
-                        observation,
-                        reward,
-                        ..
-                    } = env.step(&SpaceData::BOX(output)).unwrap();
-
-                    recent_observation = observation;
-                    total_reward += reward;
-                }
-                fitness += total_reward;
-            }
+            let (validation_fitness, all_observations) =
+                run(genome, &standard_scaler, VALIDATION_RUNS, STEPS, false);
             // log possible solutions to file
             let mut genome = genome.clone();
-            genome.fitness = fitness;
+            genome.fitness.raw = Raw::fitness(validation_fitness);
             info!(target: "app::solutions", "{}", serde_json::to_string(&genome).unwrap());
-            info!("finished validation runs with {} average fitness", fitness);
-            if fitness >= REQUIRED_FITNESS {
-                env.close();
+            info!(
+                "finished validation runs with {} average fitness",
+                validation_fitness
+            );
+            if validation_fitness > REQUIRED_FITNESS {
+                let observation_means = all_observations.mean_axis(Axis(0)).unwrap();
+                let observation_std_dev = all_observations.std_axis(Axis(0), 0.0);
 
-                return Progress::Solution(genome);
+                return Progress::Solution(
+                    Raw::fitness(validation_fitness),
+                    Behavior(
+                        observation_means
+                            .iter()
+                            .take(14)
+                            .cloned()
+                            .chain(observation_std_dev.iter().take(14).cloned())
+                            .collect(),
+                    ),
+                    genome,
+                );
             }
         }
-        env.close();
 
-        Progress::Fitness(fitness)
+        let observation_means = all_observations.mean_axis(Axis(0)).unwrap();
+        let observation_std_dev = all_observations.std_axis(Axis(0), 0.0);
+
+        Progress::new(
+            Raw::fitness(fitness),
+            Behavior(
+                observation_means
+                    .iter()
+                    .take(14)
+                    .cloned()
+                    .chain(observation_std_dev.iter().take(14).cloned())
+                    .collect(),
+            ),
+        )
+
+        // Progress::new(Raw::fitness(fitness), Behavior(vec![fitness.max(-150.0)]))
         // let state = final_observation.get_box().unwrap().to_vec();
         // Progress::Novelty(state)
         // fitness = fitness.max(-150.0);
@@ -179,9 +145,8 @@ fn train() {
                 /* if report.fitness_peak > report.archive_threshold {
                     showcase(report.top_performer);
                 } */
-                if report.num_generation % 10 == 0 {
-                    showcase(report.top_performer);
-                }
+                run(&report.top_performer, &standard_scaler_1, 1, STEPS, true);
+                // showcase(standard_scaler_1.clone(), report.top_performer);
                 None
             }
             Evaluation::Solution(genome) => Some(genome),
@@ -202,6 +167,14 @@ fn train() {
             serde_json::to_string(&neat.parameters).unwrap(),
         )
         .expect("Unable to write file");
+        fs::write(
+            format!(
+                "examples/{}/{}_winner_standard_scaler.json",
+                ENV, time_stamp
+            ),
+            serde_json::to_string(&standard_scaler_1).unwrap(),
+        )
+        .expect("Unable to write file");
 
         let secs = now.elapsed().as_millis();
         info!(
@@ -214,173 +187,87 @@ fn train() {
     }
 }
 
-fn showcase(genome: Genome) {
-    let (means, std_dev) = standard_scaler();
+fn run(
+    net: &Genome,
+    standard_scaler: &(Array1<f64>, Array1<f64>),
+    runs: usize,
+    steps: usize,
+    render: bool,
+) -> (f64, Array2<f64>) {
+    let (means, std_dev) = standard_scaler;
 
     let gym = gym::GymClient::default();
     let env = gym.make(ENV);
 
-    let mut evaluator = StatefulMatrixFabricator::fabricate(&genome).unwrap();
+    let mut evaluator = StatefulMatrixFabricator::fabricate(net).unwrap();
+    let mut fitness = 0.0;
+    let mut all_observations = Array2::zeros((1, 24));
 
-    let mut recent_observation = env.reset().expect("Unable to reset");
-    let mut total_reward = 0.0;
-
-    for _ in 0..STEPS {
-        env.render();
-        let mut observations = recent_observation.get_box().unwrap();
-
-        // normalize inputs
-        observations -= &means;
-        observations /= &std_dev;
-
-        // add bias input
-        let input = stack![Axis(0), observations, [1.0]];
-        let output = evaluator.evaluate(input.clone());
-
-        let (observation, reward) = match env.step(&SpaceData::BOX(output.clone())) {
-            Ok(State {
-                observation,
-                reward,
-                ..
-            }) => (observation, reward),
-            Err(err) => {
-                dbg!(input);
-                dbg!(output);
-                env.close();
-                panic!(err)
-            }
-        };
-
-        recent_observation = observation;
-        total_reward += reward;
-    }
-    env.close();
-    println!("finished with reward: {}", total_reward);
-}
-
-/* fn main() {
-    log4rs::init_file(format!("examples/{}/config.yaml", ENV), Default::default()).unwrap();
-
-    fn fitness_function(genome: &Genome) -> Progress {
-        let gym = gym::GymClient::default();
-        let env = gym.make(ENV);
-
-        let mut evaluator = StatefulMatrixFabricator::fabricate(genome).unwrap();
-        let mut fitness = 0.0;
-
-        for _ in 0..RUNS {
-            let mut recent_observation = env.reset().expect("Unable to reset");
-            let mut total_reward = 0.0;
-
-            for _ in 0..STEPS {
-                let mut observations = recent_observation.get_box().unwrap();
-                // normalize inputs
-                observations.mapv_inplace(activations::TANH);
-                // add bias input
-                let output = evaluator.evaluate(stack![Axis(0), observations, [1.0]]);
-
-                let State {
-                    observation,
-                    is_done,
-                    reward,
-                } = env.step(&SpaceData::BOX(output)).unwrap();
-                recent_observation = observation;
-                total_reward += reward;
-
-                if is_done {
-                    // println!("finished with reward {} after {} steps", reward, step);
-                    break;
-                }
-            }
-            fitness += total_reward;
-        }
-        env.close();
-
-        // normailze with run count
-        fitness /= RUNS as f64;
-
-        if fitness >= 300.0 {
-            Progress::Solution(genome.clone())
-        } else {
-            Progress::Fitness(fitness)
-        }
-    };
-
-    let neat = Neat::new(&format!("examples/{}/config.toml", ENV), fitness_function);
-
-    let now = Instant::now();
-
-    let time_stamp = SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
-
-    info!("starting training: {:#?}", neat.parameters);
-
-    /* let winner_json = fs::read_to_string(
-        format!("examples/winner_{}.json", ENV)
-    ).expect("cant read file");
-    let winner: Genome = serde_json::from_str(&winner_json).unwrap(); */
-
-    fs::write(
-        format!("examples/{}/{}_parameters.json", ENV, time_stamp),
-        serde_json::to_string(&neat.parameters).unwrap(),
-    )
-    .expect("Unable to write file");
-
-    if let Some(winner) = neat
-        .run()
-        .filter_map(|evaluation| match evaluation {
-            Evaluation::Progress(report) => {
-                // info!(serde_json::to_string(&report).unwrap());
-
-                info!("{}", serde_json::to_string(&report).unwrap());
-                None
-            }
-            Evaluation::Solution(genome) => Some(genome),
-        })
-        .next()
-    {
-        fs::write(
-            format!("examples/{}/{}_winner.json", ENV, time_stamp),
-            serde_json::to_string(&winner).unwrap(),
-        )
-        .expect("Unable to write file");
-
-        let secs = now.elapsed().as_millis();
-        println!(
-            "winning genome ({},{}) after {} seconds: {:?}",
-            winner.node_genes.len(),
-            winner.connection_genes.len(),
-            secs as f64 / 1000.0,
-            winner
-        );
-        let mut evaluator = StatefulMatrixFabricator::fabricate(&winner).unwrap();
-        println!("as evaluator {:#?}", evaluator);
-
-        let gym = gym::GymClient::default();
-        let env = gym.make(ENV);
-
+    for run in 0..runs {
+        evaluator.reset_internal_state();
         let mut recent_observation = env.reset().expect("Unable to reset");
-        let mut done = false;
+        let mut total_reward = 0.0;
 
-        while !done {
-            env.render();
+        for step in 0..steps {
+            if render {
+                env.render();
+            }
+
             let mut observations = recent_observation.get_box().unwrap();
-            // normalize inputs
-            observations.mapv_inplace(activations::TANH);
-            // add bias input
-            let output = evaluator.evaluate(stack![Axis(0), observations, [1.0]]);
 
-            let State {
-                observation,
-                is_done,
-                ..
-            } = env.step(&SpaceData::BOX(output)).unwrap();
+            all_observations = stack![
+                Axis(0),
+                all_observations,
+                observations.clone().insert_axis(Axis(0))
+            ];
+
+            // normalize inputs
+            observations -= means;
+            observations /= std_dev;
+
+            // add bias input
+            let input = stack![Axis(0), observations, [1.0]];
+            let output = evaluator.evaluate(input.clone());
+
+            let (observation, reward, is_done) = match env.step(&SpaceData::BOX(output.clone())) {
+                Ok(State {
+                    observation,
+                    reward,
+                    is_done,
+                }) => (observation, reward, is_done),
+                Err(err) => {
+                    error!("evaluation error: {}", err);
+                    dbg!(means);
+                    dbg!(std_dev);
+                    dbg!(input);
+                    dbg!(output);
+                    dbg!(evaluator);
+                    dbg!(net);
+                    dbg!(all_observations);
+                    panic!("evaluation error");
+                    /* (
+                        SpaceData::BOX(array![
+                            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+                        ]),
+                        0.0,
+                        true,
+                    ) */
+                }
+            };
+
             recent_observation = observation;
-            done = is_done;
+            total_reward += reward;
+
+            if is_done {
+                if render {
+                    println!("finished with reward {} after {} steps", total_reward, step);
+                }
+                break;
+            }
         }
-        env.close();
+        fitness += total_reward;
     }
+
+    (fitness / runs as f64, all_observations)
 }
- */

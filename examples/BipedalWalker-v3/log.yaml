@@ -3,17 +3,17 @@ appenders:
     kind: console
   progress:
     kind: file
-    path: "examples/BipedalWalker-v3/logs/progress-3_samples.log"
+    path: "examples/BipedalWalker-v3/logs/progress.log"
     encoder:
       pattern: "{m},{n}"
   parameters:
     kind: file
-    path: "examples/BipedalWalker-v3/logs/parameters-3_samples.log"
+    path: "examples/BipedalWalker-v3/logs/parameters.log"
     encoder:
       pattern: "{d} - {m}{n}"
   solutions:
     kind: file
-    path: "examples/BipedalWalker-v3/logs/solutions-3_samples.log"
+    path: "examples/BipedalWalker-v3/logs/solutions.log"
     encoder:
       pattern: "{d} - {m}{n}"
 root:

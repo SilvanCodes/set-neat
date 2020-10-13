@@ -6,6 +6,8 @@ use std::hash::Hasher;
 
 use serde::{Deserialize, Serialize};
 
+// DEPRECATED
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConnectionGene {
     pub input: Id,
@@ -43,11 +45,7 @@ impl Hash for ConnectionGene {
 
 impl PartialOrd for ConnectionGene {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(
-            self.input
-                .cmp(&other.input)
-                .then(self.output.cmp(&other.output)),
-        )
+        Some(self.cmp(&other))
     }
 }
 

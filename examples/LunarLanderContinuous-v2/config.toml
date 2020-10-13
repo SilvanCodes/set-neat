@@ -1,3 +1,6 @@
+required_fitness = 200
+seed = 123
+
 [setup]
 population = 250 # number of networks
 
@@ -38,13 +41,14 @@ weight_distribution = "Uniform" # probability distribution of perturbation
 activation_change = 0.05
 
 [compatability]
-target_species = 25 # number of desired species
+target_species = 20 # number of desired species
 threshold = 1.0 # difference above threshold is considered incompatible
 threshold_delta = 0.005 # adjust threshold by x if num species unequal target species
-factor_genes = 2.5 # factor for percent of different genes
-factor_weights = 1.5 # weight difference factor
-factor_activations = 0.5 # factor for percent of different activations
+factor_genes = 2.0 # factor for percent of different genes
+factor_weights = 0.1 # weight difference factor
+factor_activations = 1.0 # factor for percent of different activations
 
 [novelty]
 nearest_neighbors = 15
-archive_threshold = 0.15
+impatience = 5
+std_dev_threshold = 26 # std dev required of agent raw fitness

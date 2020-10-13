@@ -6,6 +6,8 @@ use std::hash::Hasher;
 
 use serde::{Deserialize, Serialize};
 
+// DEPRECATED
+
 #[derive(PartialEq, Eq, Hash, Clone, Debug, Serialize, Deserialize)]
 pub enum NodeKind {
     Input,
@@ -88,7 +90,7 @@ impl Eq for NodeGene {}
 
 impl PartialOrd for NodeGene {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.id.cmp(&other.id))
+        Some(self.cmp(&other))
     }
 }
 

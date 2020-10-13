@@ -47,10 +47,11 @@ impl EdgeLike for Connection {
 
 impl NetLike<Node, Connection> for Genome {
     fn nodes(&self) -> Vec<&Node> {
-        let mut nodes: Vec<&Node> = self.nodes().collect();
+        /* let mut nodes: Vec<&Node> = self.nodes().collect();
 
         nodes.sort_unstable();
-        nodes
+        nodes */
+        self.nodes().collect()
     }
     fn edges(&self) -> Vec<&Connection> {
         self.feed_forward.as_sorted_vec()
@@ -73,33 +74,33 @@ impl Recurrent<Node, Connection> for Genome {
         let mut unroll_map: HashMap<Id, Id> = HashMap::new();
         let mut tmp_ids = (0..usize::MAX).rev();
 
-        for recurrent_connection in self.recurrent.iter() {
+        for recurrent_connection in self.recurrent.as_sorted_vec() {
             let recurrent_input = unroll_map
                 .entry(recurrent_connection.input())
                 .or_insert_with(|| {
-                    let recurrent_input_id = Id(tmp_ids.next().unwrap());
+                    let wrapper_input_id = Id(tmp_ids.next().unwrap());
 
-                    let recurrent_input = Input(Node(recurrent_input_id, Activation::Linear));
-                    let recurrent_output =
+                    let wrapper_input_node = Input(Node(wrapper_input_id, Activation::Linear));
+                    let wrapper_output_node =
                         Output(Node(Id(tmp_ids.next().unwrap()), Activation::Linear));
 
                     // used to carry value into next evaluation
                     let outward_wrapping_connection = FeedForward(Connection(
                         recurrent_connection.input(),
                         Weight(1.0),
-                        recurrent_output.id(),
+                        wrapper_output_node.id(),
                     ));
 
                     // add nodes for wrapping
-                    unrolled_genome.inputs.insert(recurrent_input);
-                    unrolled_genome.outputs.insert(recurrent_output);
+                    unrolled_genome.inputs.insert(wrapper_input_node);
+                    unrolled_genome.outputs.insert(wrapper_output_node);
 
                     // add outward wrapping connection
                     unrolled_genome
                         .feed_forward
                         .insert(outward_wrapping_connection);
 
-                    recurrent_input_id
+                    wrapper_input_id
                 });
 
             let inward_wrapping_connection = FeedForward(Connection(
@@ -113,17 +114,6 @@ impl Recurrent<Node, Connection> for Genome {
                 .insert(inward_wrapping_connection);
         }
         unrolled_genome
-    }
-
-    fn memory(&self) -> usize {
-        let mut sources: Vec<Id> = self
-            .recurrent
-            .iter()
-            .map(|connection| connection.input())
-            .collect();
-        sources.sort_unstable();
-        sources.dedup();
-        sources.len()
     }
 }
 
