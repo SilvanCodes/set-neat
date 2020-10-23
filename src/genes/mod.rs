@@ -1,4 +1,4 @@
-use rand::{prelude::SmallRng, Rng};
+use rand::{prelude::SliceRandom, prelude::SmallRng, Rng};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, hash::Hash, iter::FromIterator, ops::Deref, ops::DerefMut};
 
@@ -48,6 +48,12 @@ impl<T: Gene + Hash + Eq> Genes<T> {
             .cycle()
             .skip((rng.gen::<f64>() * self.len() as f64).floor() as usize)
             .take(self.len())
+    }
+
+    pub fn drain_into_random(&mut self, rng: &mut SmallRng) -> impl Iterator<Item = T> {
+        let mut random_vec = self.drain().collect::<Vec<T>>();
+        random_vec.shuffle(rng);
+        random_vec.into_iter()
     }
 }
 

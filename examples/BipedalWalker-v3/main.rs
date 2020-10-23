@@ -1,4 +1,4 @@
-use favannat::matrix::fabricator::StatefulMatrixFabricator;
+use favannat::matrix::fabricator::RecurrentMatrixFabricator;
 use favannat::network::{StatefulEvaluator, StatefulFabricator};
 use gym::{SpaceData, State};
 use ndarray::{stack, Array1, Array2, Axis};
@@ -120,12 +120,6 @@ fn train(standard_scaler: (Array1<f64>, Array1<f64>)) {
                     .collect(),
             ),
         )
-
-        // Progress::new(Raw::fitness(fitness), Behavior(vec![fitness.max(-150.0)]))
-        // let state = final_observation.get_box().unwrap().to_vec();
-        // Progress::Novelty(state)
-        // fitness = fitness.max(-150.0);
-        // Progress::Novelty(vec![fitness])
     };
 
     let neat = Neat::new(
@@ -199,7 +193,7 @@ fn run(
     let gym = gym::GymClient::default();
     let env = gym.make(ENV);
 
-    let mut evaluator = StatefulMatrixFabricator::fabricate(net).unwrap();
+    let mut evaluator = RecurrentMatrixFabricator::fabricate(net).unwrap();
     let mut fitness = 0.0;
     let mut all_observations = Array2::zeros((1, 24));
 

@@ -193,7 +193,7 @@ impl<'a> Runtime<'a> {
 
         self.context.statistics.fitness.raw_std_dev = raw_fitness_std_dev;
 
-        let percent_diff_to_mean = dbg!(self
+        /* let percent_diff_to_mean = dbg!(self
             .context
             .compare_to_peak_fitness_mean(self.context.statistics.fitness.raw_maximum));
 
@@ -206,6 +206,13 @@ impl<'a> Runtime<'a> {
         if percent_diff_to_mean > 0.0 {
             self.context
                 .put_peak_fitness(self.context.statistics.fitness.raw_maximum);
+        } */
+
+        if self.context.statistics.fitness.raw_average < self.context.peak_average_fitness {
+            self.context.consecutive_ineffective_generations += 1;
+        } else {
+            self.context.consecutive_ineffective_generations = 0;
+            self.context.peak_average_fitness = self.context.statistics.fitness.raw_average;
         }
 
         self.context
@@ -217,12 +224,12 @@ impl<'a> Runtime<'a> {
         if self.context.consecutive_ineffective_generations
             > self.neat.parameters.novelty.impatience
         {
-            // determine novelty ratio, capped at 1.0
+            // determine novelty ratio, capped
             self.context.novelty_ratio = ((self.context.consecutive_ineffective_generations
                 - self.neat.parameters.novelty.impatience)
                 as f64
                 / self.neat.parameters.novelty.impatience as f64)
-                .min(1.0);
+                .min(self.neat.parameters.novelty.cap);
         } else {
             // on progress jump back to full fitness based search
             self.context.novelty_ratio = 0.0;

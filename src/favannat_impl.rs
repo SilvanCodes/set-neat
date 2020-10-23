@@ -5,7 +5,7 @@ use favannat::network::{EdgeLike, NetLike, NodeLike, Recurrent};
 use crate::{
     activations::{self, Activation},
     genes::{
-        connections::{Connection, FeedForward},
+        connections::{Connection, ConnectionValue, FeedForward},
         nodes::{Input, Node, Output},
         Id, Weight,
     },
@@ -115,6 +115,12 @@ impl Recurrent<Node, Connection> for Genome {
         }
         unrolled_genome
     }
+
+    /* fn memory(&self) -> usize {
+        let mut memory = self.recurrent.as_sorted_vec();
+        memory.dedup();
+        memory.len()
+    } */
 }
 
 #[cfg(test)]
@@ -126,7 +132,7 @@ mod tests {
     #[test]
     fn unroll_genome() {
         let mut parameters: Parameters = Default::default();
-        parameters.mutation.weight_perturbation = 1.0;
+        parameters.mutation.weights.perturbation_range = 1.0;
         let mut context = Context::new(&parameters);
 
         parameters.setup.dimension.input = 1;

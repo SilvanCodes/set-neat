@@ -1,4 +1,3 @@
-required_fitness = 200
 seed = 123
 
 [setup]
@@ -6,7 +5,7 @@ population = 250 # number of networks
 
 [setup.dimension]
 input = 9 # number inputs
-output = 4 # number outputs
+output = 2 # number outputs
 
 [initialization]
 output = "Tanh" # activation function of output nodes
@@ -21,34 +20,40 @@ activations = [
     "Inverse",
     "Absolute",
     "Relu",
-    "Squared",
+    # "Squared",
 ] # pool of activation functions to choose from
-connections = 0.5 # percent of inputs fully connected to outputs
+connections = 1.0 # percent of inputs fully connected to outputs
 weights = "Random"
 
 [reproduction]
 surviving = 0.2 # allow the top x percent of species to survive and reproduce
 stale_after = 15 # number of generations allowed without improvement (stale species go extinct)
+elitism_species = 1
+elitism_individuals = 0
 
 [mutation]
 gene_node = 0.05 # chance of adding a new node gene
 gene_connection = 0.1 # chance of adding a new connection gene
 recurrent = 0.5
-weight = 0.9 # chance of mutating all weights of a genome
-weight_random = 0.01 # chance that a mutated weight is replaced by a totally random one
-weight_perturbation = 0.1 # amount of perturbation
-weight_distribution = "Uniform" # probability distribution of perturbation
 activation_change = 0.05
+
+[mutation.weights]
+percent_min = 0.5
+percent_max = 0.9
+random = 0.0
+perturbation_range = 1.0
+distribution = "Normal"
 
 [compatability]
 target_species = 20 # number of desired species
-threshold = 1.0 # difference above threshold is considered incompatible
-threshold_delta = 0.005 # adjust threshold by x if num species unequal target species
+threshold = 0.5 # difference above threshold is considered incompatible
+threshold_delta = 0.002 # adjust threshold by at least x if num species unequal target species
 factor_genes = 2.0 # factor for percent of different genes
-factor_weights = 0.1 # weight difference factor
+factor_weights = 0.2 # weight difference factor
 factor_activations = 1.0 # factor for percent of different activations
 
 [novelty]
+cap = 0.0
 nearest_neighbors = 15
 impatience = 5
-std_dev_threshold = 26 # std dev required of agent raw fitness
+demanded_increase_percent = 0 # std dev required of agent raw fitness

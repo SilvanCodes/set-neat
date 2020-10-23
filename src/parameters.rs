@@ -4,7 +4,6 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Default, Debug)]
 pub struct Parameters {
-    // pub required_fitness: f64,
     pub seed: u64,
     pub setup: Setup,
     pub initialization: Initialization,
@@ -22,12 +21,9 @@ pub struct Setup {
 
 #[derive(Deserialize, Serialize, Default, Debug)]
 pub struct Initialization {
-    #[serde(default)]
     pub output: Activation,
-    #[serde(default)]
     pub activations: Vec<Activation>,
     pub connections: f64,
-    #[serde(default)]
     pub weights: WeightInitialization,
 }
 
@@ -35,6 +31,8 @@ pub struct Initialization {
 pub struct Reproduction {
     pub surviving: f64,
     pub stale_after: usize,
+    pub elitism_species: usize,
+    pub elitism_individuals: usize,
 }
 
 #[derive(Deserialize, Serialize, Default, Debug)]
@@ -46,15 +44,28 @@ pub struct Dimension {
 #[derive(Deserialize, Serialize, Default, Debug)]
 pub struct Mutation {
     // pub weight: f64,
-    pub weight_random: f64,
-    pub weight_perturbation: f64,
-    #[serde(default)]
-    pub weight_distribution: WeightDistribution,
+    // pub weight_random: f64,
+    // pub weight_perturbation: f64,
+    // pub weight_distribution: WeightDistribution,
     pub gene_node: f64,
     pub gene_connection: f64,
     pub recurrent: f64,
-    #[serde(default)]
     pub activation_change: f64,
+    pub weights: WeightsMutation,
+}
+
+#[derive(Deserialize, Serialize, Default, Debug)]
+pub struct WeightsMutation {
+    // minimum percent of weights mutated per individual
+    pub percent_min: f64,
+    // maximum percent of weights mutated per individual
+    pub percent_max: f64,
+    // chance to mutate to a new random sample of the distribution
+    pub random: f64,
+    // range of weight perutrbation, i.e. hard upper/lower cap for uniform distribution, stdandard deviation for normal distribution
+    pub perturbation_range: f64,
+    // type of distribution to sample from, normal or uniform
+    pub distribution: WeightDistribution,
 }
 
 #[derive(Deserialize, Serialize, Default, Debug)]
@@ -69,6 +80,7 @@ pub struct Compatability {
 
 #[derive(Deserialize, Serialize, Default, Debug)]
 pub struct Novelty {
+    pub cap: f64,
     pub nearest_neighbors: usize,
     pub impatience: usize,
     pub demanded_increase_percent: f64,

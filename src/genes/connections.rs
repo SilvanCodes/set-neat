@@ -10,15 +10,33 @@ use super::{Gene, Id, Weight};
 
 pub trait ConnectionType {}
 
-pub trait ConnectionValue {}
+pub trait ConnectionValue {
+    fn id(&self) -> (Id, Id);
+    fn input(&self) -> Id;
+    fn output(&self) -> Id;
+    fn weight(&mut self) -> &mut Weight;
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Connection(pub Id, pub Weight, pub Id);
 
-impl ConnectionValue for Connection {}
+impl ConnectionValue for Connection {
+    fn id(&self) -> (Id, Id) {
+        (self.0, self.2)
+    }
+    fn input(&self) -> Id {
+        self.0
+    }
+    fn output(&self) -> Id {
+        self.2
+    }
+    fn weight(&mut self) -> &mut Weight {
+        &mut self.1
+    }
+}
 impl Gene for Connection {}
 
-impl Connection {
+/* impl Connection {
     pub fn id(&self) -> (Id, Id) {
         (self.0, self.2)
     }
@@ -28,7 +46,7 @@ impl Connection {
     pub fn output(&self) -> Id {
         self.2
     }
-}
+} */
 
 impl PartialEq for Connection {
     fn eq(&self, other: &Self) -> bool {

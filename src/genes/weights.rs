@@ -77,8 +77,8 @@ pub enum WeightPerturbator {
 }
 
 impl WeightPerturbator {
-    pub fn new(kind: &WeightDistribution, range: f64) -> Self {
-        match kind {
+    pub fn new(distribution: &WeightDistribution, range: f64) -> Self {
+        match distribution {
             WeightDistribution::Uniform => WeightPerturbator::Uniform(Uniform::new(-range, range)),
             WeightDistribution::Normal => {
                 WeightPerturbator::Normal(Normal::new(0.0, range).unwrap())

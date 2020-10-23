@@ -13,7 +13,7 @@ pub struct Context {
     pub added_to_archive: usize,
     pub consecutive_ineffective_generations: usize,
     peak_fitness_buffer: Vec<f64>,
-    peak_fitness_buffer_index: usize,
+    pub peak_average_fitness: f64,
 
     pub small_rng: SmallRng,
     pub weight_pertubator: WeightPerturbator,
@@ -28,11 +28,11 @@ impl Context {
             added_to_archive: 0,
             consecutive_ineffective_generations: 0,
             peak_fitness_buffer: Vec::new(),
-            peak_fitness_buffer_index: 0,
+            peak_average_fitness: f64::NEG_INFINITY,
             small_rng: SmallRng::seed_from_u64(parameters.seed),
             weight_pertubator: WeightPerturbator::new(
-                &parameters.mutation.weight_distribution,
-                parameters.mutation.weight_perturbation,
+                &parameters.mutation.weights.distribution,
+                parameters.mutation.weights.perturbation_range,
             ),
             id_gen: Default::default(),
         }
@@ -92,7 +92,7 @@ mod test {
     #[test]
     fn calculate_percent_diff() {
         let mut parameters = Parameters::default();
-        parameters.mutation.weight_perturbation = 1.0;
+        parameters.mutation.weights.perturbation_range = 1.0;
         let mut context = Context::new(&parameters);
 
         let result = context.compare_to_peak_fitness_mean(1.0);

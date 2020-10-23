@@ -34,7 +34,9 @@ impl Species {
         // reduce to surviving members
         self.members.truncate(
             (self.members.len() as f64 * parameters.reproduction.surviving).ceil() as usize,
-        )
+        );
+
+        dbg!(self.members.len());
     }
 
     fn compute_score(&mut self, context: &Context) {
@@ -61,6 +63,13 @@ impl Species {
         self.compute_score(context);
     }
 
+    pub fn prepare_next_generation(&mut self) {
+        // set fittest member as new representative
+        self.representative = self.members[0].clone();
+        // remove all members
+        self.members.clear();
+    }
+
     pub fn reproduce<'a>(
         &'a self,
         context: &'a mut Context,
@@ -80,7 +89,12 @@ impl Species {
                 offspring
             })
             // add top x members to offspring
-            .chain(self.members.iter().take(1).cloned())
+            .chain(
+                self.members
+                    .iter()
+                    .take(parameters.reproduction.elitism_individuals)
+                    .cloned(),
+            )
     }
 }
 

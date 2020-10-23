@@ -41,30 +41,45 @@ impl Population {
         } = parameters.compatability;
 
         Population {
-            individuals,
             species: Vec::new(),
             context: PopulationContext {
-                compatability_threshold: parameters.compatability.threshold,
+                compatability_threshold: dbg!(Population::init_threshold(&individuals, parameters)),
                 threshold_delta: parameters.compatability.threshold_delta,
                 factor_genes,
                 factor_weights,
                 factor_activations,
             },
+            individuals,
         }
     }
 
     fn place_genome_into_species(&mut self, genome: Genome) {
+        let context = &self.context;
         // place into matching species
-        if let Some(species_index) = self.find_best_fitting_species(&genome) {
+        if let Some(species) = self.species.iter_mut().find(|species| {
+            Genome::compatability_distance(
+                &genome,
+                &species.representative,
+                context.factor_genes,
+                context.factor_weights,
+                context.factor_activations,
+            ) < context.compatability_threshold
+        }) {
+            species.members.push(genome);
+        } else {
+            self.species.push(Species::new(genome));
+        }
+
+        /* if let Some(species_index) = self.find_best_fitting_species(&genome) {
             self.species[species_index].members.push(genome);
         }
         // or open new species
         else {
             self.species.push(Species::new(genome));
-        }
+        } */
     }
 
-    fn find_best_fitting_species(&self, genome: &Genome) -> Option<usize> {
+    /* fn find_best_fitting_species(&self, genome: &Genome) -> Option<usize> {
         // return when no species exist
         if self.species.is_empty() {
             return None;
@@ -89,7 +104,7 @@ impl Population {
             .filter(|(_, distance)| distance < &self.context.compatability_threshold)
             // return species index
             .map(|(index, _)| index)
-    }
+    } */
 
     fn remove_stale_species(&mut self, context: &mut Context, parameters: &Parameters) {
         // sort species by fitness in descending order
@@ -103,11 +118,11 @@ impl Population {
             .species
             .iter()
             // keep at least one species
-            .take(1)
+            .take(parameters.reproduction.elitism_species)
             .chain(
                 self.species
                     .iter()
-                    .skip(1)
+                    .skip(parameters.reproduction.elitism_species)
                     .filter(|species| species.stale < threshold),
             )
             .cloned()
@@ -131,11 +146,45 @@ impl Population {
             species.adjust(context, parameters);
         }
 
+        // check on final species count
+        // do immediatly after speciation ?
+        self.adjust_threshold(parameters);
+
         self.remove_stale_species(context, parameters);
 
         // collect statistics
         context.statistics.compatability_threshold = self.context.compatability_threshold;
         context.statistics.milliseconds_elapsed_speciation = now.elapsed().as_millis();
+    }
+
+    fn init_threshold(individuals: &[Genome], parameters: &Parameters) -> f64 {
+        let mut threshold = Vec::new();
+
+        let approximate_species_size = (parameters.setup.population as f64
+            / parameters.compatability.target_species as f64)
+            .floor() as usize;
+
+        for individual_0 in individuals {
+            let mut distances = Vec::new();
+
+            for individual_1 in individuals {
+                distances.push(Genome::compatability_distance(
+                    individual_0,
+                    individual_1,
+                    parameters.compatability.factor_genes,
+                    parameters.compatability.factor_weights,
+                    parameters.compatability.factor_activations,
+                ));
+            }
+
+            distances.sort_by(|a, b| a.partial_cmp(b).unwrap());
+
+            threshold.push(distances[approximate_species_size]);
+        }
+
+        dbg!(&threshold);
+
+        threshold.iter().sum::<f64>() / threshold.len() as f64 * 1.5
     }
 
     fn adjust_threshold(&mut self, parameters: &Parameters) {
@@ -169,6 +218,8 @@ impl Population {
             .iter()
             .fold(0.0, |sum, species| sum + species.score);
 
+        dbg!(self.species.len());
+
         // if we can not differentiate species
         if total_fitness == 0.0 {
             // remove species with no members
@@ -184,6 +235,8 @@ impl Population {
             self.species
                 .retain(|species| species.score * offspring_ratio >= 1.0);
         }
+
+        dbg!(self.species.len());
 
         // iterate species, only ones that qualify for reproduction are left
         for species in &self.species {
@@ -201,11 +254,8 @@ impl Population {
 
         // clear species members
         for species in &mut self.species {
-            species.members.clear();
+            species.prepare_next_generation();
         }
-
-        // check on final species count
-        self.adjust_threshold(parameters);
 
         // collect statistics
         context.statistics.num_generation += 1;

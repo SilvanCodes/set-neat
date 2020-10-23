@@ -1,7 +1,7 @@
 use crate::{
     activations::Activation,
     genes::{
-        connections::{Connection, FeedForward, Recurrent},
+        connections::{Connection, ConnectionValue, FeedForward, Recurrent},
         nodes::{Hidden, Input, Node, Output},
         Genes,
     },
@@ -170,20 +170,22 @@ impl Genome {
 
     pub fn change_weights(&mut self, context: &mut Context, parameters: &Parameters) {
         // generate percent of changing connections
-        let change_percent = context.small_rng.gen::<f64>();
+        let change_percent = context.small_rng.gen::<f64>()
+            * (parameters.mutation.weights.percent_max - parameters.mutation.weights.percent_min)
+            + parameters.mutation.weights.percent_min;
         let num_feed_forward = (change_percent * self.feed_forward.len() as f64).floor() as usize;
         let num_recurrent = (change_percent * self.recurrent.len() as f64).floor() as usize;
 
         self.feed_forward = self
             .feed_forward
-            .drain()
+            .drain_into_random(&mut context.small_rng)
             .enumerate()
-            .map(|(num, mut connection)| {
-                if num < num_feed_forward {
-                    if context.gamble(parameters.mutation.weight_random) {
-                        connection.1.random(context);
+            .map(|(count, mut connection)| {
+                if count < num_feed_forward {
+                    if context.gamble(parameters.mutation.weights.random) {
+                        connection.weight().random(context);
                     } else {
-                        connection.1.perturbate(context);
+                        connection.weight().perturbate(context);
                     }
                 }
 
@@ -193,14 +195,14 @@ impl Genome {
 
         self.recurrent = self
             .recurrent
-            .drain()
+            .drain_into_random(&mut context.small_rng)
             .enumerate()
-            .map(|(num, mut connection)| {
-                if num < num_recurrent {
-                    if context.gamble(parameters.mutation.weight_random) {
-                        connection.1.random(context);
+            .map(|(count, mut connection)| {
+                if count < num_recurrent {
+                    if context.gamble(parameters.mutation.weights.random) {
+                        connection.weight().random(context);
                     } else {
-                        connection.1.perturbate(context);
+                        connection.weight().perturbate(context);
                     }
                 }
 
@@ -459,7 +461,7 @@ impl Genome {
 #[cfg(test)]
 mod tests {
     use super::Genome;
-    use crate::genes::{Activation, Id, Weight};
+    use crate::genes::{connections::ConnectionValue, Activation, Id, Weight};
     use crate::Parameters;
     use crate::{
         context::Context,
@@ -474,7 +476,7 @@ mod tests {
     #[test]
     fn alter_activation() {
         let mut parameters: Parameters = Default::default();
-        parameters.mutation.weight_perturbation = 1.0;
+        parameters.mutation.weights.perturbation_range = 1.0;
         let mut context = Context::new(&parameters);
 
         parameters.setup.dimension.input = 1;
@@ -498,7 +500,7 @@ mod tests {
     #[test]
     fn add_random_connection() {
         let mut parameters: Parameters = Default::default();
-        parameters.mutation.weight_perturbation = 1.0;
+        parameters.mutation.weights.perturbation_range = 1.0;
         let mut context = Context::new(&parameters);
 
         parameters.setup.dimension.input = 1;
@@ -517,7 +519,7 @@ mod tests {
     #[test]
     fn dont_add_same_connection_twice() {
         let mut parameters: Parameters = Default::default();
-        parameters.mutation.weight_perturbation = 1.0;
+        parameters.mutation.weights.perturbation_range = 1.0;
         let mut context = Context::new(&parameters);
 
         parameters.setup.dimension.input = 1;
@@ -542,7 +544,7 @@ mod tests {
     #[test]
     fn add_random_node() {
         let mut parameters: Parameters = Default::default();
-        parameters.mutation.weight_perturbation = 1.0;
+        parameters.mutation.weights.perturbation_range = 1.0;
         parameters.initialization.activations = vec![Activation::Tanh];
         let mut context = Context::new(&parameters);
 
@@ -563,7 +565,7 @@ mod tests {
     #[test]
     fn crossover_same_fitness() {
         let mut parameters: Parameters = Default::default();
-        parameters.mutation.weight_perturbation = 1.0;
+        parameters.mutation.weights.perturbation_range = 1.0;
         parameters.initialization.activations = vec![Activation::Tanh];
         let mut context = Context::new(&parameters);
 
@@ -599,7 +601,7 @@ mod tests {
     #[test]
     fn crossover_different_fitness_by_fitter() {
         let mut parameters: Parameters = Default::default();
-        parameters.mutation.weight_perturbation = 1.0;
+        parameters.mutation.weights.perturbation_range = 1.0;
         parameters.initialization.activations = vec![Activation::Tanh];
         let mut context = Context::new(&parameters);
 
@@ -633,7 +635,7 @@ mod tests {
     #[test]
     fn crossover_different_fitness_by_equal_fittnes_different_len() {
         let mut parameters: Parameters = Default::default();
-        parameters.mutation.weight_perturbation = 1.0;
+        parameters.mutation.weights.perturbation_range = 1.0;
         parameters.initialization.activations = vec![Activation::Tanh];
         let mut context = Context::new(&parameters);
 
@@ -662,7 +664,7 @@ mod tests {
     #[test]
     fn detect_no_cycle() {
         let mut parameters: Parameters = Default::default();
-        parameters.mutation.weight_perturbation = 1.0;
+        parameters.mutation.weights.perturbation_range = 1.0;
         let mut context = Context::new(&parameters);
 
         parameters.setup.dimension.input = 1;
@@ -684,7 +686,7 @@ mod tests {
     #[test]
     fn detect_cycle() {
         let mut parameters: Parameters = Default::default();
-        parameters.mutation.weight_perturbation = 1.0;
+        parameters.mutation.weights.perturbation_range = 1.0;
         parameters.initialization.activations = vec![Activation::Tanh];
         let mut context = Context::new(&parameters);
 
@@ -712,7 +714,7 @@ mod tests {
     #[test]
     fn crossover_no_cycle() {
         let mut parameters: Parameters = Default::default();
-        parameters.mutation.weight_perturbation = 1.0;
+        parameters.mutation.weights.perturbation_range = 1.0;
         let mut context = Context::new(&parameters);
 
         // assumption:
