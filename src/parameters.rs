@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Default, Debug)]
 pub struct Parameters {
+    #[serde(default)]
     pub seed: u64,
     pub setup: Setup,
     pub initialization: Initialization,
@@ -19,12 +20,35 @@ pub struct Setup {
     pub dimension: Dimension,
 }
 
-#[derive(Deserialize, Serialize, Default, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct Initialization {
     pub output: Activation,
     pub activations: Vec<Activation>,
     pub connections: f64,
+    #[serde(default)]
     pub weights: WeightInitialization,
+}
+
+impl Default for Initialization {
+    fn default() -> Self {
+        Self {
+            output: Activation::Tanh,
+            activations: vec![
+                Activation::Linear,
+                Activation::Sigmoid,
+                Activation::Tanh,
+                Activation::Gaussian,
+                Activation::Step,
+                Activation::Sine,
+                Activation::Cosine,
+                Activation::Inverse,
+                Activation::Absolute,
+                Activation::Relu,
+            ],
+            connections: 1.0,
+            weights: WeightInitialization::Random,
+        }
+    }
 }
 
 #[derive(Deserialize, Serialize, Default, Debug)]
@@ -43,10 +67,6 @@ pub struct Dimension {
 
 #[derive(Deserialize, Serialize, Default, Debug)]
 pub struct Mutation {
-    // pub weight: f64,
-    // pub weight_random: f64,
-    // pub weight_perturbation: f64,
-    // pub weight_distribution: WeightDistribution,
     pub gene_node: f64,
     pub gene_connection: f64,
     pub recurrent: f64,
@@ -54,7 +74,7 @@ pub struct Mutation {
     pub weights: WeightsMutation,
 }
 
-#[derive(Deserialize, Serialize, Default, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct WeightsMutation {
     // minimum percent of weights mutated per individual
     pub percent_min: f64,
@@ -66,6 +86,18 @@ pub struct WeightsMutation {
     pub perturbation_range: f64,
     // type of distribution to sample from, normal or uniform
     pub distribution: WeightDistribution,
+}
+
+impl Default for WeightsMutation {
+    fn default() -> Self {
+        Self {
+            percent_min: 0.0,
+            percent_max: 1.0,
+            random: 0.0,
+            perturbation_range: 1.0,
+            distribution: WeightDistribution::Uniform,
+        }
+    }
 }
 
 #[derive(Deserialize, Serialize, Default, Debug)]

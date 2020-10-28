@@ -50,24 +50,21 @@ impl Default for WeightDistribution {
 #[serde(untagged)]
 pub enum WeightInitialization {
     Fixed(f64),
-    Strategy(String),
+    Random,
 }
 
 impl WeightInitialization {
     pub fn init(&self) -> Weight {
         match self {
             WeightInitialization::Fixed(value) => Weight(*value),
-            WeightInitialization::Strategy(strategy) if strategy == "Random" => {
-                Weight(random::<f64>() * 2.0 - 1.0)
-            }
-            WeightInitialization::Strategy(_) => Weight(random::<f64>() * 2.0 - 1.0),
+            WeightInitialization::Random => Weight(random::<f64>() * 2.0 - 1.0),
         }
     }
 }
 
 impl Default for WeightInitialization {
     fn default() -> Self {
-        WeightInitialization::Strategy("Random".into())
+        WeightInitialization::Random
     }
 }
 

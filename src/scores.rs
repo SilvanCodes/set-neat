@@ -108,7 +108,7 @@ impl Raw<Fitness> {
 
 impl Shifted<Fitness> {
     pub fn normalize(self, with: f64) -> Normalized<Fitness> {
-        Normalized(Fitness(self.value() / with))
+        Normalized(Fitness(self.value() / with.max(1.0)))
     }
 }
 
@@ -123,7 +123,7 @@ impl Raw<Novelty> {
 
 impl Shifted<Novelty> {
     pub fn normalize(self, with: f64) -> Normalized<Novelty> {
-        Normalized(Novelty(self.value() / with))
+        Normalized(Novelty(self.value() / with.max(1.0)))
     }
 }
 

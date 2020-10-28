@@ -38,6 +38,7 @@ impl Context {
         }
     }
 
+    // FIXME
     pub fn compare_to_peak_fitness_mean(&mut self, peak_fitness: f64) -> f64 {
         if self.peak_fitness_buffer.is_empty() {
             return 1.0;

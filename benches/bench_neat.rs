@@ -3,13 +3,10 @@ use set_neat::{activations::Activation, Context, Genome, Parameters};
 
 pub fn crossover_same_genome_benchmark(c: &mut Criterion) {
     let mut parameters: Parameters = Default::default();
-    parameters.mutation.weight_perturbation = 1.0;
-    parameters.initialization.activations = vec![Activation::Absolute, Activation::Cosine];
     let mut context = Context::new(&parameters);
 
     parameters.setup.dimension.input = 1;
     parameters.setup.dimension.output = 1;
-    parameters.initialization.connections = 1.0;
 
     let mut genome_0 = Genome::new(&mut context, &parameters);
 
@@ -24,7 +21,6 @@ pub fn crossover_same_genome_benchmark(c: &mut Criterion) {
 
 pub fn crossover_higly_mutated_genomes_benchmark(c: &mut Criterion) {
     let mut parameters: Parameters = Default::default();
-    parameters.mutation.weight_perturbation = 1.0;
     parameters.initialization.activations = vec![Activation::Absolute, Activation::Cosine];
     let mut context = Context::new(&parameters);
 
@@ -34,9 +30,6 @@ pub fn crossover_higly_mutated_genomes_benchmark(c: &mut Criterion) {
 
     parameters.mutation.gene_node = 1.0;
     parameters.mutation.gene_connection = 1.0;
-    parameters.mutation.weight = 1.0;
-    parameters.mutation.weight_random = 0.1;
-    parameters.initialization.connections = 1.0;
 
     let mut genome_0 = Genome::new(&mut context, &parameters);
 
@@ -56,18 +49,13 @@ pub fn crossover_higly_mutated_genomes_benchmark(c: &mut Criterion) {
 
 pub fn mutate_genome_benchmark(c: &mut Criterion) {
     let mut parameters: Parameters = Default::default();
-    parameters.mutation.weight_perturbation = 1.0;
-    parameters.initialization.activations = vec![Activation::Absolute, Activation::Cosine];
     let mut context = Context::new(&parameters);
 
     parameters.setup.dimension.input = 1;
     parameters.setup.dimension.output = 1;
-    parameters.initialization.connections = 1.0;
 
     parameters.mutation.gene_node = 1.0;
     parameters.mutation.gene_connection = 1.0;
-    parameters.mutation.weight = 1.0;
-    parameters.mutation.weight_random = 0.1;
 
     let mut genome_0 = Genome::new(&mut context, &parameters);
 
@@ -80,13 +68,11 @@ pub fn mutate_genome_benchmark(c: &mut Criterion) {
 
 pub fn add_connection_to_genome_benchmark(c: &mut Criterion) {
     let mut parameters: Parameters = Default::default();
-    parameters.mutation.weight_perturbation = 1.0;
     parameters.initialization.activations = vec![Activation::Absolute, Activation::Cosine];
     let mut context = Context::new(&parameters);
 
     parameters.setup.dimension.input = 1;
     parameters.setup.dimension.output = 1;
-    parameters.initialization.connections = 1.0;
 
     let mut genome_0 = Genome::new(&mut context, &parameters);
 
@@ -97,13 +83,11 @@ pub fn add_connection_to_genome_benchmark(c: &mut Criterion) {
 
 pub fn add_node_to_genome_benchmark(c: &mut Criterion) {
     let mut parameters: Parameters = Default::default();
-    parameters.mutation.weight_perturbation = 1.0;
     parameters.initialization.activations = vec![Activation::Absolute, Activation::Cosine];
     let mut context = Context::new(&parameters);
 
     parameters.setup.dimension.input = 1;
     parameters.setup.dimension.output = 1;
-    parameters.initialization.connections = 1.0;
 
     let mut genome_0 = Genome::new(&mut context, &parameters);
 

@@ -2,7 +2,7 @@ use crate::{
     activations::Activation,
     genes::{
         connections::{Connection, ConnectionValue, FeedForward, Recurrent},
-        nodes::{Hidden, Input, Node, Output},
+        nodes::{Hidden, Input, Node, NodeValue, Output},
         Genes,
     },
     scores::FitnessScore,
@@ -102,46 +102,22 @@ impl Genome {
             (other, self)
         };
 
-        // gamble for matching feedforward genes
-        let mut feed_forward: Genes<FeedForward<Connection>> = self
+        let feed_forward = fitter
             .feed_forward
-            .iterate_matches(&other.feed_forward)
-            .map(|(gene_self, gene_other)| {
-                if context.gamble(0.5) {
-                    gene_self.clone()
-                } else {
-                    gene_other.clone()
-                }
-            })
-            .collect();
+            .crossover(&weaker.feed_forward, &mut context.small_rng);
 
-        // gamble for matching recurrent genes
-        let mut recurrent: Genes<Recurrent<Connection>> = self
+        let recurrent = fitter
             .recurrent
-            .iterate_matches(&other.recurrent)
-            .map(|(gene_self, gene_other)| {
-                if context.gamble(0.5) {
-                    gene_self.clone()
-                } else {
-                    gene_other.clone()
-                }
-            })
-            .collect();
+            .crossover(&weaker.recurrent, &mut context.small_rng);
 
-        // add different feedforward genes
-        feed_forward.extend(
-            fitter
-                .feed_forward
-                .difference(&weaker.feed_forward)
-                .cloned(),
-        );
-
-        // add different recurrent genes
-        recurrent.extend(fitter.recurrent.difference(&weaker.recurrent).cloned());
+        let hidden = fitter
+            .hidden
+            .crossover(&weaker.hidden, &mut context.small_rng);
 
         Genome {
             feed_forward,
             recurrent,
+            hidden,
             ..fitter.clone()
         }
     }

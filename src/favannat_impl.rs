@@ -6,7 +6,7 @@ use crate::{
     activations::{self, Activation},
     genes::{
         connections::{Connection, ConnectionValue, FeedForward},
-        nodes::{Input, Node, Output},
+        nodes::{Input, Node, NodeValue, Output},
         Id, Weight,
     },
     Genome,
@@ -14,7 +14,7 @@ use crate::{
 
 impl NodeLike for Node {
     fn id(&self) -> usize {
-        self.id().0
+        NodeValue::id(self).0
     }
     fn activation(&self) -> fn(f64) -> f64 {
         match self.1 {
@@ -88,7 +88,7 @@ impl Recurrent<Node, Connection> for Genome {
                     let outward_wrapping_connection = FeedForward(Connection(
                         recurrent_connection.input(),
                         Weight(1.0),
-                        wrapper_output_node.id(),
+                        NodeValue::id(&*wrapper_output_node),
                     ));
 
                     // add nodes for wrapping

@@ -646,7 +646,7 @@ mod tests {
 
         if let Some(Evaluation::Progress(report)) = runtime.next() {
             assert!(report.fitness.raw_minimum + 1.0 < f64::EPSILON);
-            assert!(report.fitness.shifted_minimum < f64::EPSILON);
+            assert!(report.fitness.shifted_minimum.abs() < f64::EPSILON);
         }
     }
 }

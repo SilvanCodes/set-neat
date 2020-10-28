@@ -2,28 +2,27 @@ use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ordering,
     hash::{Hash, Hasher},
-    iter::FromIterator,
     ops::{Deref, DerefMut},
 };
 
 use super::{Activation, Gene, Id};
 
-pub trait NodeType {}
+pub trait NodeSpecifier {}
 
-pub trait NodeValue {}
+pub trait NodeValue {
+    fn id(&self) -> Id;
+}
 
-#[derive(Debug, Copy, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Node(pub Id, pub Activation);
 
-impl NodeValue for Node {}
-
-impl Gene for Node {}
-
-impl Node {
-    pub fn id(&self) -> Id {
+impl NodeValue for Node {
+    fn id(&self) -> Id {
         self.0
     }
 }
+
+impl Gene for Node {}
 
 impl Hash for Node {
     fn hash<H: Hasher>(&self, state: &mut H) {
@@ -57,13 +56,13 @@ impl Ord for Node {
     }
 }
 
-macro_rules! makeNodeType {
+macro_rules! makeNodeSpecifier {
     ( $( $name:ident ),* ) => {
         $(
             #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Deserialize, Serialize)]
             pub struct $name<T: NodeValue>(pub T);
 
-            impl<T: NodeValue> NodeType for $name<T> {}
+            impl<T: NodeValue> NodeSpecifier for $name<T> {}
 
             impl<T: NodeValue> Deref for $name<T> {
                 type Target = T;
@@ -78,17 +77,8 @@ macro_rules! makeNodeType {
                     &mut self.0
                 }
             }
-
-            impl<'a, T: NodeValue> FromIterator<&'a $name<T>> for Vec<&'a T> {
-                fn from_iter<I: IntoIterator<Item=&'a $name<T>>>(iter: I) -> Self {
-                    iter
-                    .into_iter()
-                    .map(|i| &i.0)
-                    .collect()
-                }
-            }
         )*
     };
 }
 
-makeNodeType!(Input, Hidden, Output);
+makeNodeSpecifier!(Input, Hidden, Output);

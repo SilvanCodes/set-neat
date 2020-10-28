@@ -3,32 +3,28 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, hash::Hash, iter::FromIterator, ops::Deref, ops::DerefMut};
 
 pub mod activations;
-mod connection;
 pub mod connections;
 mod id_generator;
-mod node;
 pub mod nodes;
 mod weights;
 
 pub use activations::Activation;
-pub use connection::ConnectionGene;
 pub use id_generator::{Id, IdGenerator};
-pub use node::NodeGene;
 pub use weights::{Weight, WeightDistribution, WeightInitialization, WeightPerturbator};
 
-pub trait Gene {}
+pub trait Gene: Eq + Hash {}
 
-impl<U: Gene, T: Deref<Target = U>> Gene for T {}
+impl<U: Gene, T: Eq + Hash + Deref<Target = U>> Gene for T {}
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct Genes<T: Gene + Hash + Eq>(pub HashSet<T>);
+pub struct Genes<T: Gene>(pub HashSet<T>);
 
-impl<T: Gene + Hash + Eq> Default for Genes<T> {
+impl<T: Gene> Default for Genes<T> {
     fn default() -> Self {
         Genes(Default::default())
     }
 }
 
-impl<T: Gene + Hash + Eq> Deref for Genes<T> {
+impl<T: Gene> Deref for Genes<T> {
     type Target = HashSet<T>;
 
     fn deref(&self) -> &Self::Target {
@@ -36,13 +32,13 @@ impl<T: Gene + Hash + Eq> Deref for Genes<T> {
     }
 }
 
-impl<T: Gene + Hash + Eq> DerefMut for Genes<T> {
+impl<T: Gene> DerefMut for Genes<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
-impl<T: Gene + Hash + Eq> Genes<T> {
+impl<T: Gene> Genes<T> {
     pub fn iterate_with_random_offset(&self, rng: &mut SmallRng) -> impl Iterator<Item = &T> {
         self.iter()
             .cycle()
@@ -55,23 +51,7 @@ impl<T: Gene + Hash + Eq> Genes<T> {
         random_vec.shuffle(rng);
         random_vec.into_iter()
     }
-}
 
-impl<T: Gene + Eq + Hash> FromIterator<T> for Genes<T> {
-    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
-        Genes(iter.into_iter().collect())
-    }
-}
-
-impl<U: Ord, T: Gene + Hash + Eq + Deref<Target = U>> Genes<T> {
-    pub fn as_sorted_vec(&self) -> Vec<&U> {
-        let mut vec: Vec<&U> = self.iterate_unwrapped().collect();
-        vec.sort_unstable();
-        vec
-    }
-}
-
-impl<T: Gene + Eq + Hash> Genes<T> {
     pub fn iterate_matches<'a>(
         &'a self,
         other: &'a Genes<T>,
@@ -86,8 +66,37 @@ impl<T: Gene + Eq + Hash> Genes<T> {
     }
 }
 
-impl<'a, U: 'a, T: Gene + Hash + Eq + Deref<Target = U>> Genes<T> {
+impl<T: Gene> FromIterator<T> for Genes<T> {
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+        Genes(iter.into_iter().collect())
+    }
+}
+
+impl<'a, U: 'a, T: Gene + Deref<Target = U>> Genes<T> {
     pub fn iterate_unwrapped(&'a self) -> impl Iterator<Item = &'a U> + Sized + Clone {
         self.iter().map(|value| value.deref())
+    }
+}
+
+impl<U: Ord, T: Gene + Deref<Target = U>> Genes<T> {
+    pub fn as_sorted_vec(&self) -> Vec<&U> {
+        let mut vec: Vec<&U> = self.iterate_unwrapped().collect();
+        vec.sort_unstable();
+        vec
+    }
+}
+
+impl<T: Gene + Clone> Genes<T> {
+    pub fn crossover(&self, other: &Self, rng: &mut impl Rng) -> Self {
+        self.iterate_matches(other)
+            .map(|(gene_self, gene_other)| {
+                if rng.gen::<f64>() < 0.5 {
+                    gene_self.clone()
+                } else {
+                    gene_other.clone()
+                }
+            })
+            .chain(self.difference(other).cloned())
+            .collect()
     }
 }

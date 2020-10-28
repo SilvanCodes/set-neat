@@ -8,7 +8,7 @@ use std::{
 
 use super::{Gene, Id, Weight};
 
-pub trait ConnectionType {}
+pub trait ConnectionSpecifier {}
 
 pub trait ConnectionValue {
     fn id(&self) -> (Id, Id);
@@ -74,13 +74,13 @@ impl Ord for Connection {
     }
 }
 
-macro_rules! makeConnectionType {
+macro_rules! makeConnectionSpecifier {
     ( $( $name:ident ),* ) => {
         $(
             #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
             pub struct $name<T: ConnectionValue>(pub T);
 
-            impl<T: ConnectionValue> ConnectionType for $name<T> {}
+            impl<T: ConnectionValue> ConnectionSpecifier for $name<T> {}
 
             impl<T: ConnectionValue> Deref for $name<T> {
                 type Target = T;
@@ -99,4 +99,4 @@ macro_rules! makeConnectionType {
     };
 }
 
-makeConnectionType!(FeedForward, Recurrent);
+makeConnectionSpecifier!(FeedForward, Recurrent);
