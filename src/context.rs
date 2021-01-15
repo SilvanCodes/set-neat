@@ -11,9 +11,8 @@ pub struct Context {
     // pub novelty_ratio: f64,
     pub added_to_archive: usize,
     pub consecutive_ineffective_generations: usize,
-    peak_fitness_buffer: Vec<f64>,
+    // peak_fitness_buffer: Vec<f64>,
     pub peak_average_fitness: f64,
-
     pub small_rng: SmallRng,
     pub weight_pertubator: WeightPerturbator,
 }
@@ -26,7 +25,7 @@ impl Context {
             statistics: Report::default(),
             added_to_archive: 0,
             consecutive_ineffective_generations: 0,
-            peak_fitness_buffer: Vec::new(),
+            // peak_fitness_buffer: Vec::new(),
             peak_average_fitness: f64::NEG_INFINITY,
             small_rng: SmallRng::seed_from_u64(parameters.seed),
             weight_pertubator: WeightPerturbator::new(

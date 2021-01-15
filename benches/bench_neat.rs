@@ -26,7 +26,6 @@ pub fn crossover_higly_mutated_genomes_benchmark(c: &mut Criterion) {
 
     parameters.setup.dimension.input = 1;
     parameters.setup.dimension.output = 1;
-    parameters.initialization.connections = 1.0;
 
     parameters.mutation.gene_node = 1.0;
     parameters.mutation.gene_connection = 1.0;

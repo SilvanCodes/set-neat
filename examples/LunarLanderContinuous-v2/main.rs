@@ -5,7 +5,7 @@ use favannat::{
 };
 use gym::{SpaceData, State};
 use ndarray::{stack, Array1, Array2, Axis};
-use set_neat::{scores::Raw, Evaluation, Genome, Neat, Progress};
+use set_neat::{Evaluation, Genome, Neat, Progress};
 
 use log::{error, info};
 use std::time::Instant;
@@ -98,7 +98,7 @@ fn train(standard_scaler: (Array1<f64>, Array1<f64>)) {
 
             // log possible solutions to file
             let mut genome = genome.clone();
-            genome.fitness.raw = Raw::fitness(validation_fitness);
+            genome.fitness.raw = validation_fitness;
             info!(target: "app::solutions", "{}", serde_json::to_string(&genome).unwrap());
             info!(
                 "finished validation runs with {} average fitness",

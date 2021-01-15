@@ -1,10 +1,8 @@
 use favannat::matrix::fabricator::RecurrentMatrixFabricator;
 use favannat::network::{StatefulEvaluator, StatefulFabricator};
-use gym::{SpaceData, SpaceTemplate, State};
-use ndarray::{stack, Array1, Array2, Axis};
-use set_neat::{
-    scores::Raw, utility::gym::StandardScaler, Behavior, Evaluation, Genome, Neat, Progress,
-};
+use gym::{utility::StandardScaler, SpaceData, SpaceTemplate, State};
+use ndarray::{stack, Array2, Axis};
+use set_neat::{Evaluation, Genome, Neat, Progress};
 
 use log::{error, info};
 use std::time::Instant;
@@ -49,7 +47,7 @@ fn train(standard_scaler: StandardScaler) {
                 run(genome, &standard_scaler, VALIDATION_RUNS, STEPS, false);
             // log possible solutions to file
             let mut genome = genome.clone();
-            genome.fitness.raw = Raw::fitness(validation_fitness);
+            genome.fitness.raw = validation_fitness;
             info!(target: "app::solutions", "{}", serde_json::to_string(&genome).unwrap());
             info!(
                 "finished validation runs with {} average fitness",
