@@ -2,12 +2,13 @@ mod context;
 mod favannat_impl;
 mod genes;
 mod genome;
-mod mutations;
 mod parameters;
 mod population;
 mod runtime;
-pub mod scores;
 mod species;
+pub mod utility;
+
+pub mod scores;
 
 // re-exports
 pub use crate::context::Context;

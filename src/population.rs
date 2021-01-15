@@ -143,7 +143,7 @@ impl Population {
 
         // sort members of species and compute species score
         for species in &mut self.species {
-            species.adjust(context, parameters);
+            species.adjust(parameters);
         }
 
         // check on final species count
@@ -184,7 +184,7 @@ impl Population {
 
         dbg!(&threshold);
 
-        threshold.iter().sum::<f64>() / threshold.len() as f64 * 1.5
+        threshold.iter().sum::<f64>() / threshold.len() as f64 * 1.0
     }
 
     fn adjust_threshold(&mut self, parameters: &Parameters) {
@@ -192,11 +192,13 @@ impl Population {
         match self.species.len() {
             length if length > parameters.compatability.target_species => {
                 self.context.compatability_threshold += self.context.threshold_delta
-                    * (length as f64 / parameters.compatability.target_species as f64).powi(2);
+                    * (length as f64 / parameters.compatability.target_species as f64);
+                //.powi(2);
             }
             length if length < parameters.compatability.target_species => {
                 self.context.compatability_threshold -= self.context.threshold_delta
-                    * (parameters.compatability.target_species as f64 / length as f64).powi(2);
+                    * (parameters.compatability.target_species as f64 / length as f64);
+                //.powi(2);
             }
             _ => {}
         }
@@ -218,7 +220,7 @@ impl Population {
             .iter()
             .fold(0.0, |sum, species| sum + species.score);
 
-        dbg!(self.species.len());
+        // dbg!(self.species.len());
 
         // if we can not differentiate species
         if total_fitness == 0.0 {
@@ -236,7 +238,7 @@ impl Population {
                 .retain(|species| species.score * offspring_ratio >= 1.0);
         }
 
-        dbg!(self.species.len());
+        // dbg!(self.species.len());
 
         // iterate species, only ones that qualify for reproduction are left
         for species in &self.species {

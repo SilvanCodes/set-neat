@@ -5,8 +5,8 @@ use favannat::network::{EdgeLike, NetLike, NodeLike, Recurrent};
 use crate::{
     activations::{self, Activation},
     genes::{
-        connections::{Connection, ConnectionValue, FeedForward},
-        nodes::{Input, Node, NodeValue, Output},
+        connections::{Connection, FeedForward},
+        nodes::{Input, Node, Output},
         Id, Weight,
     },
     Genome,
@@ -14,7 +14,7 @@ use crate::{
 
 impl NodeLike for Node {
     fn id(&self) -> usize {
-        NodeValue::id(self).0
+        self.id().0
     }
     fn activation(&self) -> fn(f64) -> f64 {
         match self.1 {
@@ -88,7 +88,7 @@ impl Recurrent<Node, Connection> for Genome {
                     let outward_wrapping_connection = FeedForward(Connection(
                         recurrent_connection.input(),
                         Weight(1.0),
-                        NodeValue::id(&*wrapper_output_node),
+                        Node::id(&*wrapper_output_node),
                     ));
 
                     // add nodes for wrapping
@@ -116,11 +116,9 @@ impl Recurrent<Node, Connection> for Genome {
         unrolled_genome
     }
 
-    /* fn memory(&self) -> usize {
-        let mut memory = self.recurrent.as_sorted_vec();
-        memory.dedup();
-        memory.len()
-    } */
+    fn recurrent_edges(&self) -> Vec<&Connection> {
+        self.recurrent.as_sorted_vec()
+    }
 }
 
 #[cfg(test)]

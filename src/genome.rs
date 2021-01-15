@@ -1,14 +1,12 @@
 use crate::{
     activations::Activation,
     genes::{
-        connections::{Connection, ConnectionValue, FeedForward, Recurrent},
-        nodes::{Hidden, Input, Node, NodeValue, Output},
+        connections::{Connection, FeedForward, Recurrent},
+        nodes::{Hidden, Input, Node, Output},
         Genes,
     },
-    scores::FitnessScore,
-    scores::NoveltyScore,
 };
-use crate::{genes::Weight, scores::ScoreValue};
+use crate::{genes::Weight, scores::Score};
 use crate::{Context, Parameters};
 use rand::seq::{IteratorRandom, SliceRandom};
 use rand::Rng;
@@ -21,8 +19,8 @@ pub struct Genome {
     pub outputs: Genes<Output<Node>>,
     pub feed_forward: Genes<FeedForward<Connection>>,
     pub recurrent: Genes<Recurrent<Connection>>,
-    pub fitness: FitnessScore,
-    pub novelty: NoveltyScore,
+    pub fitness: Score,
+    pub novelty: Score,
 }
 
 impl Genome {
@@ -43,6 +41,11 @@ impl Genome {
         }
     }
 
+    // consider removing this function
+    pub fn set_fitness(&mut self, fitness: f64) {
+        self.fitness.raw = fitness;
+    }
+
     pub fn nodes(&self) -> impl Iterator<Item = &Node> {
         self.inputs
             .iterate_unwrapped()
@@ -56,8 +59,8 @@ impl Genome {
             .iterate_with_random_offset(&mut context.small_rng)
             // connect configured percent of inputs to outputs, ceil for at least one
             .take(
-                (parameters.initialization.connections * parameters.setup.dimension.input as f64)
-                    .ceil() as usize,
+                (context.small_rng.gen::<f64>() * parameters.setup.dimension.input as f64).ceil()
+                    as usize,
             )
         {
             // connect to every output
@@ -80,23 +83,55 @@ impl Genome {
     }
 
     // score is combination of fitness & novelty
-    pub fn score(&self, context: &Context) -> f64 {
+    pub fn score(&self) -> f64 {
+        /* let score = self
+        .novelty
+        .normalized
+        .value()
+        .max(self.fitness.normalized.value()); */
+
+        let novelty = self.novelty.normalized;
+        let fitness = self.fitness.normalized;
+
+        if novelty == 0.0 && fitness == 0.0 {
+            return 0.0;
+        }
+
+        let (min, max) = if novelty < fitness {
+            (novelty, fitness)
+        } else {
+            (fitness, novelty)
+        };
+
+        // ratio tells us what score is dominant in this genome
+        let ratio = min / max / 2.0;
+
+        // we weight the scores by their ratio, i.e. a genome that has a good fitness value is primarily weighted by that
+        let score = min * ratio + max * (1.0 - ratio);
+        /*
         // self.fitness.normalized.value()
-        self.fitness.normalized.value() * (1.0 - context.novelty_ratio)
-            + self.novelty.normalized.value() * context.novelty_ratio
+        let score = self.fitness.normalized.value() * (1.0 - context.novelty_ratio)
+            + self.novelty.normalized.value() * context.novelty_ratio;
+        */
+        if score.is_nan() {
+            dbg!(&self);
+            // dbg!(&context);
+        }
+
+        score
     }
 
     // self is fitter if it has higher score or in case of equal score has fewer genes, i.e. less complexity
-    pub fn is_fitter_than(&self, other: &Self, context: &Context) -> bool {
-        let score_self = self.score(context);
-        let score_other = other.score(context);
+    pub fn is_fitter_than(&self, other: &Self) -> bool {
+        let score_self = self.score();
+        let score_other = other.score();
 
         score_self > score_other
             || ((score_self - score_other).abs() < f64::EPSILON && self.len() < other.len())
     }
 
     pub fn crossover(&self, other: &Self, context: &mut Context) -> Self {
-        let (fitter, weaker) = if self.is_fitter_than(other, context) {
+        let (fitter, weaker) = if self.is_fitter_than(other) {
             (self, other)
         } else {
             (other, self)
@@ -118,7 +153,11 @@ impl Genome {
             feed_forward,
             recurrent,
             hidden,
-            ..fitter.clone()
+            fitness: Default::default(),
+            novelty: Default::default(),
+            // use input and outputs from fitter, but they should be identical with weaker
+            inputs: fitter.inputs.clone(),
+            outputs: fitter.outputs.clone(),
         }
     }
 
@@ -288,7 +327,8 @@ impl Genome {
             .take(self.inputs.len() + self.hidden.len())
         {
             if let Some(end_node) = end_node_iterator.clone().find(|&end_node| {
-                end_node != start_node
+                // recurrent connection may target itself
+                (is_recurrent || end_node != start_node)
                     && !self.are_connected(&start_node, end_node, is_recurrent)
                     && (is_recurrent || !self.would_form_cycle(start_node, end_node))
             }) {
@@ -409,7 +449,7 @@ impl Genome {
         let difference = factor_genes * different_genes_count_total / (matching_genes_count_total + different_genes_count_total)
         // average of weight differences
         + factor_weights * if matching_genes_count_total > 0.0 { weight_difference_total / matching_genes_count_total } else { 0.0 }
-        // average of activation differences
+        // percent of different activation functions, considering matching nodes genes
         + factor_activations * if matching_nodes_count > 0.0 { activation_difference / matching_nodes_count } else { 0.0 };
 
         if difference.is_nan() {
@@ -437,7 +477,6 @@ impl Genome {
 #[cfg(test)]
 mod tests {
     use super::Genome;
-    use crate::genes::{connections::ConnectionValue, Activation, Id, Weight};
     use crate::Parameters;
     use crate::{
         context::Context,
@@ -446,7 +485,10 @@ mod tests {
             nodes::{Hidden, Input, Node, Output},
             Genes,
         },
-        scores::Raw,
+    };
+    use crate::{
+        genes::{Activation, Id, Weight},
+        scores::Score,
     };
 
     #[test]
@@ -457,7 +499,6 @@ mod tests {
 
         parameters.setup.dimension.input = 1;
         parameters.setup.dimension.output = 1;
-        parameters.initialization.connections = 1.0;
         parameters.initialization.activations = vec![Activation::Absolute, Activation::Cosine];
 
         let mut genome = Genome::new(&mut context, &parameters);
@@ -526,7 +567,6 @@ mod tests {
 
         parameters.setup.dimension.input = 1;
         parameters.setup.dimension.output = 1;
-        parameters.initialization.connections = 1.0;
 
         let mut genome = Genome::new(&mut context, &parameters);
 
@@ -547,7 +587,6 @@ mod tests {
 
         parameters.setup.dimension.input = 1;
         parameters.setup.dimension.output = 1;
-        parameters.initialization.connections = 1.0;
 
         let mut genome_0 = Genome::new(&mut context, &parameters);
 
@@ -583,7 +622,6 @@ mod tests {
 
         parameters.setup.dimension.input = 2;
         parameters.setup.dimension.output = 1;
-        parameters.initialization.connections = 1.0;
 
         let mut genome_0 = Genome::new(&mut context, &parameters);
 
@@ -591,9 +629,7 @@ mod tests {
 
         let mut genome_1 = genome_0.clone();
 
-        genome_1.fitness.raw = Raw::fitness(1.0);
-        genome_1.fitness.shifted = genome_1.fitness.raw.shift(0.0);
-        genome_1.fitness.normalized = genome_1.fitness.shifted.normalize(1.0);
+        genome_1.fitness = Score::new(1.0, 0.0, 1.0);
 
         // mutate genome_0
         genome_0.add_node(&mut context, &parameters);
@@ -617,7 +653,6 @@ mod tests {
 
         parameters.setup.dimension.input = 2;
         parameters.setup.dimension.output = 1;
-        parameters.initialization.connections = 1.0;
 
         let mut genome_0 = Genome::new(&mut context, &parameters);
 
@@ -645,7 +680,6 @@ mod tests {
 
         parameters.setup.dimension.input = 1;
         parameters.setup.dimension.output = 1;
-        parameters.initialization.connections = 1.0;
 
         let mut genome_0 = Genome::new(&mut context, &parameters);
 
@@ -668,7 +702,6 @@ mod tests {
 
         parameters.setup.dimension.input = 1;
         parameters.setup.dimension.output = 1;
-        parameters.initialization.connections = 1.0;
 
         let mut genome_0 = Genome::new(&mut context, &parameters);
 
@@ -836,7 +869,7 @@ mod tests {
 
         let delta = Genome::compatability_distance(&genome_0, &genome_1, 0.0, 2.0, 0.0);
 
-        assert!(delta - 2.0 < f64::EPSILON);
+        assert!((delta - 2.0).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -879,6 +912,6 @@ mod tests {
         let delta = Genome::compatability_distance(&genome_0, &genome_1, 2.0, 0.0, 0.0);
 
         // factor 2 times 2 different genes
-        assert!(delta - 2.0 * 2.0 < f64::EPSILON);
+        assert!((delta - 2.0 * 2.0).abs() < f64::EPSILON);
     }
 }

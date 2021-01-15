@@ -1,5 +1,8 @@
-use favannat::matrix::fabricator::StatefulMatrixFabricator;
-use favannat::network::{StatefulEvaluator, StatefulFabricator};
+use favannat::{
+    looping::fabricator::LoopingFabricator,
+    matrix::fabricator::RecurrentMatrixFabricator,
+    network::{StatefulEvaluator, StatefulFabricator},
+};
 use gym::{SpaceData, State};
 use ndarray::{array, stack, Array1, Axis};
 use set_neat::{Evaluation, Genome, Neat, Progress};
@@ -71,7 +74,7 @@ fn train() {
         let gym = gym::GymClient::default();
         let env = gym.make(ENV);
 
-        let mut evaluator = StatefulMatrixFabricator::fabricate(genome).unwrap();
+        let mut evaluator = RecurrentMatrixFabricator::fabricate(genome).unwrap();
         let mut fitness = 0.0;
 
         let mut final_observation = SpaceData::BOX(array![]);
@@ -145,14 +148,14 @@ fn train() {
             }
             // log possible solutions to file
             let mut genome = genome.clone();
-            genome.fitness = fitness;
+            genome.set_fitness(fitness);
             info!(target: "app::solutions", "{}", serde_json::to_string(&genome).unwrap());
             info!("finished validation runs with {} average fitness", fitness);
             if fitness >= REQUIRED_FITNESS {
-                return Progress::Solution(genome);
+                return Progress::fitness(fitness).solved(genome);
             }
         }
-        Progress::Fitness(fitness)
+        Progress::fitness(fitness)
         // let state = final_observation.get_box().unwrap().to_vec();
         // Progress::Novelty(state)
         // fitness = fitness.max(-150.0);
@@ -203,8 +206,8 @@ fn train() {
         let secs = now.elapsed().as_millis();
         info!(
             "winning genome ({},{}) after {} seconds: {:?}",
-            winner.node_genes.len(),
-            winner.connection_genes.len(),
+            winner.nodes().count(),
+            winner.len(),
             secs as f64 / 1000.0,
             winner
         );
@@ -217,7 +220,7 @@ fn showcase(genome: Genome) {
     let gym = gym::GymClient::default();
     let env = gym.make(ENV);
 
-    let mut evaluator = StatefulMatrixFabricator::fabricate(&genome).unwrap();
+    let mut evaluator = RecurrentMatrixFabricator::fabricate(&genome).unwrap();
 
     let mut recent_observation = env.reset().expect("Unable to reset");
     let mut total_reward = 0.0;

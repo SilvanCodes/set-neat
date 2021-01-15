@@ -7,13 +7,9 @@ use ndarray::{arr1, Array2, ArrayView1, Axis};
 use rayon::prelude::*;
 use serde::Serialize;
 
-use crate::{
-    context::Context,
-    population::Population,
-    scores::{Fitness, NoveltyScore, Raw},
-};
-use crate::{genome::Genome, scores::ScoreValue};
-use crate::{scores::FitnessScore, Neat};
+use crate::genome::Genome;
+use crate::{context::Context, population::Population, utility::gym::StandardScaler};
+use crate::{scores::Score, Neat};
 
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct Report {
@@ -22,7 +18,7 @@ pub struct Report {
     pub archive_threshold: f64,
     pub fitness: FitnessReport,
     pub novelty: NoveltyReport,
-    pub novelty_ratio: f64,
+    // pub novelty_ratio: f64,
     pub peak_fitness_average: f64,
     pub num_generation: usize,
     pub num_offpring: usize,
@@ -69,16 +65,13 @@ pub struct Runtime<'a> {
     archive: Vec<Behavior>,
 }
 
-/* #[derive(Debug)]
-pub struct Progress {
-    raw_fitness: Raw<Fitness>,
-    behavior: Behavior,
-} */
-
 #[derive(Debug)]
 pub enum Progress {
-    Status(Raw<Fitness>, Behavior),
-    Solution(Raw<Fitness>, Behavior, Genome),
+    Empty,
+    Fitness(f64),
+    Novelty(Behavior),
+    Status(f64, Behavior),
+    Solution(Option<f64>, Option<Behavior>, Box<Genome>),
 }
 
 #[derive(Debug, Default)]
@@ -93,28 +86,62 @@ impl Deref for Behavior {
 }
 
 impl Progress {
-    pub fn new(raw_fitness: Raw<Fitness>, behavior: Behavior) -> Self {
-        Progress::Status(raw_fitness, behavior)
+    pub fn new(fitness: f64, behavior: Vec<f64>) -> Self {
+        Progress::Status(fitness, Behavior(behavior))
     }
 
-    pub fn behavior(&self) -> &Behavior {
+    pub fn empty() -> Self {
+        Progress::Empty
+    }
+
+    pub fn solved(self, genome: Genome) -> Self {
         match self {
-            Progress::Status(_, b) => b,
-            Progress::Solution(_, b, _) => b,
+            Progress::Fitness(fitness) => Progress::Solution(Some(fitness), None, Box::new(genome)),
+            Progress::Novelty(behavior) => {
+                Progress::Solution(None, Some(behavior), Box::new(genome))
+            }
+            Progress::Status(fitness, behavior) => {
+                Progress::Solution(Some(fitness), Some(behavior), Box::new(genome))
+            }
+            Progress::Solution(fitness, behavior, _) => {
+                Progress::Solution(fitness, behavior, Box::new(genome))
+            }
+            Progress::Empty => Progress::Solution(None, None, Box::new(genome)),
         }
     }
 
-    pub fn raw_fitness(&self) -> &Raw<Fitness> {
+    pub fn fitness(fitness: f64) -> Self {
+        Self::Fitness(fitness)
+    }
+
+    pub fn novelty(behavior: Vec<f64>) -> Self {
+        Self::Novelty(Behavior(behavior))
+    }
+
+    pub fn behavior(&self) -> Option<&Behavior> {
         match self {
-            Progress::Status(f, _) => f,
-            Progress::Solution(f, _, _) => f,
+            Progress::Status(_, behavior) => Some(behavior),
+            Progress::Solution(_, behavior, _) => behavior.as_ref(),
+            Progress::Novelty(behavior) => Some(behavior),
+            Progress::Fitness(_) => None,
+            Progress::Empty => None,
+        }
+    }
+
+    pub fn raw_fitness(&self) -> Option<f64> {
+        match *self {
+            Progress::Status(fitness, _) => Some(fitness),
+            Progress::Solution(fitness, _, _) => fitness,
+            Progress::Fitness(fitness) => Some(fitness),
+            Progress::Novelty(_) => None,
+            Progress::Empty => None,
         }
     }
 
     pub fn is_solution(&self) -> Option<&Genome> {
         match self {
-            Progress::Status(_, _) => None,
-            Progress::Solution(_, _, g) => Some(g),
+            Progress::Solution(_, _, genome) => Some(genome),
+            _ => None,
         }
     }
 }
@@ -183,7 +210,7 @@ impl<'a> Runtime<'a> {
         let raw_fitnesses_arr = arr1(
             progress
                 .iter()
-                .map(|p| p.raw_fitness().value())
+                .flat_map(|p| p.raw_fitness())
                 .collect::<Vec<f64>>()
                 .as_slice(),
         );
@@ -192,21 +219,6 @@ impl<'a> Runtime<'a> {
         let raw_fitness_std_dev = raw_fitnesses_arr.std_axis(Axis(0), 0.0).as_slice().unwrap()[0];
 
         self.context.statistics.fitness.raw_std_dev = raw_fitness_std_dev;
-
-        /* let percent_diff_to_mean = dbg!(self
-            .context
-            .compare_to_peak_fitness_mean(self.context.statistics.fitness.raw_maximum));
-
-        if percent_diff_to_mean > self.neat.parameters.novelty.demanded_increase_percent {
-            self.context.consecutive_ineffective_generations = 0;
-        } else {
-            self.context.consecutive_ineffective_generations += 1;
-        }
-
-        if percent_diff_to_mean > 0.0 {
-            self.context
-                .put_peak_fitness(self.context.statistics.fitness.raw_maximum);
-        } */
 
         if self.context.statistics.fitness.raw_average < self.context.peak_average_fitness {
             self.context.consecutive_ineffective_generations += 1;
@@ -221,7 +233,7 @@ impl<'a> Runtime<'a> {
             self.context.consecutive_ineffective_generations;
 
         // determine if impatience triggers
-        if self.context.consecutive_ineffective_generations
+        /* if self.context.consecutive_ineffective_generations
             > self.neat.parameters.novelty.impatience
         {
             // determine novelty ratio, capped
@@ -235,7 +247,7 @@ impl<'a> Runtime<'a> {
             self.context.novelty_ratio = 0.0;
         }
 
-        self.context.statistics.novelty_ratio = self.context.novelty_ratio;
+        self.context.statistics.novelty_ratio = self.context.novelty_ratio; */
     }
 
     fn generate_progress(&self) -> Vec<Progress> {
@@ -266,34 +278,33 @@ impl<'a> Runtime<'a> {
     }
 
     fn assign_novelty(&mut self, progress: &[Progress]) {
-        let mut behaviors = progress
+        let behaviors: Vec<&Behavior> = progress
             .iter()
-            .map(|progress| progress.behavior())
-            .chain(self.archive.iter());
+            .flat_map(|progress| progress.behavior())
+            .chain(self.archive.iter())
+            .collect();
 
-        let width = progress[0].behavior().len();
-        let height = progress.len() + self.archive.len();
+        if behaviors.is_empty() {
+            return;
+        }
+
+        let width = behaviors[0].len();
+        let height = behaviors.len();
+
+        let mut behavior_iter = behaviors.iter();
 
         let mut behavior_arr: Array2<f64> = Array2::zeros((width, height));
         for mut row in behavior_arr.axis_iter_mut(Axis(1)) {
-            row += &ArrayView1::from(behaviors.next().unwrap().as_slice());
+            row += &ArrayView1::from(behavior_iter.next().unwrap().as_slice());
         }
 
-        let means = behavior_arr.mean_axis(Axis(1)).unwrap();
-        let mut std_dev = behavior_arr.std_axis(Axis(1), 0.0);
-
-        // clean std_dev from zeroes
-        std_dev.map_inplace(|v| {
-            if *v == 0.0 {
-                *v = 1.0
-            }
-        });
+        let standard_scaler = StandardScaler::new(behavior_arr.view().t());
 
         let mut z_scores_arr: Array2<f64> = Array2::zeros((width, height));
 
         for (index, row) in behavior_arr.axis_iter(Axis(1)).enumerate() {
             let mut z_row = z_scores_arr.index_axis_mut(Axis(1), index);
-            z_row += &((&row - &means) / &std_dev);
+            z_row += &standard_scaler.scale(row);
         }
 
         let mut add_to_archive = Vec::new();
@@ -307,7 +318,7 @@ impl<'a> Runtime<'a> {
         for (index, z_score) in z_scores_arr
             .axis_iter(Axis(1))
             .enumerate()
-            .take(progress.len())
+            .take(behaviors.len() - self.archive.len())
         {
             let mut distances = z_scores_arr
                 .axis_iter(Axis(1))
@@ -321,7 +332,11 @@ impl<'a> Runtime<'a> {
                 .map(|sum| sum.sqrt())
                 .collect::<Vec<f64>>();
 
-            distances.sort_by(|dist_0, dist_1| dist_0.partial_cmp(&dist_1).unwrap());
+            distances.sort_by(|dist_0, dist_1| {
+                dist_0
+                    .partial_cmp(&dist_1)
+                    .unwrap_or_else(|| panic!("failed to compare {} and {}", dist_0, dist_1))
+            });
 
             // take k nearest neighbors, calculate and assign spareseness
             let sparseness = distances
@@ -349,24 +364,22 @@ impl<'a> Runtime<'a> {
             }
         }
 
-        let raw_minimum = Raw::novelty(raw_minimum);
-        let raw_average = Raw::novelty(raw_sum / progress.len() as f64);
-        let raw_maximum = Raw::novelty(raw_maximum);
+        let raw_average = raw_sum / behaviors.len() as f64;
 
-        let baseline = raw_minimum.value();
+        let baseline = raw_minimum;
 
-        let shifted_minimum = raw_minimum.shift(baseline);
-        let shifted_average = raw_average.shift(baseline);
-        let shifted_maximum = raw_maximum.shift(baseline);
+        let shifted_minimum = raw_minimum - baseline;
+        let shifted_average = raw_average - baseline;
+        let shifted_maximum = raw_maximum - baseline;
 
-        let with = shifted_maximum.value();
+        let with = shifted_maximum.max(1.0);
 
-        let normalized_minimum = shifted_minimum.normalize(with);
-        let normalized_average = shifted_average.normalize(with);
-        let normalized_maximum = shifted_maximum.normalize(with);
+        let normalized_minimum = shifted_minimum / with;
+        let normalized_average = shifted_average / with;
+        let normalized_maximum = shifted_maximum / with;
 
         for (index, individual) in self.population.individuals.iter_mut().enumerate() {
-            individual.novelty = NoveltyScore::new(raw_novelties[index], baseline, with);
+            individual.novelty = Score::new(raw_novelties[index], baseline, with);
         }
 
         // actually add to archive if over threshold
@@ -387,17 +400,17 @@ impl<'a> Runtime<'a> {
             self.context.statistics.archive_threshold = self.context.archive_threshold;
         }
 
-        self.context.statistics.novelty.raw_maximum = raw_maximum.value();
-        self.context.statistics.novelty.raw_minimum = raw_minimum.value();
-        self.context.statistics.novelty.raw_average = raw_average.value();
+        self.context.statistics.novelty.raw_maximum = raw_maximum;
+        self.context.statistics.novelty.raw_minimum = raw_minimum;
+        self.context.statistics.novelty.raw_average = raw_average;
 
-        self.context.statistics.novelty.shifted_maximum = shifted_maximum.value();
-        self.context.statistics.novelty.shifted_minimum = shifted_minimum.value();
-        self.context.statistics.novelty.shifted_average = shifted_average.value();
+        self.context.statistics.novelty.shifted_maximum = shifted_maximum;
+        self.context.statistics.novelty.shifted_minimum = shifted_minimum;
+        self.context.statistics.novelty.shifted_average = shifted_average;
 
-        self.context.statistics.novelty.normalized_maximum = normalized_maximum.value();
-        self.context.statistics.novelty.normalized_minimum = normalized_minimum.value();
-        self.context.statistics.novelty.normalized_average = normalized_average.value();
+        self.context.statistics.novelty.normalized_maximum = normalized_maximum;
+        self.context.statistics.novelty.normalized_minimum = normalized_minimum;
+        self.context.statistics.novelty.normalized_average = normalized_average;
     }
 
     // should be top performer with regard to raw fitness ?
@@ -407,7 +420,7 @@ impl<'a> Runtime<'a> {
             .individuals
             .iter()
             .enumerate()
-            .map(|(index, individual)| (index, individual.fitness.raw.value()))
+            .map(|(index, individual)| (index, individual.fitness.raw))
             .fold((0_usize, f64::NEG_INFINITY), |acc, val| {
                 if val.1 > acc.1 {
                     val
@@ -425,50 +438,64 @@ impl<'a> Runtime<'a> {
         let mut raw_sum = 0.0;
         let mut raw_maximum = f64::NEG_INFINITY;
 
-        // analyse raw fitness values
-        for raw_fitness in progress.iter().map(|p| p.raw_fitness()) {
-            if raw_fitness.value() > raw_maximum {
-                raw_maximum = raw_fitness.value();
-            }
-            if raw_fitness.value() < raw_minimum {
-                raw_minimum = raw_fitness.value();
-            }
-            raw_sum += raw_fitness.value();
+        let fitnesses: Vec<(usize, f64)> = progress
+            .iter()
+            .enumerate()
+            .flat_map(|(index, progress)| progress.raw_fitness().map(|raw| (index, raw)))
+            .collect();
+
+        if fitnesses.is_empty() {
+            return;
         }
 
-        let raw_minimum = Raw::fitness(raw_minimum);
-        let raw_average = Raw::fitness(raw_sum / progress.len() as f64);
-        let raw_maximum = Raw::fitness(raw_maximum);
+        // analyse raw fitness values
+        for &(_, raw_fitness) in &fitnesses {
+            if raw_fitness > raw_maximum {
+                raw_maximum = raw_fitness;
+            }
+            if raw_fitness < raw_minimum {
+                raw_minimum = raw_fitness;
+            }
+            raw_sum += raw_fitness;
+        }
 
-        let baseline = raw_minimum.value();
+        // let raw_minimum = Raw::fitness(raw_minimum);
+        let raw_average = raw_sum / fitnesses.len() as f64;
+        // let raw_maximum = Raw::fitness(raw_maximum);
 
-        let shifted_minimum = raw_minimum.shift(baseline);
-        let shifted_average = raw_average.shift(baseline);
-        let shifted_maximum = raw_maximum.shift(baseline);
+        let baseline = raw_minimum;
 
-        let with = shifted_maximum.value();
+        let shifted_minimum = raw_minimum - baseline;
+        let shifted_average = raw_average - baseline;
+        let shifted_maximum = raw_maximum - baseline;
 
-        let normalized_minimum = shifted_minimum.normalize(with);
-        let normalized_average = shifted_average.normalize(with);
-        let normalized_maximum = shifted_maximum.normalize(with);
+        let with = shifted_maximum.max(1.0);
+
+        let normalized_minimum = shifted_minimum / with;
+        let normalized_average = shifted_average / with;
+        let normalized_maximum = shifted_maximum / with;
 
         // shift and normalize fitness
+        for (index, raw_fitness) in fitnesses {
+            self.population.individuals[index].fitness = Score::new(raw_fitness, baseline, with);
+        }
+        /*
         for (index, individual) in self.population.individuals.iter_mut().enumerate() {
             individual.fitness =
                 FitnessScore::new(progress[index].raw_fitness().value(), baseline, with);
-        }
+        } */
 
-        self.context.statistics.fitness.raw_maximum = raw_maximum.value();
-        self.context.statistics.fitness.raw_minimum = raw_minimum.value();
-        self.context.statistics.fitness.raw_average = raw_average.value();
+        self.context.statistics.fitness.raw_maximum = raw_maximum;
+        self.context.statistics.fitness.raw_minimum = raw_minimum;
+        self.context.statistics.fitness.raw_average = raw_average;
 
-        self.context.statistics.fitness.shifted_maximum = shifted_maximum.value();
-        self.context.statistics.fitness.shifted_minimum = shifted_minimum.value();
-        self.context.statistics.fitness.shifted_average = shifted_average.value();
+        self.context.statistics.fitness.shifted_maximum = shifted_maximum;
+        self.context.statistics.fitness.shifted_minimum = shifted_minimum;
+        self.context.statistics.fitness.shifted_average = shifted_average;
 
-        self.context.statistics.fitness.normalized_maximum = normalized_maximum.value();
-        self.context.statistics.fitness.normalized_minimum = normalized_minimum.value();
-        self.context.statistics.fitness.normalized_average = normalized_average.value();
+        self.context.statistics.fitness.normalized_maximum = normalized_maximum;
+        self.context.statistics.fitness.normalized_minimum = normalized_minimum;
+        self.context.statistics.fitness.normalized_average = normalized_average;
     }
 
     fn reset_generational_statistics(&mut self) {
@@ -485,7 +512,6 @@ mod tests {
     use super::Neat;
     use crate::genome::Genome;
     use crate::runtime::{Evaluation, Progress};
-    use crate::scores::Raw;
 
     #[test]
     fn place_into_species() {
@@ -586,16 +612,16 @@ mod tests {
 
     #[test]
     fn run_neat_till_10_connections() {
-        todo!("return solution from fitness function");
-
         fn fitness_function(genome: &Genome) -> Progress {
             let fitness = genome.feed_forward.len() as f64;
-            Progress::new(Raw::fitness(fitness), Default::default())
+            if fitness < 10.0 {
+                Progress::fitness(fitness)
+            } else {
+                Progress::fitness(fitness).solved(genome.clone())
+            }
         }
 
         let mut neat = Neat::new("src/Config.toml", Box::new(fitness_function));
-
-        // neat.parameters.required_fitness = 10.0;
 
         if let Some(winner) = neat
             .run()
@@ -611,16 +637,16 @@ mod tests {
 
     #[test]
     fn run_neat_till_50_connections() {
-        todo!("return solution from fitness function");
-
         fn fitness_function(genome: &Genome) -> Progress {
             let fitness = genome.feed_forward.len() as f64;
-            Progress::new(Raw::fitness(fitness), Default::default())
+            if fitness < 50.0 {
+                Progress::fitness(fitness)
+            } else {
+                Progress::fitness(fitness).solved(genome.clone())
+            }
         }
 
         let mut neat = Neat::new("src/Config.toml", Box::new(fitness_function));
-
-        // neat.parameters.required_fitness = 50.0;
 
         if let Some(winner) = neat
             .run()
@@ -637,7 +663,7 @@ mod tests {
     #[test]
     fn move_negative_fitness_to_zero_baseline() {
         fn fitness_function(_genome: &Genome) -> Progress {
-            Progress::new(Raw::fitness(-1.0), Default::default())
+            Progress::fitness(-1.0)
         }
 
         let neat = Neat::new("src/Config.toml", Box::new(fitness_function));

@@ -29,7 +29,7 @@
 </html>
 <script>
     // const LOGFILE = 'progress-3_samples.log';
-    const LOGFILE = window.location.href.match(/(?<=\?=).*/)[0] || 'progress.log';
+    const LOGFILE = window.location.href.match(/(?<=\?=).*/)[0];
 
     let keys = [/* 'compatability_threshold', */ 'archive_threshold', 'novelty_peak', 'novelty_ratio', 'num_consecutive_ineffective_generations'];
     let keys2 = ['num_species', 'fitness_average', 'fitness_peak', 'fitness_min', 'peak_fitness_average'];
@@ -47,38 +47,11 @@
         'peak_fitness_average': 'rgb(54, 230, 35)'
     }
 
-    /* let colors = [
-        // "rgb(54, 162, 235)",
-        "rgb(75, 192, 192)",
-        "rgb(255, 99, 132)",
-        "rgb(255, 205, 86)",
-        "rgb(54, 162, 235)",
-        "rgb(75, 192, 192)",
-        "rgb(201, 203, 207)",
-        "rgb(255, 159, 64)",
-        "rgb(153, 102, 255)",
-        "rgb(255, 99, 132)",
-        "rgb(255, 205, 86)"
-    ];
-
-    let colors2 = [
-        "rgb(255, 0, 0)",
-        "rgb(201, 203, 207)",
-        "rgb(255, 159, 64)",
-        "rgb(153, 102, 255)",
-    ] */
-
     async function load() {
         fetch(LOGFILE)
             .then(response => response.text())
             .then(logs => {
                 logs = JSON.parse(`[${logs.slice(0, -2)}]`)
-
-
-
-                // let keys = [/* 'compatability_threshold', */ 'archive_threshold', 'novelty_peak'];
-                // let keys2 = ['num_species', 'fitness_average', 'fitness_peak', 'fitness_min'];
-
 
                 let datasets = keys.map((key, idx) => ({
                     label: key,
@@ -298,4 +271,4 @@
 
 </script>
 
-</html>
+</html>s

@@ -9,15 +9,15 @@ use super::{Activation, Gene, Id};
 
 pub trait NodeSpecifier {}
 
-pub trait NodeValue {
-    fn id(&self) -> Id;
-}
+pub trait NodeMarker {}
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Node(pub Id, pub Activation);
 
-impl NodeValue for Node {
-    fn id(&self) -> Id {
+impl NodeMarker for Node {}
+
+impl Node {
+    pub fn id(&self) -> Id {
         self.0
     }
 }
@@ -60,11 +60,11 @@ macro_rules! makeNodeSpecifier {
     ( $( $name:ident ),* ) => {
         $(
             #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Deserialize, Serialize)]
-            pub struct $name<T: NodeValue>(pub T);
+            pub struct $name<T: NodeMarker>(pub T);
 
-            impl<T: NodeValue> NodeSpecifier for $name<T> {}
+            impl<T: NodeMarker> NodeSpecifier for $name<T> {}
 
-            impl<T: NodeValue> Deref for $name<T> {
+            impl<T: NodeMarker> Deref for $name<T> {
                 type Target = T;
 
                 fn deref(&self) -> &Self::Target {
@@ -72,7 +72,7 @@ macro_rules! makeNodeSpecifier {
                 }
             }
 
-            impl<T: NodeValue> DerefMut for $name<T> {
+            impl<T: NodeMarker> DerefMut for $name<T> {
                 fn deref_mut(&mut self) -> &mut Self::Target {
                     &mut self.0
                 }

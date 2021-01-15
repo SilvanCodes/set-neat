@@ -10,33 +10,14 @@ use super::{Gene, Id, Weight};
 
 pub trait ConnectionSpecifier {}
 
-pub trait ConnectionValue {
-    fn id(&self) -> (Id, Id);
-    fn input(&self) -> Id;
-    fn output(&self) -> Id;
-    fn weight(&mut self) -> &mut Weight;
-}
+pub trait ConnectionMarker {}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Connection(pub Id, pub Weight, pub Id);
 
-impl ConnectionValue for Connection {
-    fn id(&self) -> (Id, Id) {
-        (self.0, self.2)
-    }
-    fn input(&self) -> Id {
-        self.0
-    }
-    fn output(&self) -> Id {
-        self.2
-    }
-    fn weight(&mut self) -> &mut Weight {
-        &mut self.1
-    }
-}
-impl Gene for Connection {}
+impl ConnectionMarker for Connection {}
 
-/* impl Connection {
+impl Connection {
     pub fn id(&self) -> (Id, Id) {
         (self.0, self.2)
     }
@@ -46,7 +27,11 @@ impl Gene for Connection {}
     pub fn output(&self) -> Id {
         self.2
     }
-} */
+    pub fn weight(&mut self) -> &mut Weight {
+        &mut self.1
+    }
+}
+impl Gene for Connection {}
 
 impl PartialEq for Connection {
     fn eq(&self, other: &Self) -> bool {
@@ -78,11 +63,11 @@ macro_rules! makeConnectionSpecifier {
     ( $( $name:ident ),* ) => {
         $(
             #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
-            pub struct $name<T: ConnectionValue>(pub T);
+            pub struct $name<T: ConnectionMarker>(pub T);
 
-            impl<T: ConnectionValue> ConnectionSpecifier for $name<T> {}
+            impl<T: ConnectionMarker> ConnectionSpecifier for $name<T> {}
 
-            impl<T: ConnectionValue> Deref for $name<T> {
+            impl<T: ConnectionMarker> Deref for $name<T> {
                 type Target = T;
 
                 fn deref(&self) -> &Self::Target {
@@ -90,7 +75,7 @@ macro_rules! makeConnectionSpecifier {
                 }
             }
 
-            impl<T: ConnectionValue> DerefMut for $name<T> {
+            impl<T: ConnectionMarker> DerefMut for $name<T> {
                 fn deref_mut(&mut self) -> &mut Self::Target {
                     &mut self.0
                 }

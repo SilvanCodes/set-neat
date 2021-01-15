@@ -24,7 +24,6 @@ pub struct Setup {
 pub struct Initialization {
     pub output: Activation,
     pub activations: Vec<Activation>,
-    pub connections: f64,
     #[serde(default)]
     pub weights: WeightInitialization,
 }
@@ -45,7 +44,6 @@ impl Default for Initialization {
                 Activation::Absolute,
                 Activation::Relu,
             ],
-            connections: 1.0,
             weights: WeightInitialization::Random,
         }
     }
@@ -112,10 +110,10 @@ pub struct Compatability {
 
 #[derive(Deserialize, Serialize, Default, Debug)]
 pub struct Novelty {
-    pub cap: f64,
+    // pub cap: f64,
     pub nearest_neighbors: usize,
-    pub impatience: usize,
-    pub demanded_increase_percent: f64,
+    // pub impatience: usize,
+    // pub demanded_increase_percent: f64,
 }
 
 impl Parameters {

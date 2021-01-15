@@ -23,23 +23,17 @@ impl Species {
         }
     }
 
-    fn order_surviving_members(&mut self, context: &Context, parameters: &Parameters) {
+    fn order_surviving_members(&mut self, parameters: &Parameters) {
         // sort members by descending score, i.e. fittest first
-        self.members.sort_by(|genome_0, genome_1| {
-            genome_1
-                .score(context)
-                .partial_cmp(&genome_0.score(context))
-                .unwrap()
-        });
+        self.members
+            .sort_by(|genome_0, genome_1| genome_1.score().partial_cmp(&genome_0.score()).unwrap());
         // reduce to surviving members
         self.members.truncate(
             (self.members.len() as f64 * parameters.reproduction.surviving).ceil() as usize,
         );
-
-        dbg!(self.members.len());
     }
 
-    fn compute_score(&mut self, context: &Context) {
+    fn compute_score(&mut self) {
         let factor = self.members.len() as f64;
         let old_score = self.score;
 
@@ -47,7 +41,7 @@ impl Species {
         self.score = self
             .members
             .iter()
-            .map(|member| member.score(context) / factor)
+            .map(|member| member.score() / factor)
             .sum();
 
         // did score increase ?
@@ -58,9 +52,9 @@ impl Species {
         }
     }
 
-    pub fn adjust(&mut self, context: &Context, parameters: &Parameters) {
-        self.order_surviving_members(context, parameters);
-        self.compute_score(context);
+    pub fn adjust(&mut self, parameters: &Parameters) {
+        self.order_surviving_members(parameters);
+        self.compute_score();
     }
 
     pub fn prepare_next_generation(&mut self) {

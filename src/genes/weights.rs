@@ -68,6 +68,7 @@ impl Default for WeightInitialization {
     }
 }
 
+#[derive(Debug)]
 pub enum WeightPerturbator {
     Uniform(Uniform<f64>),
     Normal(Normal<f64>),

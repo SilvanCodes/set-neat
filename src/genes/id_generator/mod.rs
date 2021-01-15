@@ -6,6 +6,7 @@ use id_iter::IdIter;
 mod id;
 mod id_iter;
 
+#[derive(Debug)]
 pub struct IdGenerator {
     id_gen: RangeFrom<usize>,
     id_cache: HashMap<(Id, Id), Vec<Id>>,

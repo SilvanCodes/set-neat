@@ -1,35 +1,33 @@
-use favannat::matrix::fabricator::RecurrentMatrixFabricator;
 use favannat::{
     looping::fabricator::LoopingFabricator,
+    matrix::fabricator::RecurrentMatrixFabricator,
     network::{StatefulEvaluator, StatefulFabricator},
 };
 use gym::{SpaceData, State};
 use ndarray::{stack, Array1, Array2, Axis};
-use set_neat::{scores::Raw, Evaluation, Genome, Neat, Progress};
+use set_neat::{Evaluation, Genome, Neat, Progress};
 
 use log::{error, info};
 use std::time::Instant;
 use std::time::SystemTime;
 use std::{env, fs};
 
-pub const RUNS: usize = 5;
-pub const STEPS: usize = usize::MAX;
+pub const RUNS: usize = 10;
+pub const STEPS: usize = 100;
 pub const VALIDATION_RUNS: usize = 100;
-pub const ENV: &str = "LunarLanderContinuous-v2";
-pub const REQUIRED_FITNESS: f64 = 200.0;
+pub const ENV: &str = "CartPole-v1";
+pub const REQUIRED_FITNESS: f64 = 495.0;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
 
     if let Some(timestamp) = args.get(1) {
-        let winner_json = fs::read_to_string(format!("examples/{}/{}_winner.json", ENV, timestamp))
-            .expect("cant read file");
+        let winner_json =
+            fs::read_to_string(format!("examples/{}/winner.json", ENV)).expect("cant read file");
         let winner: Genome = serde_json::from_str(&winner_json).unwrap();
-        let scaler_json = fs::read_to_string(format!(
-            "examples/{}/{}_winner_standard_scaler.json",
-            ENV, timestamp
-        ))
-        .expect("cant read file");
+        let scaler_json =
+            fs::read_to_string(format!("examples/{}/winner_standard_scaler.json", ENV))
+                .expect("cant read file");
         let standard_scaler: (Array1<f64>, Array1<f64>) =
             serde_json::from_str(&scaler_json).unwrap();
         // showcase(standard_scaler, winner);
@@ -98,7 +96,7 @@ fn train(standard_scaler: (Array1<f64>, Array1<f64>)) {
 
             // log possible solutions to file
             let mut genome = genome.clone();
-            genome.fitness.raw = Raw::fitness(validation_fitness);
+            genome.set_fitness(validation_fitness);
             info!(target: "app::solutions", "{}", serde_json::to_string(&genome).unwrap());
             info!(
                 "finished validation runs with {} average fitness",
@@ -162,6 +160,11 @@ fn train(standard_scaler: (Array1<f64>, Array1<f64>)) {
             .unwrap()
             .as_secs();
         fs::write(
+            format!("examples/{}/winner.json", ENV),
+            serde_json::to_string(&winner).unwrap(),
+        )
+        .expect("Unable to write file");
+        fs::write(
             format!("examples/{}/{}_winner.json", ENV, time_stamp),
             serde_json::to_string(&winner).unwrap(),
         )
@@ -176,6 +179,11 @@ fn train(standard_scaler: (Array1<f64>, Array1<f64>)) {
                 "examples/{}/{}_winner_standard_scaler.json",
                 ENV, time_stamp
             ),
+            serde_json::to_string(&other_standard_scaler).unwrap(),
+        )
+        .expect("Unable to write file");
+        fs::write(
+            format!("examples/{}/winner_standard_scaler.json", ENV),
             serde_json::to_string(&other_standard_scaler).unwrap(),
         )
         .expect("Unable to write file");
@@ -207,7 +215,7 @@ fn run(
     // let mut evaluator = RecurrentMatrixFabricator::fabricate(net).unwrap();
     let mut evaluator = LoopingFabricator::fabricate(net).unwrap();
     let mut fitness = 0.0;
-    let mut all_observations = Array2::zeros((1, 8));
+    let mut all_observations = Array2::zeros((1, 2));
 
     if debug {
         dbg!(net);
@@ -248,25 +256,24 @@ fn run(
                 dbg!(&output);
             }
 
-            let (observation, reward, is_done) = match env.step(&SpaceData::BOX(output.clone())) {
-                Ok(State {
+            if output[0] > 0.0 {
+                let State {
                     observation,
-                    reward,
                     is_done,
-                }) => (observation, reward, is_done),
-                Err(err) => {
-                    error!("evaluation error: {}", err);
-                    dbg!(run);
-                    dbg!(input);
-                    dbg!(output);
-                    dbg!(evaluator);
-                    dbg!(net);
-                    dbg!(all_observations);
-                    panic!("evaluation error");
-                }
-            };
+                    ..
+                } = env.step(&SpaceData::DISCRETE(0)).unwrap();
+                recent_observation = observation;
+                done = is_done;
+            } else {
+                let State {
+                    observation,
+                    is_done,
+                    ..
+                } = env.step(&SpaceData::DISCRETE(1)).unwrap();
+                recent_observation = observation;
+                done = is_done;
+            }
 
-            recent_observation = observation;
             total_reward += reward;
 
             if is_done {

@@ -1,0 +1,38 @@
+refresh_rate: 30 seconds
+appenders:
+  stdout:
+    kind: console
+  progress:
+    kind: file
+    path: "examples/Pendulum-v0/progress.log"
+    encoder:
+      pattern: "{m},{n}"
+  parameters:
+    kind: file
+    path: "examples/Pendulum-v0/parameters.log"
+    encoder:
+      pattern: "{d} - {m}{n}"
+  solutions:
+    kind: file
+    path: "examples/Pendulum-v0/solutions.log"
+    encoder:
+      pattern: "{d} - {m}{n}"
+root:
+  level: info
+  appenders:
+    - stdout
+
+loggers:
+  # Route log events sent to the "app::requests" logger to the "requests" appender,
+  app::progress:
+    level: info
+    appenders:
+      - progress
+  app::parameters:
+    level: info
+    appenders:
+      - parameters
+  app::solutions:
+    level: info
+    appenders:
+      - solutions

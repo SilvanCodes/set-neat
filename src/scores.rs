@@ -1,4 +1,22 @@
 use serde::{Deserialize, Serialize};
+#[derive(Debug, Default, Clone, Deserialize, Serialize)]
+pub struct Score {
+    pub raw: f64,
+    pub shifted: f64,
+    pub normalized: f64,
+}
+
+impl Score {
+    pub fn new(raw: f64, baseline: f64, with: f64) -> Self {
+        Self {
+            raw,
+            shifted: raw - baseline,
+            normalized: (raw - baseline) / with,
+        }
+    }
+}
+
+/* use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
 
 pub trait ScoreType {}
@@ -9,7 +27,7 @@ pub trait ScoreValue {
 }
 
 #[derive(Debug, Default, Copy, Clone, Deserialize, Serialize, PartialEq)]
-pub struct Fitness(f64);
+pub struct Fitness(pub f64);
 
 impl ScoreValue for Fitness {
     type Value = f64;
@@ -148,15 +166,5 @@ mod tests {
 
         assert_eq!(normalized, Normalized(Fitness(0.5)))
     }
-
-    /* #[test]
-    fn nest() {
-        let normal = Normalized(Fitness(1.0));
-
-        let adjusted = normal.adjust(2.0);
-
-
-
-        assert_eq!(adjusted, Adjusted(Fitness(0.5)))
-    } */
 }
+ */

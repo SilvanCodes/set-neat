@@ -1,5 +1,3 @@
-required_fitness = 15.9
-
 [setup]
 population = 150 # number of networks
 
@@ -23,21 +21,25 @@ activations = [
     # "Squared",
 ] # pool of activation functions to choose from
 connections = 1.0 # percent of inputs fully connected to outputs
-weights = "Random" # initial value of weights
 
 [reproduction]
 surviving = 0.2 # allow the top x percent of species to survive and reproduce
 stale_after = 15 # number of generations allowed without improvement (stale species are reproduced only by the top performing member)
+elitism_species = 1
+elitism_individuals = 0
 
 [mutation]
 gene_node = 0.05 # chance of adding a new node gene
 gene_connection = 0.1 # chance of adding a new connection gene
 recurrent = 0.0 # chanche of a new connection being a recurrent one
-weight = 0.8 # chance of mutating all weights of a genome
-weight_random = 0.1 # chance that a mutated weight is replaced by a totally random one
-weight_perturbation = 3.0 # amount of perturbation
-weight_distribution = "Uniform"
 activation_change = 0.0
+
+[mutation.weights]
+percent_min = 0.8
+percent_max = 0.8
+random = 0.1
+perturbation_range = 3.0
+distribution = "Uniform"
 
 [compatability]
 target_species = 15 # number of desired species
@@ -48,4 +50,7 @@ factor_weights = 0.1 # weight difference factor
 factor_activations = 0.0 # factor for percent of different activations
 
 [novelty]
+cap = 0.0
 nearest_neighbors = 25
+impatience = 5
+demanded_increase_percent = 0.0

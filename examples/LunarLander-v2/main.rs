@@ -1,5 +1,8 @@
-use favannat::matrix::fabricator::StatefulMatrixFabricator;
-use favannat::network::{StatefulEvaluator, StatefulFabricator};
+use favannat::{
+    looping::fabricator::LoopingFabricator,
+    matrix::fabricator::RecurrentMatrixFabricator,
+    network::{StatefulEvaluator, StatefulFabricator},
+};
 use gym::{SpaceData, State};
 use ndarray::{array, stack, Axis};
 use rand::{distributions::WeightedIndex, prelude::SmallRng, SeedableRng};
@@ -71,7 +74,7 @@ fn train() {
         let env = gym.make(ENV);
         let mut rng = SmallRng::seed_from_u64(42);
 
-        let mut evaluator = StatefulMatrixFabricator::fabricate(genome).unwrap();
+        let mut evaluator = RecurrentMatrixFabricator::fabricate(genome).unwrap();
         let mut fitness = 0.0;
         let mut done = false;
 
@@ -162,13 +165,13 @@ fn train() {
             }
             info!("finished validation runs with {} average fitness", fitness);
             if fitness >= 200.0 {
-                return Progress::Solution(genome.clone());
+                return Progress::fitness(fitness).solved(genome.clone());
             }
         }
         // Progress::Fitness(fitness)
         let state = final_observation.get_box().unwrap().to_vec();
         // state.truncate(4);
-        Progress::Novelty(state)
+        Progress::novelty(state)
     };
 
     let neat = Neat::new(
@@ -185,9 +188,7 @@ fn train() {
         .filter_map(|evaluation| match evaluation {
             Evaluation::Progress(report) => {
                 info!(target: "app::progress", "{}", serde_json::to_string(&report).unwrap());
-                if report.fitness_peak > report.archive_threshold {
-                    showcase(report.top_performer);
-                }
+
                 None
             }
             Evaluation::Solution(genome) => Some(genome),
@@ -212,8 +213,8 @@ fn train() {
         let secs = now.elapsed().as_millis();
         info!(
             "winning genome ({},{}) after {} seconds: {:?}",
-            winner.node_genes.len(),
-            winner.connection_genes.len(),
+            winner.nodes().count(),
+            winner.len(),
             secs as f64 / 1000.0,
             winner
         );
@@ -225,7 +226,7 @@ fn showcase(genome: Genome) {
     let env = gym.make(ENV);
     let mut rng = SmallRng::seed_from_u64(42);
 
-    let mut evaluator = StatefulMatrixFabricator::fabricate(&genome).unwrap();
+    let mut evaluator = RecurrentMatrixFabricator::fabricate(&genome).unwrap();
 
     let actions = [
         &SpaceData::DISCRETE(0),

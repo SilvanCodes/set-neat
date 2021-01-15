@@ -1,0 +1,1 @@
+{"inputs":[[0,"Linear"],[2,"Linear"],[1,"Linear"]],"hidden":[],"outputs":[[3,"Tanh"]],"feed_forward":[[1,1.3008443042980158,3],[2,-0.8282658591803567,3]],"recurrent":[],"fitness":{"raw":91.31068429902618,"shifted":0.0,"normalized":0.0},"novelty":{"raw":1.2071706772993356,"shifted":1.082063278149542,"normalized":0.6720990109620026}}

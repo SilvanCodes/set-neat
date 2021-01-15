@@ -1,7 +1,8 @@
-use favannat::matrix::fabricator::MatrixFabricator;
-use favannat::network::{Evaluator, Fabricator};
+use favannat::looping::fabricator::LoopingFabricator;
+use favannat::matrix::fabricator::FeedForwardMatrixFabricator;
+use favannat::network::{Evaluator, Fabricator, StatefulEvaluator, StatefulFabricator};
 use ndarray::array;
-use set_neat::{scores::Raw, Behavior, Evaluation, Genome, Neat, Progress};
+use set_neat::{Evaluation, Genome, Neat, Progress};
 use std::time::Instant;
 
 fn main() {
@@ -14,8 +15,10 @@ fn main() {
         let result_2;
         let result_3;
 
-        match MatrixFabricator::fabricate(genome) {
-            Ok(evaluator) => {
+        match LoopingFabricator::fabricate(genome) {
+            Ok(mut evaluator) => {
+                // match FeedForwardMatrixFabricator::fabricate(genome) {
+                // Ok(evaluator) => {
                 result_0 = evaluator.evaluate(array![1.0, 1.0, 0.0]);
                 result_1 = evaluator.evaluate(array![1.0, 1.0, 1.0]);
                 result_2 = evaluator.evaluate(array![1.0, 0.0, 1.0]);
@@ -57,7 +60,12 @@ fn main() {
                 + (0.0 - result_3[0]).abs()))
         .powi(2);
 
-        Progress::new(Raw::fitness(fitness), Behavior(vec![fitness]))
+        if fitness > 15.9 {
+            Progress::fitness(fitness).solved(genome.clone())
+        } else {
+            Progress::fitness(fitness)
+        }
+
         // Progress::Fitness(fitness)
 
         /* let rr0 = (4.0 - ((1.0 - result_rr0[0][0])
@@ -79,7 +87,7 @@ fn main() {
         (rr0 + rr1 + rr2) / 3.0 */
     };
 
-    let neat = Neat::new("examples/XOR.toml", Box::new(fitness_function));
+    let neat = Neat::new("examples/xor/config.toml", Box::new(fitness_function));
 
     let mut millis_elapsed_in_run = Vec::new();
     let mut connections_in_winner_in_run = Vec::new();
@@ -153,7 +161,7 @@ fn main() {
             secs as f64 / 1000.0,
             winner
         );
-        let evaluator = MatrixFabricator::fabricate(&winner).unwrap();
+        let evaluator = LoopingFabricator::fabricate(&winner).unwrap();
         println!("as evaluator {:#?}", evaluator);
     } */
 }
