@@ -1,38 +1,33 @@
-mod context;
 mod favannat_impl;
 mod genes;
-mod genome;
+mod genomee;
 mod parameters;
 mod population;
 mod runtime;
 mod species;
+// remove ASAP
 pub mod utility;
 
-pub mod scores;
+mod individual;
+mod rng;
+mod statistics;
+
+use parameters::Parameters;
 
 // re-exports
-pub use crate::context::Context;
-pub use crate::genes::{
-    activations,
-    connections::{Connection, FeedForward, Recurrent},
-    nodes::{Hidden, Input, Node, Output},
-    Activation, Genes, Id, Weight,
-};
-pub use crate::genome::Genome;
-pub use crate::parameters::Parameters;
-pub use crate::runtime::{Behavior, Runtime};
-pub use crate::runtime::{Evaluation, Progress};
+pub use individual::Individual;
+pub use runtime::{Evaluation, Progress, Runtime};
 
 pub struct Neat {
     pub parameters: Parameters,
-    progress_function: Box<dyn Fn(&Genome) -> Progress + Send + Sync>,
+    progress_function: Box<dyn Fn(&Individual) -> Progress + Send + Sync>,
 }
 
 // public API
 impl Neat {
     pub fn new(
         path: &str,
-        progress_function: Box<dyn Fn(&Genome) -> Progress + Send + Sync>,
+        progress_function: Box<dyn Fn(&Individual) -> Progress + Send + Sync>,
     ) -> Self {
         Neat {
             parameters: Parameters::new(path).unwrap(),

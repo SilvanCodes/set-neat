@@ -1,75 +1,56 @@
 use crate::{
-    activations::Activation,
-    genes::{
-        connections::{Connection, FeedForward, Recurrent},
-        nodes::{Hidden, Input, Node, Output},
-        Genes,
-    },
+    genes::{connections::Connection, nodes::Node, Activation, Genes, IdGenerator},
+    parameters::Parameters,
+    rng::NeatRng,
 };
-use crate::{genes::Weight, scores::Score};
-use crate::{Context, Parameters};
-use rand::seq::{IteratorRandom, SliceRandom};
-use rand::Rng;
+
+use rand::{
+    prelude::{IteratorRandom, SliceRandom},
+    Rng,
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Genome {
-    pub inputs: Genes<Input<Node>>,
-    pub hidden: Genes<Hidden<Node>>,
-    pub outputs: Genes<Output<Node>>,
-    pub feed_forward: Genes<FeedForward<Connection>>,
-    pub recurrent: Genes<Recurrent<Connection>>,
-    pub fitness: Score,
-    pub novelty: Score,
+    pub inputs: Genes<Node>,
+    pub hidden: Genes<Node>,
+    pub outputs: Genes<Node>,
+    pub feed_forward: Genes<Connection>,
+    pub recurrent: Genes<Connection>,
 }
 
 impl Genome {
-    pub fn new(context: &mut Context, parameters: &Parameters) -> Self {
+    pub fn new(id_gen: &mut IdGenerator, parameters: &Parameters) -> Self {
         Genome {
-            inputs: (0..parameters.setup.dimension.input)
-                .map(|_| Input(Node(context.id_gen.next_id(), Activation::Linear)))
+            inputs: (0..parameters.setup.input_dimension)
+                .map(|_| Node::new(id_gen.next_id(), Activation::Linear))
                 .collect(),
-            outputs: (0..parameters.setup.dimension.output)
-                .map(|_| {
-                    Output(Node(
-                        context.id_gen.next_id(),
-                        parameters.initialization.output,
-                    ))
-                })
+            outputs: (0..parameters.setup.output_dimension)
+                .map(|_| Node::new(id_gen.next_id(), parameters.activations.output_nodes))
                 .collect(),
             ..Default::default()
         }
     }
 
-    // consider removing this function
-    pub fn set_fitness(&mut self, fitness: f64) {
-        self.fitness.raw = fitness;
-    }
-
     pub fn nodes(&self) -> impl Iterator<Item = &Node> {
         self.inputs
-            .iterate_unwrapped()
-            .chain(self.hidden.iterate_unwrapped())
-            .chain(self.outputs.iterate_unwrapped())
+            .iter()
+            // .iterate_unwrapped()
+            .chain(self.hidden.iter() /* .iterate_unwrapped() */)
+            .chain(self.outputs.iter() /* .iterate_unwrapped() */)
     }
 
-    pub fn init(&mut self, context: &mut Context, parameters: &Parameters) {
-        for input in self
-            .inputs
-            .iterate_with_random_offset(&mut context.small_rng)
-            // connect configured percent of inputs to outputs, ceil for at least one
-            .take(
-                (context.small_rng.gen::<f64>() * parameters.setup.dimension.input as f64).ceil()
-                    as usize,
-            )
-        {
+    pub fn init(&mut self, rng: &mut NeatRng, parameters: &Parameters) {
+        for input in self.inputs.iterate_with_random_offset(&mut rng.small).take(
+            (rng.small.gen::<f64>() * parameters.setup.input_dimension as f64).ceil() as usize,
+        ) {
             // connect to every output
             for output in self.outputs.iter() {
-                assert!(self.feed_forward.insert(FeedForward(Connection(
-                    input.id(),
-                    Weight::default(),
-                    output.id()
-                ))));
+                assert!(self.feed_forward.insert(Connection::new(
+                    input.id,
+                    rng.weight_perturbation(),
+                    output.id
+                )));
             }
         }
     }
@@ -82,269 +63,180 @@ impl Genome {
         self.feed_forward.is_empty() && self.recurrent.is_empty()
     }
 
-    // score is combination of fitness & novelty
-    pub fn score(&self) -> f64 {
-        /* let score = self
-        .novelty
-        .normalized
-        .value()
-        .max(self.fitness.normalized.value()); */
+    pub fn cross_in(&self, other: &Self, rng: &mut impl Rng) -> Self {
+        let feed_forward = self.feed_forward.cross_in(&other.feed_forward, rng);
 
-        let novelty = self.novelty.normalized;
-        let fitness = self.fitness.normalized;
+        let recurrent = self.recurrent.cross_in(&other.recurrent, rng);
 
-        if novelty == 0.0 && fitness == 0.0 {
-            return 0.0;
-        }
-
-        let (min, max) = if novelty < fitness {
-            (novelty, fitness)
-        } else {
-            (fitness, novelty)
-        };
-
-        // ratio tells us what score is dominant in this genome
-        let ratio = min / max / 2.0;
-
-        // we weight the scores by their ratio, i.e. a genome that has a good fitness value is primarily weighted by that
-        let score = min * ratio + max * (1.0 - ratio);
-        /*
-        // self.fitness.normalized.value()
-        let score = self.fitness.normalized.value() * (1.0 - context.novelty_ratio)
-            + self.novelty.normalized.value() * context.novelty_ratio;
-        */
-        if score.is_nan() {
-            dbg!(&self);
-            // dbg!(&context);
-        }
-
-        score
-    }
-
-    // self is fitter if it has higher score or in case of equal score has fewer genes, i.e. less complexity
-    pub fn is_fitter_than(&self, other: &Self) -> bool {
-        let score_self = self.score();
-        let score_other = other.score();
-
-        score_self > score_other
-            || ((score_self - score_other).abs() < f64::EPSILON && self.len() < other.len())
-    }
-
-    pub fn crossover(&self, other: &Self, context: &mut Context) -> Self {
-        let (fitter, weaker) = if self.is_fitter_than(other) {
-            (self, other)
-        } else {
-            (other, self)
-        };
-
-        let feed_forward = fitter
-            .feed_forward
-            .crossover(&weaker.feed_forward, &mut context.small_rng);
-
-        let recurrent = fitter
-            .recurrent
-            .crossover(&weaker.recurrent, &mut context.small_rng);
-
-        let hidden = fitter
-            .hidden
-            .crossover(&weaker.hidden, &mut context.small_rng);
+        let hidden = self.hidden.cross_in(&other.hidden, rng);
 
         Genome {
             feed_forward,
             recurrent,
             hidden,
-            fitness: Default::default(),
-            novelty: Default::default(),
             // use input and outputs from fitter, but they should be identical with weaker
-            inputs: fitter.inputs.clone(),
-            outputs: fitter.outputs.clone(),
+            inputs: self.inputs.clone(),
+            outputs: self.outputs.clone(),
         }
     }
 
-    pub fn mutate(&mut self, context: &mut Context, parameters: &Parameters) {
+    pub fn mutate(&mut self, rng: &mut NeatRng, id_gen: &mut IdGenerator, parameters: &Parameters) {
         // mutate weigths
         // if context.gamble(parameters.mutation.weight) {
-        self.change_weights(context, parameters);
+        self.change_weights(rng);
         // }
 
         // mutate connection gene
-        if context.gamble(parameters.mutation.gene_connection) {
-            self.add_connection(context, parameters).unwrap_or_default();
+        if rng.gamble(parameters.mutation.new_connection_chance) {
+            self.add_connection(rng, parameters).unwrap_or_default();
         }
 
         // mutate node gene
-        if context.gamble(parameters.mutation.gene_node) {
-            self.add_node(context, parameters);
+        if rng.gamble(parameters.mutation.new_node_chance) {
+            self.add_node(rng, id_gen, parameters);
         }
 
         // change some activation
-        if context.gamble(parameters.mutation.activation_change) {
-            self.alter_activation(context, parameters);
+        if rng.gamble(parameters.mutation.change_activation_function_chance) {
+            self.alter_activation(rng, parameters);
         }
     }
 
-    pub fn change_weights(&mut self, context: &mut Context, parameters: &Parameters) {
-        // generate percent of changing connections
-        let change_percent = context.small_rng.gen::<f64>()
-            * (parameters.mutation.weights.percent_max - parameters.mutation.weights.percent_min)
-            + parameters.mutation.weights.percent_min;
-        let num_feed_forward = (change_percent * self.feed_forward.len() as f64).floor() as usize;
-        let num_recurrent = (change_percent * self.recurrent.len() as f64).floor() as usize;
-
+    pub fn change_weights(&mut self, rng: &mut NeatRng) {
         self.feed_forward = self
             .feed_forward
-            .drain_into_random(&mut context.small_rng)
-            .enumerate()
-            .map(|(count, mut connection)| {
-                if count < num_feed_forward {
-                    if context.gamble(parameters.mutation.weights.random) {
-                        connection.weight().random(context);
-                    } else {
-                        connection.weight().perturbate(context);
-                    }
-                }
-
+            .drain_into_random(&mut rng.small)
+            .map(|mut connection| {
+                connection.weight += rng.weight_perturbation();
                 connection
             })
             .collect();
 
         self.recurrent = self
             .recurrent
-            .drain_into_random(&mut context.small_rng)
-            .enumerate()
-            .map(|(count, mut connection)| {
-                if count < num_recurrent {
-                    if context.gamble(parameters.mutation.weights.random) {
-                        connection.weight().random(context);
-                    } else {
-                        connection.weight().perturbate(context);
-                    }
-                }
-
+            .drain_into_random(&mut rng.small)
+            .map(|mut connection| {
+                connection.weight += rng.weight_perturbation();
                 connection
             })
             .collect();
     }
 
-    pub fn alter_activation(&mut self, context: &mut Context, parameters: &Parameters) {
-        if let Some(node) = self
-            .hidden
-            .iter()
-            .nth((context.small_rng.gen::<f64>() * self.hidden.len() as f64).floor() as usize)
-        {
-            let updated = Hidden(Node(
-                node.id(),
+    pub fn alter_activation(&mut self, rng: &mut NeatRng, parameters: &Parameters) {
+        if let Some(node) = self.hidden.random(&mut rng.small) {
+            let updated = Node::new(
+                node.id,
                 parameters
-                    .initialization
                     .activations
+                    .hidden_nodes
                     .iter()
-                    .filter(|&&activation| activation != node.1)
-                    .choose(&mut context.small_rng)
+                    .filter(|&&activation| activation != node.activation)
+                    .choose(&mut rng.small)
                     .cloned()
-                    .unwrap_or(node.1),
-            ));
+                    .unwrap_or(node.activation),
+            );
 
             self.hidden.replace(updated);
         }
     }
 
-    pub fn add_node(&mut self, context: &mut Context, parameters: &Parameters) {
+    pub fn add_node(
+        &mut self,
+        rng: &mut NeatRng,
+        id_gen: &mut IdGenerator,
+        parameters: &Parameters,
+    ) {
         // select an connection gene and split
-        let mut random_connection = self
-            .feed_forward
-            .iter()
-            .choose(&mut context.small_rng)
-            .cloned()
-            .unwrap();
+        let mut random_connection = self.feed_forward.random(&mut rng.small).cloned().unwrap();
 
-        let id = context
-            .id_gen
+        let id = id_gen
             .cached_id_iter(random_connection.id())
             .find(|&id| {
                 self.hidden
-                    .get(&Hidden(Node(id, Activation::Linear)))
+                    .get(&Node::new(id, Activation::Linear))
                     .is_none()
             })
             .unwrap();
 
         // construct new node gene
-        let new_node = Hidden(Node(
+        let new_node = Node::new(
             id,
             parameters
-                .initialization
                 .activations
-                .choose(&mut context.small_rng)
+                .hidden_nodes
+                .choose(&mut rng.small)
                 .cloned()
                 .unwrap(),
-        ));
+        );
 
         // insert new connection pointing to new node
-        assert!(self.feed_forward.insert(FeedForward(Connection(
-            random_connection.input(),
-            Weight(1.0),
-            new_node.id(),
-        ))));
+        assert!(self.feed_forward.insert(Connection::new(
+            random_connection.input,
+            1.0,
+            new_node.id,
+        )));
         // insert new connection pointing from new node
-        assert!(self.feed_forward.insert(FeedForward(Connection(
-            new_node.id(),
-            random_connection.1,
-            random_connection.output(),
-        ))));
+        assert!(self.feed_forward.insert(Connection::new(
+            new_node.id,
+            random_connection.weight,
+            random_connection.output,
+        )));
         // insert new node into genome
         assert!(self.hidden.insert(new_node));
 
         // update weight to zero to 'deactivate' connnection
-        random_connection.1 = Weight(0.0);
+        random_connection.weight = 0.0;
         self.feed_forward.replace(random_connection);
     }
 
     pub fn add_connection(
         &mut self,
-        context: &mut Context,
+        rng: &mut NeatRng,
         parameters: &Parameters,
     ) -> Result<(), &'static str> {
-        let is_recurrent = context.gamble(parameters.mutation.recurrent);
+        let is_recurrent = rng.gamble(parameters.mutation.connection_is_recurrent_chance);
 
         let start_node_iterator = self
             .inputs
-            .iterate_unwrapped()
-            .chain(self.hidden.iterate_unwrapped());
+            .iter()
+            // .iterate_unwrapped()
+            .chain(self.hidden.iter() /* .iterate_unwrapped() */);
 
         let end_node_iterator = self
             .hidden
-            .iterate_unwrapped()
-            .chain(self.outputs.iterate_unwrapped());
+            .iter()
+            // .iterate_unwrapped()
+            .chain(self.outputs.iter() /* .iterate_unwrapped() */);
 
         for start_node in start_node_iterator
             // make iterator wrap
             .cycle()
             // randomly offset into the iterator to choose any node
             .skip(
-                (context.small_rng.gen::<f64>() * (self.inputs.len() + self.hidden.len()) as f64)
-                    .floor() as usize,
+                (rng.small.gen::<f64>() * (self.inputs.len() + self.hidden.len()) as f64).floor()
+                    as usize,
             )
             // just loop every value once
             .take(self.inputs.len() + self.hidden.len())
         {
             if let Some(end_node) = end_node_iterator.clone().find(|&end_node| {
-                // recurrent connection may target itself
-                (is_recurrent || end_node != start_node)
+                end_node != start_node
                     && !self.are_connected(&start_node, end_node, is_recurrent)
                     && (is_recurrent || !self.would_form_cycle(start_node, end_node))
             }) {
                 if is_recurrent {
-                    assert!(self.recurrent.insert(Recurrent(Connection(
-                        start_node.id(),
-                        parameters.initialization.weights.init(),
-                        end_node.id(),
-                    ))));
+                    assert!(self.recurrent.insert(Connection::new(
+                        start_node.id,
+                        rng.weight_perturbation(),
+                        end_node.id,
+                    )));
                 } else {
                     // add new feed-forward connection
-                    assert!(self.feed_forward.insert(FeedForward(Connection(
-                        start_node.id(),
-                        parameters.initialization.weights.init(),
-                        end_node.id(),
-                    ))));
+                    assert!(self.feed_forward.insert(Connection::new(
+                        start_node.id,
+                        rng.weight_perturbation(),
+                        end_node.id,
+                    )));
                 }
                 return Ok(());
             }
@@ -356,34 +248,28 @@ impl Genome {
     // check if to nodes are connected
     fn are_connected(&self, start_node: &Node, end_node: &Node, recurrent: bool) -> bool {
         if recurrent {
-            self.recurrent.contains(&Recurrent(Connection(
-                start_node.id(),
-                Weight::default(),
-                end_node.id(),
-            )))
+            self.recurrent
+                .contains(&Connection::new(start_node.id, 0.0, end_node.id))
         } else {
-            self.feed_forward.contains(&FeedForward(Connection(
-                start_node.id(),
-                Weight::default(),
-                end_node.id(),
-            )))
+            self.feed_forward
+                .contains(&Connection::new(start_node.id, 0.0, end_node.id))
         }
     }
 
     // can only operate when no cycles present yet, which is assumed
     fn would_form_cycle(&self, start_node: &Node, end_node: &Node) -> bool {
         // needs to detect if there is a path from end to start
-        let mut possible_paths: Vec<&FeedForward<Connection>> = self
+        let mut possible_paths: Vec<&Connection> = self
             .feed_forward
             .iter()
-            .filter(|connection| connection.input() == end_node.id())
+            .filter(|connection| connection.input == end_node.id)
             .collect();
         let mut next_possible_path = Vec::new();
 
         while !possible_paths.is_empty() {
             for path in possible_paths {
                 // we have a cycle if path leads to start_node_gene
-                if path.output() == start_node.id() {
+                if path.output == start_node.id {
                     return true;
                 }
                 // collect further paths
@@ -391,7 +277,7 @@ impl Genome {
                     next_possible_path.extend(
                         self.feed_forward
                             .iter()
-                            .filter(|connection| connection.input() == path.output()),
+                            .filter(|connection| connection.input == path.output),
                     );
                 }
             }
@@ -400,86 +286,13 @@ impl Genome {
         }
         false
     }
-
-    pub fn compatability_distance(
-        genome_0: &Genome,
-        genome_1: &Genome,
-        factor_genes: f64,
-        factor_weights: f64,
-        factor_activations: f64,
-    ) -> f64 {
-        let mut weight_difference_total = 0.0;
-        let mut activation_difference = 0.0;
-
-        let matching_genes_count_total = (genome_0
-            .feed_forward
-            .iterate_matches(&genome_1.feed_forward)
-            .inspect(|(connection_0, connection_1)| {
-                weight_difference_total += connection_0.1.difference(&connection_1.1);
-            })
-            .count()
-            + genome_0
-                .recurrent
-                .iterate_matches(&genome_1.recurrent)
-                .inspect(|(connection_0, connection_1)| {
-                    weight_difference_total += connection_0.1.difference(&connection_1.1);
-                })
-                .count()) as f64;
-
-        let different_genes_count_total = (genome_0
-            .feed_forward
-            .iterate_unmatches(&genome_1.feed_forward)
-            .count()
-            + genome_0
-                .recurrent
-                .iterate_unmatches(&genome_1.recurrent)
-                .count()) as f64;
-
-        let matching_nodes_count = genome_0
-            .hidden
-            .iterate_matches(&genome_1.hidden)
-            .inspect(|(node_0, node_1)| {
-                if node_0.1 != node_1.1 {
-                    activation_difference += 1.0;
-                }
-            })
-            .count() as f64;
-
-        // percent of different genes, considering unique genes
-        let difference = factor_genes * different_genes_count_total / (matching_genes_count_total + different_genes_count_total)
-        // average of weight differences
-        + factor_weights * if matching_genes_count_total > 0.0 { weight_difference_total / matching_genes_count_total } else { 0.0 }
-        // percent of different activation functions, considering matching nodes genes
-        + factor_activations * if matching_nodes_count > 0.0 { activation_difference / matching_nodes_count } else { 0.0 };
-
-        if difference.is_nan() {
-            dbg!(factor_genes);
-            dbg!(different_genes_count_total);
-            dbg!(matching_genes_count_total);
-            dbg!(different_genes_count_total);
-            dbg!(factor_weights);
-            dbg!(weight_difference_total);
-            dbg!(matching_genes_count_total);
-            dbg!(factor_activations);
-            dbg!(activation_difference);
-            dbg!(matching_nodes_count);
-            panic!("difference is nan");
-        } else {
-            difference
-        }
-
-        // neat python function
-        //(activation_difference + c1 * different_nodes_count) / genome_0.node_genes.len().max(genome_1.node_genes.len()) as f64
-        // + (weight_difference_total + c1 * different_genes_count_total) / (genome_0.connection_genes.len() + genome_0.recurrent_connection_genes.len()).max(genome_1.connection_genes.len() + genome_1.recurrent_connection_genes.len()) as f64
-    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::Genome;
-    use crate::Parameters;
+    /* use super::Genome;
     use crate::{
-        context::Context,
+        context::{rng::NeatRng, Context},
         genes::{
             connections::{Connection, FeedForward},
             nodes::{Hidden, Input, Node, Output},
@@ -488,7 +301,7 @@ mod tests {
     };
     use crate::{
         genes::{Activation, Id, Weight},
-        scores::Score,
+        parameters::Parameters,
     };
 
     #[test]
@@ -499,6 +312,7 @@ mod tests {
 
         parameters.setup.dimension.input = 1;
         parameters.setup.dimension.output = 1;
+        parameters.initialization.connections = 1.0;
         parameters.initialization.activations = vec![Activation::Absolute, Activation::Cosine];
 
         let mut genome = Genome::new(&mut context, &parameters);
@@ -567,6 +381,7 @@ mod tests {
 
         parameters.setup.dimension.input = 1;
         parameters.setup.dimension.output = 1;
+        parameters.initialization.connections = 1.0;
 
         let mut genome = Genome::new(&mut context, &parameters);
 
@@ -587,6 +402,7 @@ mod tests {
 
         parameters.setup.dimension.input = 1;
         parameters.setup.dimension.output = 1;
+        parameters.initialization.connections = 1.0;
 
         let mut genome_0 = Genome::new(&mut context, &parameters);
 
@@ -605,7 +421,7 @@ mod tests {
         println!("genome_1 {:?}", genome_1);
 
         // shorter genome is fitter genome
-        let offspring = genome_0.crossover(&genome_1, &mut context);
+        let offspring = genome_0.cross_in(&genome_1, &mut context);
 
         println!("offspring {:?}", offspring);
 
@@ -615,6 +431,8 @@ mod tests {
 
     #[test]
     fn crossover_different_fitness_by_fitter() {
+        todo!("move to individual/mod.rs");
+
         let mut parameters: Parameters = Default::default();
         parameters.mutation.weights.perturbation_range = 1.0;
         parameters.initialization.activations = vec![Activation::Tanh];
@@ -622,6 +440,7 @@ mod tests {
 
         parameters.setup.dimension.input = 2;
         parameters.setup.dimension.output = 1;
+        parameters.initialization.connections = 1.0;
 
         let mut genome_0 = Genome::new(&mut context, &parameters);
 
@@ -629,7 +448,9 @@ mod tests {
 
         let mut genome_1 = genome_0.clone();
 
-        genome_1.fitness = Score::new(1.0, 0.0, 1.0);
+        /* genome_1.fitness.raw = Raw::fitness(1.0);
+        genome_1.fitness.shifted = genome_1.fitness.raw.shift(0.0);
+        genome_1.fitness.normalized = genome_1.fitness.shifted.normalize(1.0); */
 
         // mutate genome_0
         genome_0.add_node(&mut context, &parameters);
@@ -638,7 +459,7 @@ mod tests {
         genome_1.add_node(&mut context, &parameters);
         genome_1.add_connection(&mut context, &parameters).unwrap();
 
-        let offspring = genome_0.crossover(&genome_1, &mut context);
+        let offspring = genome_0.cross_in(&genome_1, &mut context);
 
         assert_eq!(offspring.hidden.len(), 1);
         assert_eq!(offspring.feed_forward.len(), 5);
@@ -646,6 +467,8 @@ mod tests {
 
     #[test]
     fn crossover_different_fitness_by_equal_fittnes_different_len() {
+        todo!("move to individual/mod.rs");
+
         let mut parameters: Parameters = Default::default();
         parameters.mutation.weights.perturbation_range = 1.0;
         parameters.initialization.activations = vec![Activation::Tanh];
@@ -653,6 +476,7 @@ mod tests {
 
         parameters.setup.dimension.input = 2;
         parameters.setup.dimension.output = 1;
+        parameters.initialization.connections = 1.0;
 
         let mut genome_0 = Genome::new(&mut context, &parameters);
 
@@ -666,7 +490,7 @@ mod tests {
         genome_1.add_node(&mut context, &parameters);
         genome_1.add_connection(&mut context, &parameters).unwrap();
 
-        let offspring = genome_0.crossover(&genome_1, &mut context);
+        let offspring = genome_0.cross_in(&genome_1, &mut context);
 
         assert_eq!(offspring.hidden.len(), 1);
         assert_eq!(offspring.feed_forward.len(), 4);
@@ -680,6 +504,7 @@ mod tests {
 
         parameters.setup.dimension.input = 1;
         parameters.setup.dimension.output = 1;
+        parameters.initialization.connections = 1.0;
 
         let mut genome_0 = Genome::new(&mut context, &parameters);
 
@@ -702,6 +527,7 @@ mod tests {
 
         parameters.setup.dimension.input = 1;
         parameters.setup.dimension.output = 1;
+        parameters.initialization.connections = 1.0;
 
         let mut genome_0 = Genome::new(&mut context, &parameters);
 
@@ -723,8 +549,13 @@ mod tests {
     #[test]
     fn crossover_no_cycle() {
         let mut parameters: Parameters = Default::default();
-        parameters.mutation.weights.perturbation_range = 1.0;
+        parameters.mutation.weights.perturbation_std_dev = 1.0;
         let mut context = Context::new(&parameters);
+
+        let mut rng = NeatRng::new(
+            parameters.seed,
+            parameters.mutation.weights.perturbation_std_dev,
+        );
 
         // assumption:
         // crossover of equal fitness genomes should not produce cycles
@@ -780,7 +611,7 @@ mod tests {
             .feed_forward
             .insert(FeedForward(Connection(Id(3), Weight::default(), Id(2))));
 
-        let offspring = genome_0.crossover(&genome_1, &mut context);
+        let offspring = genome_0.cross_in(&genome_1, &mut rng.small);
 
         println!("offspring {:?}", offspring);
 
@@ -801,7 +632,7 @@ mod tests {
         }
     }
 
-    #[test]
+    /* #[test]
     fn compatability_distance_same_genome() {
         let genome_0 = Genome {
             inputs: Genes(
@@ -913,5 +744,5 @@ mod tests {
 
         // factor 2 times 2 different genes
         assert!((delta - 2.0 * 2.0).abs() < f64::EPSILON);
-    }
+    } */ */
 }

@@ -2,11 +2,11 @@ use favannat::looping::fabricator::LoopingFabricator;
 use favannat::matrix::fabricator::FeedForwardMatrixFabricator;
 use favannat::network::{Evaluator, Fabricator, StatefulEvaluator, StatefulFabricator};
 use ndarray::array;
-use set_neat::{Evaluation, Genome, Neat, Progress};
+use set_neat::{Evaluation, Individual, Neat, Progress};
 use std::time::Instant;
 
 fn main() {
-    let fitness_function = |genome: &Genome| -> Progress {
+    let fitness_function = |individual: &Individual| -> Progress {
         /* let result_rr0;
         let result_rr1;
         let result_rr2; */
@@ -15,9 +15,9 @@ fn main() {
         let result_2;
         let result_3;
 
-        match LoopingFabricator::fabricate(genome) {
+        match LoopingFabricator::fabricate(individual) {
             Ok(mut evaluator) => {
-                // match FeedForwardMatrixFabricator::fabricate(genome) {
+                // match FeedForwardMatrixFabricator::fabricate(individual) {
                 // Ok(evaluator) => {
                 result_0 = evaluator.evaluate(array![1.0, 1.0, 0.0]);
                 result_1 = evaluator.evaluate(array![1.0, 1.0, 1.0]);
@@ -46,7 +46,7 @@ fn main() {
                 ]; */
             }
             Err(e) => {
-                println!("error fabricating genome: {:?} {:?}", genome, e);
+                println!("error fabricating individual: {:?} {:?}", individual, e);
                 panic!("")
             }
         }
@@ -61,7 +61,7 @@ fn main() {
         .powi(2);
 
         if fitness > 15.9 {
-            Progress::fitness(fitness).solved(genome.clone())
+            Progress::fitness(fitness).solved(individual.clone())
         } else {
             Progress::fitness(fitness)
         }
@@ -102,10 +102,10 @@ fn main() {
             .run()
             .filter_map(|evaluation| match evaluation {
                 Evaluation::Progress(report) => {
-                    generations = report.num_generation;
+                    generations = report.population.num_generation;
                     None
                 }
-                Evaluation::Solution(genome) => Some(genome),
+                Evaluation::Solution(individual) => Some(individual),
             })
             .next()
         {
@@ -149,13 +149,13 @@ fn main() {
                 println!("{:#?}", report);
                 None
             }
-            Evaluation::Solution(genome) => Some(genome),
+            Evaluation::Solution(individual) => Some(individual),
         })
         .next()
     {
         let secs = now.elapsed().as_millis();
         println!(
-            "winning genome ({},{}) after {} seconds: {:?}",
+            "winning individual ({},{}) after {} seconds: {:?}",
             winner.nodes().count(),
             winner.feed_forward.len(),
             secs as f64 / 1000.0,

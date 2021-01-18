@@ -1,20 +1,20 @@
 use rand::prelude::SliceRandom;
 
-use crate::context::Context;
-use crate::genome::Genome;
 use crate::parameters::Parameters;
+use crate::rng::NeatRng;
+use crate::{genes::IdGenerator, individual::Individual};
 
 #[derive(Debug, Clone)]
 pub struct Species {
-    pub representative: Genome,
-    pub members: Vec<Genome>,
+    pub representative: Individual,
+    pub members: Vec<Individual>,
     pub score: f64,
     pub stale: usize,
 }
 
 // public API
 impl Species {
-    pub fn new(first_member: Genome) -> Self {
+    pub fn new(first_member: Individual) -> Self {
         Species {
             representative: first_member.clone(),
             members: vec![first_member],
@@ -23,14 +23,13 @@ impl Species {
         }
     }
 
-    fn order_surviving_members(&mut self, parameters: &Parameters) {
+    fn order_surviving_members(&mut self, survival_rate: f64) {
         // sort members by descending score, i.e. fittest first
         self.members
             .sort_by(|genome_0, genome_1| genome_1.score().partial_cmp(&genome_0.score()).unwrap());
         // reduce to surviving members
-        self.members.truncate(
-            (self.members.len() as f64 * parameters.reproduction.surviving).ceil() as usize,
-        );
+        self.members
+            .truncate((self.members.len() as f64 * survival_rate).ceil() as usize);
     }
 
     fn compute_score(&mut self) {
@@ -52,8 +51,8 @@ impl Species {
         }
     }
 
-    pub fn adjust(&mut self, parameters: &Parameters) {
-        self.order_surviving_members(parameters);
+    pub fn adjust(&mut self, survival_rate: f64) {
+        self.order_surviving_members(survival_rate);
         self.compute_score();
     }
 
@@ -66,20 +65,19 @@ impl Species {
 
     pub fn reproduce<'a>(
         &'a self,
-        context: &'a mut Context,
+        rng: &'a mut NeatRng,
+        id_gen: &'a mut IdGenerator,
         parameters: &'a Parameters,
         offspring: usize,
-    ) -> impl Iterator<Item = Genome> + 'a {
+    ) -> impl Iterator<Item = Individual> + 'a {
         self.members
             .iter()
             .cycle()
             .take(offspring)
             .map(move |member| {
-                let mut offspring = member.crossover(
-                    self.members.choose(&mut context.small_rng).unwrap(),
-                    context,
-                );
-                offspring.mutate(context, parameters);
+                let mut offspring =
+                    member.crossover(self.members.choose(&mut rng.small).unwrap(), &mut rng.small);
+                offspring.mutate(rng, id_gen, parameters);
                 offspring
             })
             // add top x members to offspring
@@ -95,13 +93,4 @@ impl Species {
 #[cfg(test)]
 mod tests {
     use super::Species;
-    use crate::genome::Genome;
-    use crate::{
-        activations::Activation,
-        genes::{
-            connections::{Connection, FeedForward},
-            nodes::{Input, Node, Output},
-            Genes, Id, Weight,
-        },
-    };
 }

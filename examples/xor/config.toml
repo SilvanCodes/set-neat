@@ -1,13 +1,21 @@
 [setup]
-population = 150 # number of networks
+    seed = 42
+    population_size = 150
+    input_dimension = 3
+    output_dimension = 1
+    add_to_archive_chance = 0.5
+    novelty_nearest_neighbors = 16
 
-[setup.dimension]
-input = 3 # number inputs
-output = 1 # number outputs
+[mutation]
+new_node_chance = 0.05
+new_connection_chance = 0.10
+connection_is_recurrent_chance = 0.0
+change_activation_function_chance = 0.0
+weight_perturbation_std_dev = 5.0
 
-[initialization]
-output = "Sigmoid" # activation function of output nodes
-activations = [
+[activations]
+output_nodes = "Sigmoid" # activation function of output nodes
+hidden_nodes = [
     # "Linear",
     "Sigmoid",
     # "Tanh",
@@ -20,37 +28,18 @@ activations = [
     # "Relu",
     # "Squared",
 ] # pool of activation functions to choose from
-connections = 1.0 # percent of inputs fully connected to outputs
+
 
 [reproduction]
-surviving = 0.2 # allow the top x percent of species to survive and reproduce
-stale_after = 15 # number of generations allowed without improvement (stale species are reproduced only by the top performing member)
+survival_rate = 0.2 # allow the top x percent of species to survive and reproduce
+generations_until_stale = 15 # number of generations allowed without improvement (stale species are reproduced only by the top performing member)
 elitism_species = 1
 elitism_individuals = 0
 
-[mutation]
-gene_node = 0.05 # chance of adding a new node gene
-gene_connection = 0.1 # chance of adding a new connection gene
-recurrent = 0.0 # chanche of a new connection being a recurrent one
-activation_change = 0.0
-
-[mutation.weights]
-percent_min = 0.8
-percent_max = 0.8
-random = 0.1
-perturbation_range = 3.0
-distribution = "Uniform"
-
-[compatability]
-target_species = 15 # number of desired species
-threshold = 1.0 # difference above threshold is considered incompatible
-threshold_delta = 0.01 # adjust threshold by x if num species unequal target species
-factor_genes = 2.0 # factor for percent of different genes
-factor_weights = 0.1 # weight difference factor
+[speciation]
+target_species_count = 15 # number of desired species
+compatability_threshold = 1.0 # difference above threshold is considered incompatible
+compatability_threshold_delta = 0.01 # adjust threshold by x if num species unequal target species
+factor_weights = 1.0 # factor for percent of different genes
+factor_genes = 1.0 # weight difference factor
 factor_activations = 0.0 # factor for percent of different activations
-
-[novelty]
-cap = 0.0
-nearest_neighbors = 25
-impatience = 5
-demanded_increase_percent = 0.0

@@ -1,14 +1,16 @@
-use rand::{prelude::IteratorRandom, prelude::SliceRandom, Rng};
+use rand::{prelude::SliceRandom, prelude::SmallRng, Rng};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, hash::Hash, iter::FromIterator, ops::Deref, ops::DerefMut};
 
 pub mod activations;
 pub mod connections;
-mod id;
+mod id_generator;
 pub mod nodes;
+mod weights;
 
 pub use activations::Activation;
-pub use id::{id_generator::IdGenerator, Id};
+pub use id_generator::{Id, IdGenerator};
+pub use weights::{Weight, WeightDistribution, WeightInitialization, WeightPerturbator};
 
 pub trait Gene: Eq + Hash {}
 
@@ -37,18 +39,14 @@ impl<T: Gene> DerefMut for Genes<T> {
 }
 
 impl<T: Gene> Genes<T> {
-    pub fn iterate_with_random_offset(&self, rng: &mut impl Rng) -> impl Iterator<Item = &T> {
+    pub fn iterate_with_random_offset(&self, rng: &mut SmallRng) -> impl Iterator<Item = &T> {
         self.iter()
             .cycle()
             .skip((rng.gen::<f64>() * self.len() as f64).floor() as usize)
             .take(self.len())
     }
 
-    pub fn random(&self, rng: &mut impl Rng) -> Option<&T> {
-        self.iter().choose(rng)
-    }
-
-    pub fn drain_into_random(&mut self, rng: &mut impl Rng) -> impl Iterator<Item = T> {
+    pub fn drain_into_random(&mut self, rng: &mut SmallRng) -> impl Iterator<Item = T> {
         let mut random_vec = self.drain().collect::<Vec<T>>();
         random_vec.shuffle(rng);
         random_vec.into_iter()
@@ -80,24 +78,16 @@ impl<'a, U: 'a, T: Gene + Deref<Target = U>> Genes<T> {
     }
 }
 
-/* impl<U: Ord, T: Gene + Deref<Target = U>> Genes<T> {
+impl<U: Ord, T: Gene + Deref<Target = U>> Genes<T> {
     pub fn as_sorted_vec(&self) -> Vec<&U> {
         let mut vec: Vec<&U> = self.iterate_unwrapped().collect();
-        vec.sort_unstable();
-        vec
-    }
-} */
-
-impl<T: Gene + Ord> Genes<T> {
-    pub fn as_sorted_vec(&self) -> Vec<&T> {
-        let mut vec: Vec<&T> = self.iter().collect();
         vec.sort_unstable();
         vec
     }
 }
 
 impl<T: Gene + Clone> Genes<T> {
-    pub fn cross_in(&self, other: &Self, rng: &mut impl Rng) -> Self {
+    pub fn crossover(&self, other: &Self, rng: &mut impl Rng) -> Self {
         self.iterate_matches(other)
             .map(|(gene_self, gene_other)| {
                 if rng.gen::<f64>() < 0.5 {

@@ -1,41 +1,33 @@
 use serde::{Deserialize, Serialize};
-use std::{
-    cmp::Ordering,
-    hash::Hash,
-    hash::Hasher,
-    ops::{Deref, DerefMut},
-};
+use std::{cmp::Ordering, hash::Hash, hash::Hasher};
 
-use super::{Gene, Id, Weight};
-
-pub trait ConnectionSpecifier {}
-
-pub trait ConnectionMarker {}
+use super::{Gene, Id};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Connection(pub Id, pub Weight, pub Id);
-
-impl ConnectionMarker for Connection {}
+pub struct Connection {
+    pub input: Id,
+    pub output: Id,
+    pub weight: f64,
+}
 
 impl Connection {
+    pub fn new(input: Id, weight: f64, output: Id) -> Self {
+        Self {
+            input,
+            output,
+            weight,
+        }
+    }
     pub fn id(&self) -> (Id, Id) {
-        (self.0, self.2)
-    }
-    pub fn input(&self) -> Id {
-        self.0
-    }
-    pub fn output(&self) -> Id {
-        self.2
-    }
-    pub fn weight(&mut self) -> &mut Weight {
-        &mut self.1
+        (self.input, self.output)
     }
 }
+
 impl Gene for Connection {}
 
 impl PartialEq for Connection {
     fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0 && self.2 == other.2
+        self.id() == other.id()
     }
 }
 
@@ -43,7 +35,7 @@ impl Eq for Connection {}
 
 impl Hash for Connection {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        (self.0, self.2).hash(state);
+        self.id().hash(state);
     }
 }
 
@@ -55,33 +47,6 @@ impl PartialOrd for Connection {
 
 impl Ord for Connection {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.0.cmp(&other.0).then(self.2.cmp(&other.2))
+        self.id().cmp(&other.id())
     }
 }
-
-macro_rules! makeConnectionSpecifier {
-    ( $( $name:ident ),* ) => {
-        $(
-            #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
-            pub struct $name<T: ConnectionMarker>(pub T);
-
-            impl<T: ConnectionMarker> ConnectionSpecifier for $name<T> {}
-
-            impl<T: ConnectionMarker> Deref for $name<T> {
-                type Target = T;
-
-                fn deref(&self) -> &Self::Target {
-                    &self.0
-                }
-            }
-
-            impl<T: ConnectionMarker> DerefMut for $name<T> {
-                fn deref_mut(&mut self) -> &mut Self::Target {
-                    &mut self.0
-                }
-            }
-        )*
-    };
-}
-
-makeConnectionSpecifier!(FeedForward, Recurrent);

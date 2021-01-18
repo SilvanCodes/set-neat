@@ -7,11 +7,16 @@ use ndarray::{arr1, Array2, ArrayView1, Axis};
 use rayon::prelude::*;
 use serde::Serialize;
 
-use crate::genome::Genome;
-use crate::{context::Context, population::Population, utility::gym::StandardScaler};
-use crate::{scores::Score, Neat};
+// use crate::genomee::Genome;
+use crate::{
+    individual::scores::Score, population::Population, statistics::Statistics,
+    utility::gym::StandardScaler,
+};
+use crate::{individual::Individual, Neat};
 
-#[derive(Debug, Clone, Default, Serialize)]
+pub use self::{evaluation::Evaluation, progress::Progress};
+
+/* #[derive(Debug, Clone, Default, Serialize)]
 pub struct Report {
     pub top_performer: Genome,
     pub compatability_threshold: f64,
@@ -57,24 +62,79 @@ pub struct NoveltyReport {
     pub normalized_minimum: f64,
     pub normalized_average: f64,
 }
+ */
+
+mod evaluation;
+mod progress;
 
 pub struct Runtime<'a> {
     neat: &'a Neat,
+    population: Population,
+    statistics: Statistics,
+}
+
+impl<'a> Runtime<'a> {
+    pub fn new(neat: &'a Neat) -> Self {
+        Self {
+            neat,
+            population: Population::new(neat.parameters.clone()),
+            statistics: Statistics::default(),
+        }
+    }
+
+    fn generate_progress(&self) -> Vec<Progress> {
+        let progress_fn = &self.neat.progress_function;
+
+        // apply progress function to every individual
+        self.population
+            .individuals()
+            .par_iter()
+            .map(progress_fn)
+            .collect::<Vec<Progress>>()
+    }
+
+    fn check_for_solution(&self, progress: &[Progress]) -> Option<Individual> {
+        progress
+            .iter()
+            .filter_map(|p| p.is_solution())
+            .cloned()
+            .next()
+    }
+}
+
+impl<'a> Iterator for Runtime<'a> {
+    type Item = Evaluation;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.statistics.time_stamp = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let now = Instant::now();
+
+        // generate progress by running progress function for every individual
+        let progress = self.generate_progress();
+
+        self.statistics.milliseconds_elapsed_evaluation = now.elapsed().as_millis();
+
+        if let Some(winner) = self.check_for_solution(&progress) {
+            Some(Evaluation::Solution(winner))
+        } else {
+            self.statistics.population = self.population.next_generation(&progress);
+
+            Some(Evaluation::Progress(self.statistics.clone()))
+        }
+    }
+}
+
+/* pub struct Runtime<'a> {
+    neat: &'a Neat,
     context: Context,
     population: Population,
-    archive: Vec<Behavior>,
-}
+    statistics: Statistics,
+} */
 
-#[derive(Debug)]
-pub enum Progress {
-    Empty,
-    Fitness(f64),
-    Novelty(Behavior),
-    Status(f64, Behavior),
-    Solution(Option<f64>, Option<Behavior>, Box<Genome>),
-}
-
-#[derive(Debug, Default)]
+/* #[derive(Debug, Default)]
 pub struct Behavior(pub Vec<f64>);
 
 impl Deref for Behavior {
@@ -83,75 +143,10 @@ impl Deref for Behavior {
     fn deref(&self) -> &Self::Target {
         &self.0
     }
-}
+} */
 
-impl Progress {
-    pub fn new(fitness: f64, behavior: Vec<f64>) -> Self {
-        Progress::Status(fitness, Behavior(behavior))
-    }
-
-    pub fn empty() -> Self {
-        Progress::Empty
-    }
-
-    pub fn solved(self, genome: Genome) -> Self {
-        match self {
-            Progress::Fitness(fitness) => Progress::Solution(Some(fitness), None, Box::new(genome)),
-            Progress::Novelty(behavior) => {
-                Progress::Solution(None, Some(behavior), Box::new(genome))
-            }
-            Progress::Status(fitness, behavior) => {
-                Progress::Solution(Some(fitness), Some(behavior), Box::new(genome))
-            }
-            Progress::Solution(fitness, behavior, _) => {
-                Progress::Solution(fitness, behavior, Box::new(genome))
-            }
-            Progress::Empty => Progress::Solution(None, None, Box::new(genome)),
-        }
-    }
-
-    pub fn fitness(fitness: f64) -> Self {
-        Self::Fitness(fitness)
-    }
-
-    pub fn novelty(behavior: Vec<f64>) -> Self {
-        Self::Novelty(Behavior(behavior))
-    }
-
-    pub fn behavior(&self) -> Option<&Behavior> {
-        match self {
-            Progress::Status(_, behavior) => Some(behavior),
-            Progress::Solution(_, behavior, _) => behavior.as_ref(),
-            Progress::Novelty(behavior) => Some(behavior),
-            Progress::Fitness(_) => None,
-            Progress::Empty => None,
-        }
-    }
-
-    pub fn raw_fitness(&self) -> Option<f64> {
-        match *self {
-            Progress::Status(fitness, _) => Some(fitness),
-            Progress::Solution(fitness, _, _) => fitness,
-            Progress::Fitness(fitness) => Some(fitness),
-            Progress::Novelty(_) => None,
-            Progress::Empty => None,
-        }
-    }
-
-    pub fn is_solution(&self) -> Option<&Genome> {
-        match self {
-            Progress::Solution(_, _, genome) => Some(genome),
-            _ => None,
-        }
-    }
-}
-
-pub enum Evaluation {
-    Progress(Report),
-    Solution(Genome),
-}
-
-impl<'a> Iterator for Runtime<'a> {
+// IMPLEMENT ON NEAT
+/* impl<'a> Iterator for Runtime<'a> {
     type Item = Evaluation;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -166,46 +161,46 @@ impl<'a> Iterator for Runtime<'a> {
         // assign novelty from progress behavior to individuals
         self.assign_novelty(&progress);
 
-        self.context.statistics.milliseconds_elapsed_evaluation = now.elapsed().as_millis();
+        self.statistics.milliseconds_elapsed_evaluation = now.elapsed().as_millis();
 
         // set top performer for report
         self.determine_top_performer();
 
-        self.measure_effectiveness(&progress);
+        // self.measure_effectiveness(&progress);
 
         if let Some(winner) = self.check_for_solution(&progress) {
             Some(Evaluation::Solution(winner))
         } else {
             self.population
                 .speciate(&mut self.context, &self.neat.parameters);
-            self.population
-                .reproduce(&mut self.context, &self.neat.parameters);
-            Some(Evaluation::Progress(self.context.statistics.clone()))
+            self.population.reproduce(&self.neat.parameters);
+            Some(Evaluation::Progress(self.statistics.clone()))
         }
     }
-}
+} */
 
-impl<'a> Runtime<'a> {
+/* impl<'a> Runtime<'a> {
     pub fn new(neat: &'a Neat) -> Self {
         let mut context = Context::new(&neat.parameters);
 
-        let population = Population::new(&mut context, &neat.parameters);
+        let population = Population::new(neat.parameters.clone());
 
         let mut runtime = Runtime {
             neat,
             context,
-            archive: Vec::new(),
+            // archive: Vec::new(),
             population,
+            statistics: Default::default(),
         };
 
-        runtime.init_novelty();
+        // runtime.init_novelty();
 
         runtime
     }
-}
+} */
 
 // private API
-impl<'a> Runtime<'a> {
+/* impl<'a> Runtime<'a> {
     fn measure_effectiveness(&mut self, progress: &[Progress]) {
         let raw_fitnesses_arr = arr1(
             progress
@@ -218,19 +213,19 @@ impl<'a> Runtime<'a> {
         // determine standard deviation of agent fitness
         let raw_fitness_std_dev = raw_fitnesses_arr.std_axis(Axis(0), 0.0).as_slice().unwrap()[0];
 
-        self.context.statistics.fitness.raw_std_dev = raw_fitness_std_dev;
+        // self.context.statistics.fitness.raw_std_dev = raw_fitness_std_dev;
 
-        if self.context.statistics.fitness.raw_average < self.context.peak_average_fitness {
+        /* if self.context.statistics.fitness.raw_average < self.context.peak_average_fitness {
             self.context.consecutive_ineffective_generations += 1;
         } else {
             self.context.consecutive_ineffective_generations = 0;
             self.context.peak_average_fitness = self.context.statistics.fitness.raw_average;
-        }
+        } */
 
-        self.context
-            .statistics
-            .num_consecutive_ineffective_generations =
-            self.context.consecutive_ineffective_generations;
+        /* self.context
+        .statistics
+        .num_consecutive_ineffective_generations =
+        self.context.consecutive_ineffective_generations; */
 
         // determine if impatience triggers
         /* if self.context.consecutive_ineffective_generations
@@ -261,7 +256,7 @@ impl<'a> Runtime<'a> {
             .collect::<Vec<Progress>>()
     }
 
-    fn check_for_solution(&self, progress: &[Progress]) -> Option<Genome> {
+    fn check_for_solution(&self, progress: &[Progress]) -> Option<Individual> {
         progress
             .iter()
             .filter_map(|p| p.is_solution())
@@ -269,15 +264,17 @@ impl<'a> Runtime<'a> {
             .next()
     }
 
-    fn init_novelty(&mut self) {
+    // MOVE INTO POPULATION
+    /* fn init_novelty(&mut self) {
         let progress = self.generate_progress();
         // init archive threshold to initial fitness peak
         self.assign_novelty(progress.as_slice());
         // set initial archive theshold from sample taken
         self.context.archive_threshold = self.context.statistics.novelty.raw_maximum;
-    }
+    } */
 
-    fn assign_novelty(&mut self, progress: &[Progress]) {
+    // MOVE INTO POPULATION
+    /* fn assign_novelty(&mut self, progress: &[Progress]) {
         let behaviors: Vec<&Behavior> = progress
             .iter()
             .flat_map(|progress| progress.behavior())
@@ -411,10 +408,11 @@ impl<'a> Runtime<'a> {
         self.context.statistics.novelty.normalized_maximum = normalized_maximum;
         self.context.statistics.novelty.normalized_minimum = normalized_minimum;
         self.context.statistics.novelty.normalized_average = normalized_average;
-    }
+    } */
 
+    // MOVE INTO POPULATION
     // should be top performer with regard to raw fitness ?
-    fn determine_top_performer(&mut self) {
+    /* fn determine_top_performer(&mut self) {
         let pos = self
             .population
             .individuals
@@ -430,9 +428,10 @@ impl<'a> Runtime<'a> {
             });
 
         self.context.statistics.top_performer = self.population.individuals[pos.0].clone();
-    }
+    } */
 
-    #[allow(clippy::float_cmp)]
+    // MOVE INTO POPULATION
+    /* #[allow(clippy::float_cmp)]
     fn assign_fitness(&mut self, progress: &[Progress]) {
         let mut raw_minimum = f64::INFINITY;
         let mut raw_sum = 0.0;
@@ -496,21 +495,21 @@ impl<'a> Runtime<'a> {
         self.context.statistics.fitness.normalized_maximum = normalized_maximum;
         self.context.statistics.fitness.normalized_minimum = normalized_minimum;
         self.context.statistics.fitness.normalized_average = normalized_average;
-    }
+    } */
 
-    fn reset_generational_statistics(&mut self) {
+    /* fn reset_generational_statistics(&mut self) {
         self.context.statistics.time_stamp = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap()
             .as_secs();
         self.context.statistics.num_species_stale = 0;
-    }
-}
+    } */
+} */
 
 #[cfg(test)]
 mod tests {
-    use super::Neat;
-    use crate::genome::Genome;
+    /* use super::Neat;
+    use crate::individual::Individual;
     use crate::runtime::{Evaluation, Progress};
 
     #[test]
@@ -674,5 +673,5 @@ mod tests {
             assert!(report.fitness.raw_minimum + 1.0 < f64::EPSILON);
             assert!(report.fitness.shifted_minimum.abs() < f64::EPSILON);
         }
-    }
+    } */
 }
