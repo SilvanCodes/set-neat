@@ -1,5 +1,3 @@
-use std::ops::{Deref, DerefMut};
-
 use rand::{prelude::SmallRng, Rng, SeedableRng};
 use rand_distr::{Distribution, Normal};
 

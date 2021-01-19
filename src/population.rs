@@ -4,6 +4,7 @@ use crate::{
     individual::{
         behavior::{Behavior, Behaviors},
         genes::IdGenerator,
+        genome::Genome,
         scores::Score,
         Individual,
     },
@@ -73,7 +74,7 @@ impl Population {
         let context = &self.parameters.speciation;
         // place into matching species
         if let Some(species) = self.species.iter_mut().find(|species| {
-            Individual::compatability_distance(
+            Genome::compatability_distance(
                 &individual,
                 &species.representative,
                 context.factor_genes,
@@ -191,7 +192,7 @@ impl Population {
             let mut distances = Vec::new();
 
             for individual_1 in &self.individuals {
-                distances.push(Individual::compatability_distance(
+                distances.push(Genome::compatability_distance(
                     individual_0,
                     individual_1,
                     self.parameters.speciation.factor_genes,

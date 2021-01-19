@@ -121,13 +121,3 @@ impl Parameters {
         s.try_into()
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::Parameters;
-
-    #[test]
-    fn read_parameters() {
-        let parameters = Parameters::new("src/Config.toml").unwrap();
-    }
-}

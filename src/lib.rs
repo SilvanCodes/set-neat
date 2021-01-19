@@ -10,10 +10,10 @@ mod individual;
 mod rng;
 mod statistics;
 
-use parameters::Parameters;
-
 // re-exports
-pub use individual::Individual;
+pub use individual::{genes::IdGenerator, Individual};
+pub use parameters::Parameters;
+pub use rng::NeatRng;
 pub use runtime::{Evaluation, Progress, Runtime};
 
 pub struct Neat {
