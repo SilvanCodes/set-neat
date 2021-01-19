@@ -2,9 +2,9 @@ use std::collections::HashMap;
 
 use favannat::network::{EdgeLike, NetLike, NodeLike, Recurrent};
 
-use crate::{
+use crate::individual::{
     genes::{activations, connections::Connection, nodes::Node, Activation, Id},
-    individual::Individual,
+    Individual,
 };
 
 impl NodeLike for Node {
@@ -100,7 +100,7 @@ impl Recurrent<Node, Connection> for Individual {
                     });
 
             let inward_wrapping_connection = Connection::new(
-                recurrent_input.clone(),
+                *recurrent_input,
                 recurrent_connection.weight,
                 recurrent_connection.output,
             );
@@ -119,7 +119,7 @@ impl Recurrent<Node, Connection> for Individual {
 
 #[cfg(test)]
 mod tests {
-    use favannat::network::Recurrent;
+    // use favannat::network::Recurrent;
 
     // use crate::{Context, Genome, Parameters};
 

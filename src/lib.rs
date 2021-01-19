@@ -1,6 +1,4 @@
 mod favannat_impl;
-mod genes;
-mod genomee;
 mod parameters;
 mod population;
 mod runtime;

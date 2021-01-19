@@ -5,7 +5,7 @@ use favannat::{
 };
 use gym::{SpaceData, State};
 use ndarray::{stack, Array1, Array2, Axis};
-use set_neat::{Evaluation, Genome, Neat, Progress};
+use set_neat::{Evaluation, Individual, Neat, Progress};
 
 use log::{error, info};
 use std::time::Instant;
@@ -24,7 +24,7 @@ fn main() {
     if let Some(timestamp) = args.get(1) {
         let winner_json =
             fs::read_to_string(format!("examples/{}/winner.json", ENV)).expect("cant read file");
-        let winner: Genome = serde_json::from_str(&winner_json).unwrap();
+        let winner: Individual = serde_json::from_str(&winner_json).unwrap();
         let scaler_json =
             fs::read_to_string(format!("examples/{}/winner_standard_scaler.json", ENV))
                 .expect("cant read file");
@@ -73,10 +73,11 @@ fn train(standard_scaler: (Array1<f64>, Array1<f64>)) {
 
     let other_standard_scaler = standard_scaler.clone();
 
-    let fitness_function = move |genome: &Genome| -> Progress {
+    let fitness_function = move |individual: &Individual| -> Progress {
         let standard_scaler = &standard_scaler;
 
-        let (fitness, all_observations) = run(standard_scaler, genome, RUNS, STEPS, false, false);
+        let (fitness, all_observations) =
+            run(standard_scaler, individual, RUNS, STEPS, false, false);
 
         if fitness > 0.0 {
             dbg!(fitness);
@@ -87,7 +88,7 @@ fn train(standard_scaler: (Array1<f64>, Array1<f64>)) {
 
             let (validation_fitness, all_observations) = run(
                 &standard_scaler,
-                genome,
+                individual,
                 VALIDATION_RUNS,
                 STEPS,
                 false,
@@ -95,9 +96,9 @@ fn train(standard_scaler: (Array1<f64>, Array1<f64>)) {
             );
 
             // log possible solutions to file
-            let mut genome = genome.clone();
-            genome.set_fitness(validation_fitness);
-            info!(target: "app::solutions", "{}", serde_json::to_string(&genome).unwrap());
+            let mut individual = individual.clone();
+            individual.fitness.raw = validation_fitness;
+            info!(target: "app::solutions", "{}", serde_json::to_string(&individual).unwrap());
             info!(
                 "finished validation runs with {} average fitness",
                 validation_fitness
@@ -111,7 +112,7 @@ fn train(standard_scaler: (Array1<f64>, Array1<f64>)) {
                         .row(all_observations.shape()[0] - 1)
                         .to_vec(),
                 )
-                .solved(genome);
+                .solved(individual);
             }
         }
         // let observation_means = all_observations.mean_axis(Axis(0)).unwrap();
@@ -151,7 +152,7 @@ fn train(standard_scaler: (Array1<f64>, Array1<f64>)) {
                 } */
                 None
             }
-            Evaluation::Solution(genome) => Some(genome),
+            Evaluation::Solution(individual) => Some(individual),
         })
         .next()
     {
@@ -190,7 +191,7 @@ fn train(standard_scaler: (Array1<f64>, Array1<f64>)) {
 
         let secs = now.elapsed().as_millis();
         info!(
-            "winning genome ({},{}) after {} seconds: {:?}",
+            "winning individual ({},{}) after {} seconds: {:?}",
             winner.nodes().count(),
             winner.feed_forward.len(),
             secs as f64 / 1000.0,
@@ -201,7 +202,7 @@ fn train(standard_scaler: (Array1<f64>, Array1<f64>)) {
 
 fn run(
     standard_scaler: &(Array1<f64>, Array1<f64>),
-    net: &Genome,
+    net: &Individual,
     runs: usize,
     steps: usize,
     render: bool,

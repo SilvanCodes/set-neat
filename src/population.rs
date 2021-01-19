@@ -1,9 +1,9 @@
 use std::{mem, time::Instant};
 
 use crate::{
-    genes::IdGenerator,
     individual::{
         behavior::{Behavior, Behaviors},
+        genes::IdGenerator,
         scores::Score,
         Individual,
     },

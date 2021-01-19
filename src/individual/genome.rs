@@ -1,5 +1,5 @@
 use crate::{
-    genes::{connections::Connection, nodes::Node, Activation, Genes, IdGenerator},
+    individual::genes::{connections::Connection, nodes::Node, Activation, Genes, IdGenerator},
     parameters::Parameters,
     rng::NeatRng,
 };
@@ -286,60 +286,136 @@ impl Genome {
         }
         false
     }
+
+    pub fn compatability_distance(
+        genome_0: &Self,
+        genome_1: &Self,
+        factor_genes: f64,
+        factor_weights: f64,
+        factor_activations: f64,
+    ) -> f64 {
+        let mut weight_difference_total = 0.0;
+        let mut activation_difference = 0.0;
+
+        let matching_genes_count_total = (genome_0
+            .feed_forward
+            .iterate_matches(&genome_1.feed_forward)
+            .inspect(|(connection_0, connection_1)| {
+                weight_difference_total += (connection_0.weight - connection_1.weight).abs();
+            })
+            .count()
+            + genome_0
+                .recurrent
+                .iterate_matches(&genome_1.recurrent)
+                .inspect(|(connection_0, connection_1)| {
+                    weight_difference_total += (connection_0.weight - connection_1.weight).abs();
+                })
+                .count()) as f64;
+
+        let different_genes_count_total = (genome_0
+            .feed_forward
+            .iterate_unmatches(&genome_1.feed_forward)
+            .count()
+            + genome_0
+                .recurrent
+                .iterate_unmatches(&genome_1.recurrent)
+                .count()) as f64;
+
+        let matching_nodes_count = genome_0
+            .hidden
+            .iterate_matches(&genome_1.hidden)
+            .inspect(|(node_0, node_1)| {
+                if node_0.activation != node_1.activation {
+                    activation_difference += 1.0;
+                }
+            })
+            .count() as f64;
+
+        // percent of different genes, considering unique genes
+        let difference = factor_genes * different_genes_count_total / (matching_genes_count_total + different_genes_count_total)
+        // average of weight differences
+        + factor_weights * if matching_genes_count_total > 0.0 { weight_difference_total / matching_genes_count_total } else { 0.0 }
+        // percent of different activation functions, considering matching nodes genes
+        + factor_activations * if matching_nodes_count > 0.0 { activation_difference / matching_nodes_count } else { 0.0 };
+
+        if difference.is_nan() {
+            dbg!(factor_genes);
+            dbg!(different_genes_count_total);
+            dbg!(matching_genes_count_total);
+            dbg!(different_genes_count_total);
+            dbg!(factor_weights);
+            dbg!(weight_difference_total);
+            dbg!(matching_genes_count_total);
+            dbg!(factor_activations);
+            dbg!(activation_difference);
+            dbg!(matching_nodes_count);
+            panic!("difference is nan");
+        } else {
+            difference
+        }
+
+        // neat python function
+        //(activation_difference + c1 * different_nodes_count) / genome_0.node_genes.len().max(genome_1.node_genes.len()) as f64
+        // + (weight_difference_total + c1 * different_genes_count_total) / (genome_0.connection_genes.len() + genome_0.recurrent_connection_genes.len()).max(genome_1.connection_genes.len() + genome_1.recurrent_connection_genes.len()) as f64
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    /* use super::Genome;
+    use super::Genome;
     use crate::{
-        context::{rng::NeatRng, Context},
-        genes::{
-            connections::{Connection, FeedForward},
-            nodes::{Hidden, Input, Node, Output},
-            Genes,
+        individual::genes::{
+            connections::Connection, nodes::Node, Activation, Genes, Id, IdGenerator,
         },
-    };
-    use crate::{
-        genes::{Activation, Id, Weight},
         parameters::Parameters,
+        rng::NeatRng,
     };
 
     #[test]
     fn alter_activation() {
-        let mut parameters: Parameters = Default::default();
-        parameters.mutation.weights.perturbation_range = 1.0;
-        let mut context = Context::new(&parameters);
+        // create id book-keeping
+        let mut id_gen = IdGenerator::default();
 
-        parameters.setup.dimension.input = 1;
-        parameters.setup.dimension.output = 1;
-        parameters.initialization.connections = 1.0;
-        parameters.initialization.activations = vec![Activation::Absolute, Activation::Cosine];
+        let parameters: Parameters = Default::default();
 
-        let mut genome = Genome::new(&mut context, &parameters);
+        // create randomn source
+        let mut rng = NeatRng::new(
+            parameters.setup.seed,
+            parameters.mutation.weight_perturbation_std_dev,
+        );
 
-        genome.init(&mut context, &parameters);
+        let mut genome = Genome::new(&mut id_gen, &parameters);
 
-        genome.add_node(&mut context, &parameters);
+        genome.init(&mut rng, &parameters);
 
-        let old_activation = genome.hidden.iter().next().unwrap().1;
+        genome.add_node(&mut rng, &mut id_gen, &parameters);
 
-        genome.alter_activation(&mut context, &parameters);
+        let old_activation = genome.hidden.iter().next().unwrap().activation;
 
-        assert_ne!(genome.hidden.iter().next().unwrap().1, old_activation);
+        genome.alter_activation(&mut rng, &parameters);
+
+        assert_ne!(
+            genome.hidden.iter().next().unwrap().activation,
+            old_activation
+        );
     }
 
     #[test]
     fn add_random_connection() {
-        let mut parameters: Parameters = Default::default();
-        parameters.mutation.weights.perturbation_range = 1.0;
-        let mut context = Context::new(&parameters);
+        // create id book-keeping
+        let mut id_gen = IdGenerator::default();
 
-        parameters.setup.dimension.input = 1;
-        parameters.setup.dimension.output = 1;
+        let parameters: Parameters = Default::default();
 
-        let mut genome = Genome::new(&mut context, &parameters);
+        // create randomn source
+        let mut rng = NeatRng::new(
+            parameters.setup.seed,
+            parameters.mutation.weight_perturbation_std_dev,
+        );
 
-        let result = genome.add_connection(&mut context, &parameters).is_ok();
+        let mut genome = Genome::new(&mut id_gen, &parameters);
+
+        let result = genome.add_connection(&mut rng, &parameters).is_ok();
 
         println!("{:?}", genome);
 
@@ -349,17 +425,21 @@ mod tests {
 
     #[test]
     fn dont_add_same_connection_twice() {
-        let mut parameters: Parameters = Default::default();
-        parameters.mutation.weights.perturbation_range = 1.0;
-        let mut context = Context::new(&parameters);
+        // create id book-keeping
+        let mut id_gen = IdGenerator::default();
 
-        parameters.setup.dimension.input = 1;
-        parameters.setup.dimension.output = 1;
+        let parameters: Parameters = Default::default();
 
-        let mut genome = Genome::new(&mut context, &parameters);
+        // create randomn source
+        let mut rng = NeatRng::new(
+            parameters.setup.seed,
+            parameters.mutation.weight_perturbation_std_dev,
+        );
 
-        let result_0 = genome.add_connection(&mut context, &parameters).is_ok();
-        if let Err(message) = genome.add_connection(&mut context, &parameters) {
+        let mut genome = Genome::new(&mut id_gen, &parameters);
+
+        let result_0 = genome.add_connection(&mut rng, &parameters).is_ok();
+        if let Err(message) = genome.add_connection(&mut rng, &parameters) {
             assert_eq!(message, "no connection possible");
         } else {
             // assert!(false);
@@ -374,19 +454,21 @@ mod tests {
 
     #[test]
     fn add_random_node() {
-        let mut parameters: Parameters = Default::default();
-        parameters.mutation.weights.perturbation_range = 1.0;
-        parameters.initialization.activations = vec![Activation::Tanh];
-        let mut context = Context::new(&parameters);
+        // create id book-keeping
+        let mut id_gen = IdGenerator::default();
 
-        parameters.setup.dimension.input = 1;
-        parameters.setup.dimension.output = 1;
-        parameters.initialization.connections = 1.0;
+        let parameters: Parameters = Default::default();
 
-        let mut genome = Genome::new(&mut context, &parameters);
+        // create randomn source
+        let mut rng = NeatRng::new(
+            parameters.setup.seed,
+            parameters.mutation.weight_perturbation_std_dev,
+        );
 
-        genome.init(&mut context, &parameters);
-        genome.add_node(&mut context, &parameters);
+        let mut genome = Genome::new(&mut id_gen, &parameters);
+
+        genome.init(&mut rng, &parameters);
+        genome.add_node(&mut rng, &mut id_gen, &parameters);
 
         println!("{:?}", genome);
 
@@ -394,34 +476,36 @@ mod tests {
     }
 
     #[test]
-    fn crossover_same_fitness() {
-        let mut parameters: Parameters = Default::default();
-        parameters.mutation.weights.perturbation_range = 1.0;
-        parameters.initialization.activations = vec![Activation::Tanh];
-        let mut context = Context::new(&parameters);
+    fn crossover() {
+        // create id book-keeping
+        let mut id_gen = IdGenerator::default();
 
-        parameters.setup.dimension.input = 1;
-        parameters.setup.dimension.output = 1;
-        parameters.initialization.connections = 1.0;
+        let parameters: Parameters = Default::default();
 
-        let mut genome_0 = Genome::new(&mut context, &parameters);
+        // create randomn source
+        let mut rng = NeatRng::new(
+            parameters.setup.seed,
+            parameters.mutation.weight_perturbation_std_dev,
+        );
 
-        genome_0.init(&mut context, &parameters);
+        let mut genome_0 = Genome::new(&mut id_gen, &parameters);
+
+        genome_0.init(&mut rng, &parameters);
 
         let mut genome_1 = genome_0.clone();
 
         // mutate genome_0
-        genome_0.add_node(&mut context, &parameters);
+        genome_0.add_node(&mut rng, &mut id_gen, &parameters);
 
         // mutate genome_1
-        genome_1.add_node(&mut context, &parameters);
-        genome_1.add_node(&mut context, &parameters);
+        genome_1.add_node(&mut rng, &mut id_gen, &parameters);
+        genome_1.add_node(&mut rng, &mut id_gen, &parameters);
 
         println!("genome_0 {:?}", genome_0);
         println!("genome_1 {:?}", genome_1);
 
         // shorter genome is fitter genome
-        let offspring = genome_0.cross_in(&genome_1, &mut context);
+        let offspring = genome_0.cross_in(&genome_1, &mut rng.small);
 
         println!("offspring {:?}", offspring);
 
@@ -430,85 +514,21 @@ mod tests {
     }
 
     #[test]
-    fn crossover_different_fitness_by_fitter() {
-        todo!("move to individual/mod.rs");
-
-        let mut parameters: Parameters = Default::default();
-        parameters.mutation.weights.perturbation_range = 1.0;
-        parameters.initialization.activations = vec![Activation::Tanh];
-        let mut context = Context::new(&parameters);
-
-        parameters.setup.dimension.input = 2;
-        parameters.setup.dimension.output = 1;
-        parameters.initialization.connections = 1.0;
-
-        let mut genome_0 = Genome::new(&mut context, &parameters);
-
-        genome_0.init(&mut context, &parameters);
-
-        let mut genome_1 = genome_0.clone();
-
-        /* genome_1.fitness.raw = Raw::fitness(1.0);
-        genome_1.fitness.shifted = genome_1.fitness.raw.shift(0.0);
-        genome_1.fitness.normalized = genome_1.fitness.shifted.normalize(1.0); */
-
-        // mutate genome_0
-        genome_0.add_node(&mut context, &parameters);
-
-        // mutate genome_1
-        genome_1.add_node(&mut context, &parameters);
-        genome_1.add_connection(&mut context, &parameters).unwrap();
-
-        let offspring = genome_0.cross_in(&genome_1, &mut context);
-
-        assert_eq!(offspring.hidden.len(), 1);
-        assert_eq!(offspring.feed_forward.len(), 5);
-    }
-
-    #[test]
-    fn crossover_different_fitness_by_equal_fittnes_different_len() {
-        todo!("move to individual/mod.rs");
-
-        let mut parameters: Parameters = Default::default();
-        parameters.mutation.weights.perturbation_range = 1.0;
-        parameters.initialization.activations = vec![Activation::Tanh];
-        let mut context = Context::new(&parameters);
-
-        parameters.setup.dimension.input = 2;
-        parameters.setup.dimension.output = 1;
-        parameters.initialization.connections = 1.0;
-
-        let mut genome_0 = Genome::new(&mut context, &parameters);
-
-        genome_0.init(&mut context, &parameters);
-
-        let mut genome_1 = genome_0.clone();
-        // mutate genome_0
-        genome_0.add_node(&mut context, &parameters);
-
-        // mutate genome_1
-        genome_1.add_node(&mut context, &parameters);
-        genome_1.add_connection(&mut context, &parameters).unwrap();
-
-        let offspring = genome_0.cross_in(&genome_1, &mut context);
-
-        assert_eq!(offspring.hidden.len(), 1);
-        assert_eq!(offspring.feed_forward.len(), 4);
-    }
-
-    #[test]
     fn detect_no_cycle() {
-        let mut parameters: Parameters = Default::default();
-        parameters.mutation.weights.perturbation_range = 1.0;
-        let mut context = Context::new(&parameters);
+        // create id book-keeping
+        let mut id_gen = IdGenerator::default();
 
-        parameters.setup.dimension.input = 1;
-        parameters.setup.dimension.output = 1;
-        parameters.initialization.connections = 1.0;
+        let parameters: Parameters = Default::default();
 
-        let mut genome_0 = Genome::new(&mut context, &parameters);
+        // create randomn source
+        let mut rng = NeatRng::new(
+            parameters.setup.seed,
+            parameters.mutation.weight_perturbation_std_dev,
+        );
 
-        genome_0.init(&mut context, &parameters);
+        let mut genome_0 = Genome::new(&mut id_gen, &parameters);
+
+        genome_0.init(&mut rng, &parameters);
 
         let input = genome_0.inputs.iter().next().unwrap();
         let output = genome_0.outputs.iter().next().unwrap();
@@ -520,21 +540,23 @@ mod tests {
 
     #[test]
     fn detect_cycle() {
-        let mut parameters: Parameters = Default::default();
-        parameters.mutation.weights.perturbation_range = 1.0;
-        parameters.initialization.activations = vec![Activation::Tanh];
-        let mut context = Context::new(&parameters);
+        // create id book-keeping
+        let mut id_gen = IdGenerator::default();
 
-        parameters.setup.dimension.input = 1;
-        parameters.setup.dimension.output = 1;
-        parameters.initialization.connections = 1.0;
+        let parameters: Parameters = Default::default();
 
-        let mut genome_0 = Genome::new(&mut context, &parameters);
+        // create randomn source
+        let mut rng = NeatRng::new(
+            parameters.setup.seed,
+            parameters.mutation.weight_perturbation_std_dev,
+        );
 
-        genome_0.init(&mut context, &parameters);
+        let mut genome_0 = Genome::new(&mut id_gen, &parameters);
+
+        genome_0.init(&mut rng, &parameters);
 
         // mutate genome_0
-        genome_0.add_node(&mut context, &parameters);
+        genome_0.add_node(&mut rng, &mut id_gen, &parameters);
 
         let input = genome_0.inputs.iter().next().unwrap();
         let output = genome_0.outputs.iter().next().unwrap();
@@ -548,13 +570,12 @@ mod tests {
 
     #[test]
     fn crossover_no_cycle() {
-        let mut parameters: Parameters = Default::default();
-        parameters.mutation.weights.perturbation_std_dev = 1.0;
-        let mut context = Context::new(&parameters);
+        let parameters: Parameters = Default::default();
 
+        // create random source
         let mut rng = NeatRng::new(
-            parameters.seed,
-            parameters.mutation.weights.perturbation_std_dev,
+            parameters.setup.seed,
+            parameters.mutation.weight_perturbation_std_dev,
         );
 
         // assumption:
@@ -565,21 +586,21 @@ mod tests {
 
         let mut genome_0 = Genome {
             inputs: Genes(
-                vec![Input(Node(Id(0), Activation::Linear))]
+                vec![Node::new(Id(0), Activation::Linear)]
                     .iter()
                     .cloned()
                     .collect(),
             ),
             outputs: Genes(
-                vec![Output(Node(Id(1), Activation::Linear))]
+                vec![Node::new(Id(1), Activation::Linear)]
                     .iter()
                     .cloned()
                     .collect(),
             ),
             hidden: Genes(
                 vec![
-                    Hidden(Node(Id(2), Activation::Tanh)),
-                    Hidden(Node(Id(3), Activation::Tanh)),
+                    Node::new(Id(2), Activation::Tanh),
+                    Node::new(Id(3), Activation::Tanh),
                 ]
                 .iter()
                 .cloned()
@@ -587,10 +608,10 @@ mod tests {
             ),
             feed_forward: Genes(
                 vec![
-                    FeedForward(Connection(Id(0), Weight::default(), Id(2))),
-                    FeedForward(Connection(Id(2), Weight::default(), Id(1))),
-                    FeedForward(Connection(Id(0), Weight::default(), Id(3))),
-                    FeedForward(Connection(Id(3), Weight::default(), Id(1))),
+                    Connection::new(Id(0), 1.0, Id(2)),
+                    Connection::new(Id(2), 1.0, Id(1)),
+                    Connection::new(Id(0), 1.0, Id(3)),
+                    Connection::new(Id(3), 1.0, Id(1)),
                 ]
                 .iter()
                 .cloned()
@@ -604,12 +625,12 @@ mod tests {
         // insert connectio one way in genome0
         genome_0
             .feed_forward
-            .insert(FeedForward(Connection(Id(2), Weight::default(), Id(3))));
+            .insert(Connection::new(Id(2), 1.0, Id(3)));
 
         // insert connection the other way in genome1
         genome_1
             .feed_forward
-            .insert(FeedForward(Connection(Id(3), Weight::default(), Id(2))));
+            .insert(Connection::new(Id(3), 1.0, Id(2)));
 
         let offspring = genome_0.cross_in(&genome_1, &mut rng.small);
 
@@ -619,37 +640,34 @@ mod tests {
             for connection1 in offspring.feed_forward.iter() {
                 println!(
                     "{:?}->{:?}, {:?}->{:?}",
-                    connection0.input(),
-                    connection0.output(),
-                    connection1.input(),
-                    connection1.output()
+                    connection0.input, connection0.output, connection1.input, connection1.output
                 );
                 assert!(
-                    !(connection0.input() == connection1.output()
-                        && connection0.output() == connection1.input())
+                    !(connection0.input == connection1.output
+                        && connection0.output == connection1.input)
                 )
             }
         }
     }
 
-    /* #[test]
+    #[test]
     fn compatability_distance_same_genome() {
         let genome_0 = Genome {
             inputs: Genes(
-                vec![Input(Node(Id(0), Activation::Linear))]
+                vec![Node::new(Id(0), Activation::Linear)]
                     .iter()
                     .cloned()
                     .collect(),
             ),
             outputs: Genes(
-                vec![Output(Node(Id(1), Activation::Linear))]
+                vec![Node::new(Id(1), Activation::Linear)]
                     .iter()
                     .cloned()
                     .collect(),
             ),
 
             feed_forward: Genes(
-                vec![FeedForward(Connection(Id(0), Weight(1.0), Id(1)))]
+                vec![Connection::new(Id(0), 1.0, Id(1))]
                     .iter()
                     .cloned()
                     .collect(),
@@ -668,20 +686,20 @@ mod tests {
     fn compatability_distance_different_weight_genome() {
         let genome_0 = Genome {
             inputs: Genes(
-                vec![Input(Node(Id(0), Activation::Linear))]
+                vec![Node::new(Id(0), Activation::Linear)]
                     .iter()
                     .cloned()
                     .collect(),
             ),
             outputs: Genes(
-                vec![Output(Node(Id(1), Activation::Linear))]
+                vec![Node::new(Id(1), Activation::Linear)]
                     .iter()
                     .cloned()
                     .collect(),
             ),
 
             feed_forward: Genes(
-                vec![FeedForward(Connection(Id(0), Weight(1.0), Id(1)))]
+                vec![Connection::new(Id(0), 1.0, Id(1))]
                     .iter()
                     .cloned()
                     .collect(),
@@ -693,7 +711,7 @@ mod tests {
 
         genome_1
             .feed_forward
-            .replace(FeedForward(Connection(Id(0), Weight(2.0), Id(1))));
+            .replace(Connection::new(Id(0), 2.0, Id(1)));
 
         println!("genome_0: {:?}", genome_0);
         println!("genome_1: {:?}", genome_1);
@@ -707,20 +725,20 @@ mod tests {
     fn compatability_distance_different_connection_genome() {
         let genome_0 = Genome {
             inputs: Genes(
-                vec![Input(Node(Id(0), Activation::Linear))]
+                vec![Node::new(Id(0), Activation::Linear)]
                     .iter()
                     .cloned()
                     .collect(),
             ),
             outputs: Genes(
-                vec![Output(Node(Id(1), Activation::Linear))]
+                vec![Node::new(Id(1), Activation::Linear)]
                     .iter()
                     .cloned()
                     .collect(),
             ),
 
             feed_forward: Genes(
-                vec![FeedForward(Connection(Id(0), Weight(1.0), Id(1)))]
+                vec![Connection::new(Id(0), 1.0, Id(1))]
                     .iter()
                     .cloned()
                     .collect(),
@@ -732,17 +750,17 @@ mod tests {
 
         genome_1
             .feed_forward
-            .replace(FeedForward(Connection(Id(0), Weight(1.0), Id(2))));
+            .insert(Connection::new(Id(0), 1.0, Id(2)));
         genome_1
             .feed_forward
-            .replace(FeedForward(Connection(Id(2), Weight(2.0), Id(1))));
+            .insert(Connection::new(Id(2), 2.0, Id(1)));
 
         println!("genome_0: {:?}", genome_0);
         println!("genome_1: {:?}", genome_1);
 
         let delta = Genome::compatability_distance(&genome_0, &genome_1, 2.0, 0.0, 0.0);
 
-        // factor 2 times 2 different genes
-        assert!((delta - 2.0 * 2.0).abs() < f64::EPSILON);
-    } */ */
+        // factor 2 times 2 different genes over 3 total genes
+        assert!((delta - 2.0 * 2.0 / 3.0).abs() < f64::EPSILON);
+    }
 }

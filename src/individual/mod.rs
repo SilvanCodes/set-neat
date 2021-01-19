@@ -3,12 +3,12 @@ use std::ops::{Deref, DerefMut};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 
-use crate::{genes::IdGenerator, parameters::Parameters};
+use crate::parameters::Parameters;
 
-use self::scores::Score;
-use self::{behavior::Behavior, genome::Genome};
+use self::{behavior::Behavior, genes::IdGenerator, genome::Genome, scores::Score};
 
 pub mod behavior;
+pub mod genes;
 pub mod genome;
 pub mod scores;
 
@@ -167,4 +167,80 @@ impl Individual {
         //(activation_difference + c1 * different_nodes_count) / genome_0.node_genes.len().max(genome_1.node_genes.len()) as f64
         // + (weight_difference_total + c1 * different_genes_count_total) / (genome_0.connection_genes.len() + genome_0.recurrent_connection_genes.len()).max(genome_1.connection_genes.len() + genome_1.recurrent_connection_genes.len()) as f64
     }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn feature() {}
+
+    /* #[test]
+    fn crossover_different_fitness_by_fitter() {
+        // create id book-keeping
+        let mut id_gen = IdGenerator::default();
+
+        let mut parameters: Parameters = Default::default();
+
+        parameters.setup.input_dimension = 2;
+
+        // create randomn source
+        let mut rng = NeatRng::new(
+            parameters.setup.seed,
+            parameters.mutation.weight_perturbation_std_dev,
+        );
+
+        let mut genome_0 = Genome::new(&mut id_gen, &parameters);
+
+        genome_0.init(&mut rng, &parameters);
+
+        let mut genome_1 = genome_0.clone();
+
+        genome_1.fitness = Score::new(1.0, 0.0, 1.0);
+
+        // mutate genome_0
+        genome_0.add_node(&mut rng, &mut id_gen, &parameters);
+
+        // mutate genome_1
+        genome_1.add_node(&mut rng, &mut id_gen, &parameters);
+        genome_1.add_connection(&mut rng, &parameters).unwrap();
+
+        let offspring = genome_0.cross_in(&genome_1, &mut rng.small);
+
+        assert_eq!(offspring.hidden.len(), 1);
+        assert_eq!(offspring.feed_forward.len(), 5);
+    }
+
+    #[test]
+    fn crossover_equal_fittnes_different_len() {
+        // create id book-keeping
+        let mut id_gen = IdGenerator::default();
+
+        let mut parameters: Parameters = Default::default();
+
+        parameters.setup.input_dimension = 2;
+
+        // create randomn source
+        let mut rng = NeatRng::new(
+            parameters.setup.seed,
+            parameters.mutation.weight_perturbation_std_dev,
+        );
+
+        let mut genome_0 = Genome::new(&mut id_gen, &parameters);
+
+        genome_0.init(&mut rng, &parameters);
+
+        let mut genome_1 = genome_0.clone();
+        // mutate genome_0
+        genome_0.add_node(&mut rng, &mut id_gen, &parameters);
+
+        // mutate genome_1
+        genome_1.add_node(&mut rng, &mut id_gen, &parameters);
+        genome_1.add_connection(&mut rng, &parameters).unwrap();
+
+        let offspring = genome_0.cross_in(&genome_1, &mut rng.small);
+
+        assert_eq!(offspring.hidden.len(), 1);
+        assert_eq!(offspring.feed_forward.len(), 4);
+    }
+    */
 }
