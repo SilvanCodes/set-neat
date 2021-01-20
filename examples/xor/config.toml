@@ -1,17 +1,18 @@
 [setup]
-    seed = 42
-    population_size = 150
-    input_dimension = 3
-    output_dimension = 1
-    add_to_archive_chance = 0.5
-    novelty_nearest_neighbors = 16
+seed = 42
+population_size = 150
+input_dimension = 3
+output_dimension = 1
+connected_input_percent = 0.3
+add_to_archive_chance = 0.5
+novelty_nearest_neighbors = 16
 
 [mutation]
 new_node_chance = 0.05
 new_connection_chance = 0.10
 connection_is_recurrent_chance = 0.0
 change_activation_function_chance = 0.0
-weight_perturbation_std_dev = 5.0
+weight_perturbation_std_dev = 3.0
 
 [activations]
 output_nodes = "Sigmoid" # activation function of output nodes
@@ -40,6 +41,6 @@ elitism_individuals = 0
 target_species_count = 15 # number of desired species
 compatability_threshold = 1.0 # difference above threshold is considered incompatible
 compatability_threshold_delta = 0.01 # adjust threshold by x if num species unequal target species
-factor_weights = 1.0 # factor for percent of different genes
+factor_weights = 0.0 # factor for percent of different genes
 factor_genes = 1.0 # weight difference factor
 factor_activations = 0.0 # factor for percent of different activations

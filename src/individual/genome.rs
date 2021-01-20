@@ -36,13 +36,14 @@ impl Genome {
         self.inputs
             .iter()
             // .iterate_unwrapped()
-            .chain(self.hidden.iter() /* .iterate_unwrapped() */)
-            .chain(self.outputs.iter() /* .iterate_unwrapped() */)
+            .chain(self.hidden.iter())
+            .chain(self.outputs.iter())
     }
 
     pub fn init(&mut self, rng: &mut NeatRng, parameters: &Parameters) {
         for input in self.inputs.iterate_with_random_offset(&mut rng.small).take(
-            (rng.small.gen::<f64>() * parameters.setup.input_dimension as f64).ceil() as usize,
+            (parameters.setup.connected_input_percent * parameters.setup.input_dimension as f64)
+                .ceil() as usize,
         ) {
             // connect to every output
             for output in self.outputs.iter() {
@@ -331,32 +332,12 @@ impl Genome {
             })
             .count() as f64;
 
-        // percent of different genes, considering unique genes
-        let difference = factor_genes * different_genes_count_total / (matching_genes_count_total + different_genes_count_total)
-        // average of weight differences
+        // percent of different genes, considering all unique genes from both genomes
+        factor_genes * different_genes_count_total / (matching_genes_count_total + different_genes_count_total)
+        // average weight differences , considering matching connection genes
         + factor_weights * if matching_genes_count_total > 0.0 { weight_difference_total / matching_genes_count_total } else { 0.0 }
         // percent of different activation functions, considering matching nodes genes
-        + factor_activations * if matching_nodes_count > 0.0 { activation_difference / matching_nodes_count } else { 0.0 };
-
-        if difference.is_nan() {
-            dbg!(factor_genes);
-            dbg!(different_genes_count_total);
-            dbg!(matching_genes_count_total);
-            dbg!(different_genes_count_total);
-            dbg!(factor_weights);
-            dbg!(weight_difference_total);
-            dbg!(matching_genes_count_total);
-            dbg!(factor_activations);
-            dbg!(activation_difference);
-            dbg!(matching_nodes_count);
-            panic!("difference is nan");
-        } else {
-            difference
-        }
-
-        // neat python function
-        //(activation_difference + c1 * different_nodes_count) / genome_0.node_genes.len().max(genome_1.node_genes.len()) as f64
-        // + (weight_difference_total + c1 * different_genes_count_total) / (genome_0.connection_genes.len() + genome_0.recurrent_connection_genes.len()).max(genome_1.connection_genes.len() + genome_1.recurrent_connection_genes.len()) as f64
+        + factor_activations * if matching_nodes_count > 0.0 { activation_difference / matching_nodes_count } else { 0.0 }
     }
 }
 

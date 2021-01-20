@@ -17,8 +17,8 @@ fn main() {
 
         match LoopingFabricator::fabricate(individual) {
             Ok(mut evaluator) => {
-                // match FeedForwardMatrixFabricator::fabricate(individual) {
-                // Ok(evaluator) => {
+                /* match FeedForwardMatrixFabricator::fabricate(individual) {
+                Ok(evaluator) => { */
                 result_0 = evaluator.evaluate(array![1.0, 1.0, 0.0]);
                 result_1 = evaluator.evaluate(array![1.0, 1.0, 1.0]);
                 result_2 = evaluator.evaluate(array![1.0, 0.0, 1.0]);

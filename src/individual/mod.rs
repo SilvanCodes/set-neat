@@ -96,11 +96,12 @@ impl Individual {
 
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn feature() {}
+    use crate::{IdGenerator, Individual, NeatRng, Parameters};
 
-    /* #[test]
-    fn crossover_different_fitness_by_fitter() {
+    use super::scores::Score;
+
+    #[test]
+    fn crossover_different_fitness() {
         // create id book-keeping
         let mut id_gen = IdGenerator::default();
 
@@ -114,22 +115,22 @@ mod tests {
             parameters.mutation.weight_perturbation_std_dev,
         );
 
-        let mut genome_0 = Genome::new(&mut id_gen, &parameters);
+        let mut individuals_0 = Individual::initial(&mut id_gen, &parameters);
 
-        genome_0.init(&mut rng, &parameters);
+        individuals_0.init(&mut rng, &parameters);
 
-        let mut genome_1 = genome_0.clone();
+        let mut individual_1 = individuals_0.clone();
 
-        genome_1.fitness = Score::new(1.0, 0.0, 1.0);
+        individual_1.fitness = Score::new(1.0, 0.0, 1.0);
 
-        // mutate genome_0
-        genome_0.add_node(&mut rng, &mut id_gen, &parameters);
+        // mutate individuals_0
+        individuals_0.add_node(&mut rng, &mut id_gen, &parameters);
 
-        // mutate genome_1
-        genome_1.add_node(&mut rng, &mut id_gen, &parameters);
-        genome_1.add_connection(&mut rng, &parameters).unwrap();
+        // mutate individual_1
+        individual_1.add_node(&mut rng, &mut id_gen, &parameters);
+        individual_1.add_connection(&mut rng, &parameters).unwrap();
 
-        let offspring = genome_0.cross_in(&genome_1, &mut rng.small);
+        let offspring = individuals_0.crossover(&individual_1, &mut rng.small);
 
         assert_eq!(offspring.hidden.len(), 1);
         assert_eq!(offspring.feed_forward.len(), 5);
@@ -150,22 +151,22 @@ mod tests {
             parameters.mutation.weight_perturbation_std_dev,
         );
 
-        let mut genome_0 = Genome::new(&mut id_gen, &parameters);
+        let mut individuals_0 = Individual::initial(&mut id_gen, &parameters);
 
-        genome_0.init(&mut rng, &parameters);
+        individuals_0.init(&mut rng, &parameters);
 
-        let mut genome_1 = genome_0.clone();
+        let mut individual_1 = individuals_0.clone();
+
         // mutate genome_0
-        genome_0.add_node(&mut rng, &mut id_gen, &parameters);
+        individuals_0.add_node(&mut rng, &mut id_gen, &parameters);
 
         // mutate genome_1
-        genome_1.add_node(&mut rng, &mut id_gen, &parameters);
-        genome_1.add_connection(&mut rng, &parameters).unwrap();
+        individual_1.add_node(&mut rng, &mut id_gen, &parameters);
+        individual_1.add_connection(&mut rng, &parameters).unwrap();
 
-        let offspring = genome_0.cross_in(&genome_1, &mut rng.small);
+        let offspring = individuals_0.crossover(&individual_1, &mut rng.small);
 
         assert_eq!(offspring.hidden.len(), 1);
         assert_eq!(offspring.feed_forward.len(), 4);
     }
-    */
 }

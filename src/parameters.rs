@@ -17,6 +17,7 @@ pub struct Setup {
     pub population_size: usize,
     pub input_dimension: usize,
     pub output_dimension: usize,
+    pub connected_input_percent: f64,
     pub add_to_archive_chance: f64,
     pub novelty_nearest_neighbors: usize,
 }
@@ -28,6 +29,7 @@ impl Default for Setup {
             population_size: 250,
             input_dimension: 1,
             output_dimension: 1,
+            connected_input_percent: 1.0,
             add_to_archive_chance: 0.5,
             novelty_nearest_neighbors: 16,
         }

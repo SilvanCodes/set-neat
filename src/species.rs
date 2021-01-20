@@ -200,6 +200,8 @@ mod tests {
             .reproduce(&mut rng, &mut id_gen, &parameters, expected_offspring)
             .collect();
 
-        assert!(offspring.len() == expected_offspring + 1);
+        assert!(
+            offspring.len() == expected_offspring + parameters.reproduction.elitism_individuals
+        );
     }
 }
