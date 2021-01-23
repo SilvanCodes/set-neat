@@ -1,36 +1,38 @@
+use favannat::matrix::fabricator::RecurrentMatrixFabricator;
 use favannat::{
     looping::fabricator::LoopingFabricator,
-    matrix::fabricator::RecurrentMatrixFabricator,
     network::{StatefulEvaluator, StatefulFabricator},
 };
 use gym::{utility::StandardScaler, SpaceData, SpaceTemplate, State};
-use ndarray::{stack, Array1, Array2, Axis};
-use set_neat::{Evaluation, Genome, Neat, Progress};
+use ndarray::{stack, Array, Array2, Axis};
+use set_neat::{Evaluation, Individual, Neat, Progress};
 
 use log::{error, info};
 use std::time::Instant;
 use std::time::SystemTime;
 use std::{env, fs};
 
-pub const RUNS: usize = 10;
-pub const STEPS: usize = 100;
+pub const RUNS: usize = 1;
+pub const STEPS: usize = usize::MAX;
 pub const VALIDATION_RUNS: usize = 100;
-pub const ENV: &str = "CartPole-v1";
-pub const REQUIRED_FITNESS: f64 = 495.0;
+pub const ENV: &str = "CarRacing-v0";
+pub const REQUIRED_FITNESS: f64 = 900.0;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
 
     if let Some(timestamp) = args.get(1) {
-        let winner_json =
-            fs::read_to_string(format!("examples/{}/winner.json", ENV)).expect("cant read file");
-        let winner: Genome = serde_json::from_str(&winner_json).unwrap();
-        let scaler_json =
-            fs::read_to_string(format!("examples/{}/winner_standard_scaler.json", ENV))
-                .expect("cant read file");
+        let winner_json = fs::read_to_string(format!("examples/{}/{}_winner.json", ENV, timestamp))
+            .expect("cant read file");
+        let winner: Individual = serde_json::from_str(&winner_json).unwrap();
+        let scaler_json = fs::read_to_string(format!(
+            "examples/{}/{}_winner_standard_scaler.json",
+            ENV, timestamp
+        ))
+        .expect("cant read file");
         let standard_scaler: StandardScaler = serde_json::from_str(&scaler_json).unwrap();
         // showcase(standard_scaler, winner);
-        run(&winner, &standard_scaler, 1, STEPS, true, false);
+        run(&standard_scaler, &winner, 1, STEPS, true, false);
     } else {
         train(StandardScaler::for_environment(ENV));
     }
@@ -43,10 +45,11 @@ fn train(standard_scaler: StandardScaler) {
 
     let other_standard_scaler = standard_scaler.clone();
 
-    let fitness_function = move |genome: &Genome| -> Progress {
+    let fitness_function = move |individual: &Individual| -> Progress {
         let standard_scaler = &standard_scaler;
 
-        let (fitness, all_observations) = run(genome, standard_scaler, RUNS, STEPS, false, false);
+        let (fitness, all_observations) =
+            run(standard_scaler, individual, RUNS, STEPS, false, false);
 
         if fitness > 0.0 {
             dbg!(fitness);
@@ -56,8 +59,8 @@ fn train(standard_scaler: StandardScaler) {
             info!("hit task theshold, starting validation runs...");
 
             let (validation_fitness, all_observations) = run(
-                genome,
                 &standard_scaler,
+                individual,
                 VALIDATION_RUNS,
                 STEPS,
                 false,
@@ -65,9 +68,9 @@ fn train(standard_scaler: StandardScaler) {
             );
 
             // log possible solutions to file
-            let mut genome = genome.clone();
-            genome.set_fitness(validation_fitness);
-            info!(target: "app::solutions", "{}", serde_json::to_string(&genome).unwrap());
+            let mut individual = individual.clone();
+            individual.fitness.raw = validation_fitness;
+            info!(target: "app::solutions", "{}", serde_json::to_string(&individual).unwrap());
             info!(
                 "finished validation runs with {} average fitness",
                 validation_fitness
@@ -75,23 +78,23 @@ fn train(standard_scaler: StandardScaler) {
             if validation_fitness > REQUIRED_FITNESS {
                 // let observation_means = all_observations.mean_axis(Axis(0)).unwrap();
                 // let observation_std_dev = all_observations.std_axis(Axis(0), 0.0);
-                return Progress::new(
+                return Progress::fitness(
                     validation_fitness,
-                    all_observations
-                        .row(all_observations.shape()[0] - 1)
-                        .to_vec(),
+                    /* all_observations
+                    .row(all_observations.shape()[0] - 1)
+                    .to_vec(), */
                 )
-                .solved(genome);
+                .solved(individual);
             }
         }
         // let observation_means = all_observations.mean_axis(Axis(0)).unwrap();
         // let observation_std_dev = all_observations.std_axis(Axis(0), 0.0);
 
-        Progress::new(
+        Progress::fitness(
             fitness,
-            all_observations
-                .row(all_observations.shape()[0] - 1)
-                .to_vec(),
+            /* all_observations
+            .row(all_observations.shape()[0] - 1)
+            .to_vec(), */
         )
     };
 
@@ -106,22 +109,23 @@ fn train(standard_scaler: StandardScaler) {
 
     if let Some(winner) = neat
         .run()
+        .take(100)
         .filter_map(|evaluation| match evaluation {
             Evaluation::Progress(report) => {
                 info!(target: "app::progress", "{}", serde_json::to_string(&report).unwrap());
-                /* if report.num_generation % 5 == 0 {
+                if report.population.num_generation % 5 == 0 {
                     run(
                         &other_standard_scaler,
-                        &report.top_performer,
+                        &report.population.top_performer,
                         1,
                         STEPS,
                         true,
                         true,
                     );
-                } */
+                }
                 None
             }
-            Evaluation::Solution(genome) => Some(genome),
+            Evaluation::Solution(individual) => Some(individual),
         })
         .next()
     {
@@ -129,11 +133,6 @@ fn train(standard_scaler: StandardScaler) {
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap()
             .as_secs();
-        fs::write(
-            format!("examples/{}/winner.json", ENV),
-            serde_json::to_string(&winner).unwrap(),
-        )
-        .expect("Unable to write file");
         fs::write(
             format!("examples/{}/{}_winner.json", ENV, time_stamp),
             serde_json::to_string(&winner).unwrap(),
@@ -152,26 +151,23 @@ fn train(standard_scaler: StandardScaler) {
             serde_json::to_string(&other_standard_scaler).unwrap(),
         )
         .expect("Unable to write file");
-        fs::write(
-            format!("examples/{}/winner_standard_scaler.json", ENV),
-            serde_json::to_string(&other_standard_scaler).unwrap(),
-        )
-        .expect("Unable to write file");
 
         let secs = now.elapsed().as_millis();
         info!(
-            "winning genome ({},{}) after {} seconds: {:?}",
+            "winning individual ({},{}) after {} seconds: {:?}",
             winner.nodes().count(),
             winner.feed_forward.len(),
             secs as f64 / 1000.0,
             winner
         );
+    } else {
+        println!("##### OUT OF TIME #####");
     }
 }
 
 fn run(
-    net: &Genome,
     standard_scaler: &StandardScaler,
+    net: &Individual,
     runs: usize,
     steps: usize,
     render: bool,
@@ -180,21 +176,25 @@ fn run(
     let gym = gym::GymClient::default();
     let env = gym.make(ENV);
 
-    let mut evaluator = RecurrentMatrixFabricator::fabricate(net).unwrap();
+    // let mut evaluator = RecurrentMatrixFabricator::fabricate(net).unwrap();
+    let mut evaluator = LoopingFabricator::fabricate(net).unwrap();
     let mut fitness = 0.0;
+    let mut all_observations = Array2::zeros((1, 27648));
+    /* s */
 
-    let mut all_observations;
-
-    if let SpaceTemplate::BOX { shape, .. } = env.observation_space() {
-        all_observations = Array2::zeros((1, shape[0]));
-    } else {
-        panic!("is no box observation space")
+    if debug {
+        dbg!(net);
+        dbg!(&evaluator);
     }
 
     for run in 0..runs {
         evaluator.reset_internal_state();
         let mut recent_observation = env.reset().expect("Unable to reset");
         let mut total_reward = 0.0;
+
+        if debug {
+            dbg!(run);
+        }
 
         for step in 0..steps {
             if render {
@@ -203,26 +203,26 @@ fn run(
 
             let mut observations = recent_observation.get_box().unwrap();
 
+            observations = Array::from(observations.into_raw_vec());
+
             all_observations = stack![
                 Axis(0),
                 all_observations,
                 observations.clone().insert_axis(Axis(0))
             ];
 
-            // normalize inputs
             standard_scaler.scale_inplace(observations.view_mut());
 
             // add bias input
             let input = stack![Axis(0), observations, [1.0]];
             let output = evaluator.evaluate(input.clone());
 
-            let action = if output[0] > 0.0 {
-                SpaceData::DISCRETE(0)
-            } else {
-                SpaceData::DISCRETE(1)
-            };
+            if debug {
+                dbg!(&input);
+                dbg!(&output);
+            }
 
-            let (observation, reward, is_done) = match env.step(&action) {
+            let (observation, reward, is_done) = match env.step(&SpaceData::BOX(output.clone())) {
                 Ok(State {
                     observation,
                     reward,
@@ -230,20 +230,13 @@ fn run(
                 }) => (observation, reward, is_done),
                 Err(err) => {
                     error!("evaluation error: {}", err);
+                    dbg!(run);
                     dbg!(input);
                     dbg!(output);
                     dbg!(evaluator);
                     dbg!(net);
                     dbg!(all_observations);
                     panic!("evaluation error");
-                    /* (
-                        SpaceData::BOX(array![
-                            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
-                        ]),
-                        0.0,
-                        true,
-                    ) */
                 }
             };
 
@@ -258,6 +251,10 @@ fn run(
             }
         }
         fitness += total_reward;
+    }
+
+    if debug {
+        dbg!(&all_observations);
     }
 
     (fitness / runs as f64, all_observations)

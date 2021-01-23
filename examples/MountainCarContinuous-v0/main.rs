@@ -140,6 +140,7 @@ fn train(standard_scaler: (Array1<f64>, Array1<f64>)) {
         .filter_map(|evaluation| match evaluation {
             Evaluation::Progress(report) => {
                 info!(target: "app::progress", "{}", serde_json::to_string(&report).unwrap());
+                println!("{}", report.population.num_generation);
                 /* if report.num_generation % 5 == 0 {
                     run(
                         &other_standard_scaler,

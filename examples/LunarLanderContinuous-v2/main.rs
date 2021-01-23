@@ -12,7 +12,7 @@ use std::time::Instant;
 use std::time::SystemTime;
 use std::{env, fs};
 
-pub const RUNS: usize = 5;
+pub const RUNS: usize = 1;
 pub const STEPS: usize = usize::MAX;
 pub const VALIDATION_RUNS: usize = 100;
 pub const ENV: &str = "LunarLanderContinuous-v2";
@@ -78,11 +78,11 @@ fn train(standard_scaler: StandardScaler) {
             if validation_fitness > REQUIRED_FITNESS {
                 // let observation_means = all_observations.mean_axis(Axis(0)).unwrap();
                 // let observation_std_dev = all_observations.std_axis(Axis(0), 0.0);
-                return Progress::new(
+                return Progress::fitness(
                     validation_fitness,
-                    all_observations
-                        .row(all_observations.shape()[0] - 1)
-                        .to_vec(),
+                    /* all_observations
+                    .row(all_observations.shape()[0] - 1)
+                    .to_vec(), */
                 )
                 .solved(individual);
             }
@@ -90,11 +90,11 @@ fn train(standard_scaler: StandardScaler) {
         // let observation_means = all_observations.mean_axis(Axis(0)).unwrap();
         // let observation_std_dev = all_observations.std_axis(Axis(0), 0.0);
 
-        Progress::new(
+        Progress::fitness(
             fitness,
-            all_observations
-                .row(all_observations.shape()[0] - 1)
-                .to_vec(),
+            /* all_observations
+            .row(all_observations.shape()[0] - 1)
+            .to_vec(), */
         )
     };
 
@@ -109,6 +109,7 @@ fn train(standard_scaler: StandardScaler) {
 
     if let Some(winner) = neat
         .run()
+        .take(100)
         .filter_map(|evaluation| match evaluation {
             Evaluation::Progress(report) => {
                 info!(target: "app::progress", "{}", serde_json::to_string(&report).unwrap());
@@ -159,6 +160,8 @@ fn train(standard_scaler: StandardScaler) {
             secs as f64 / 1000.0,
             winner
         );
+    } else {
+        println!("##### OUT OF TIME #####");
     }
 }
 

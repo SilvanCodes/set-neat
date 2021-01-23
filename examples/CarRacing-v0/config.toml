@@ -1,9 +1,9 @@
 [setup]
 seed = 42
 population_size = 250
-input_dimension = 9
-output_dimension = 2
-connected_input_percent = 0.5
+input_dimension = 27649
+output_dimension = 3
+connected_input_percent = 0.3
 add_to_archive_chance = 0.5
 novelty_nearest_neighbors = 16
 
@@ -15,7 +15,7 @@ change_activation_function_chance = 0.05
 weight_perturbation_std_dev = 1.5
 
 [activations]
-output_nodes = "Tanh" # activation function of output nodes
+output_nodes = ["Tanh", "Sigmoid", "Sigmoid"] # activation function of output nodes
 hidden_nodes = [
     "Linear",
     "Sigmoid",
@@ -42,5 +42,5 @@ target_species_count = 20 # number of desired species
 compatability_threshold = 1.0 # difference above threshold is considered incompatible
 compatability_threshold_delta = 0.02 # adjust threshold by x if num species unequal target species
 factor_weights = 1.0 # factor for percent of different genes
-factor_genes = 0.5 # weight difference factor
+factor_genes = 1.0 # weight difference factor
 factor_activations = 1.0 # factor for percent of different activations

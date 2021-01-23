@@ -2,7 +2,7 @@ use favannat::matrix::fabricator::RecurrentMatrixFabricator;
 use favannat::network::{StatefulEvaluator, StatefulFabricator};
 use gym::{utility::StandardScaler, SpaceData, SpaceTemplate, State};
 use ndarray::{stack, Array2, Axis};
-use set_neat::{Evaluation, Genome, Neat, Progress};
+use set_neat::{Evaluation, Individual, Neat, Progress};
 
 use log::{error, info};
 use std::time::Instant;
@@ -21,7 +21,7 @@ fn main() {
     if args.get(1).is_some() {
         let winner_json = fs::read_to_string(format!("examples/{}/winner_1601592694.json", ENV))
             .expect("cant read file");
-        let winner: Genome = serde_json::from_str(&winner_json).unwrap();
+        let winner: Individual = serde_json::from_str(&winner_json).unwrap();
         let standard_scaler: StandardScaler = serde_json::from_str(&winner_json).unwrap();
         run(&winner, &standard_scaler, 1, STEPS, true);
     } else {
@@ -34,8 +34,8 @@ fn train(standard_scaler: StandardScaler) {
 
     let standard_scaler_1 = standard_scaler.clone();
 
-    let fitness_function = move |genome: &Genome| -> Progress {
-        let (fitness, all_observations) = run(genome, &standard_scaler, RUNS, STEPS, false);
+    let fitness_function = move |individual: &Individual| -> Progress {
+        let (fitness, all_observations) = run(individual, &standard_scaler, RUNS, STEPS, false);
 
         if fitness > 0.0 {
             dbg!(fitness);
@@ -44,11 +44,11 @@ fn train(standard_scaler: StandardScaler) {
         if fitness >= REQUIRED_FITNESS {
             info!("hit task theshold, starting validation runs...");
             let (validation_fitness, all_observations) =
-                run(genome, &standard_scaler, VALIDATION_RUNS, STEPS, false);
+                run(individual, &standard_scaler, VALIDATION_RUNS, STEPS, false);
             // log possible solutions to file
-            let mut genome = genome.clone();
-            genome.fitness.raw = validation_fitness;
-            info!(target: "app::solutions", "{}", serde_json::to_string(&genome).unwrap());
+            let mut individual = individual.clone();
+            individual.fitness.raw = validation_fitness;
+            info!(target: "app::solutions", "{}", serde_json::to_string(&individual).unwrap());
             info!(
                 "finished validation runs with {} average fitness",
                 validation_fitness
@@ -66,7 +66,7 @@ fn train(standard_scaler: StandardScaler) {
                         .chain(observation_std_dev.iter().take(14).cloned())
                         .collect(),
                 )
-                .solved(genome);
+                .solved(individual);
             }
         }
 
@@ -98,14 +98,20 @@ fn train(standard_scaler: StandardScaler) {
         .filter_map(|evaluation| match evaluation {
             Evaluation::Progress(report) => {
                 info!(target: "app::progress", "{}", serde_json::to_string(&report).unwrap());
-                if report.num_generation % 5 == 0 {
-                    run(&report.top_performer, &standard_scaler_1, 1, STEPS, true);
+                if report.population.num_generation % 5 == 0 {
+                    run(
+                        &report.population.top_performer,
+                        &standard_scaler_1,
+                        1,
+                        STEPS,
+                        true,
+                    );
                 }
 
                 // showcase(standard_scaler_1.clone(), report.top_performer);
                 None
             }
-            Evaluation::Solution(genome) => Some(genome),
+            Evaluation::Solution(individual) => Some(individual),
         })
         .next()
     {
@@ -133,7 +139,7 @@ fn train(standard_scaler: StandardScaler) {
         .expect("Unable to write file");
 
         info!(
-            "winning genome ({},{}) after {} seconds: {:?}",
+            "winning individual ({},{}) after {} seconds: {:?}",
             winner.nodes().count(),
             winner.feed_forward.len(),
             now.elapsed().as_secs(),
@@ -143,7 +149,7 @@ fn train(standard_scaler: StandardScaler) {
 }
 
 fn run(
-    net: &Genome,
+    net: &Individual,
     standard_scaler: &StandardScaler,
     runs: usize,
     steps: usize,

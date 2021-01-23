@@ -57,8 +57,6 @@ impl Species {
     }
 
     pub fn prepare_next_generation(&mut self) {
-        // set fittest member as new representative
-        self.representative = self.members[0].clone();
         // remove all members
         self.members.clear();
     }
