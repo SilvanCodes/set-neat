@@ -12,7 +12,7 @@ use std::time::Instant;
 use std::time::SystemTime;
 use std::{env, fs};
 
-pub const RUNS: usize = 1;
+pub const RUNS: usize = 3;
 pub const STEPS: usize = usize::MAX;
 pub const VALIDATION_RUNS: usize = 100;
 pub const ENV: &str = "LunarLanderContinuous-v2";

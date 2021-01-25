@@ -21,6 +21,7 @@ pub struct Population {
     species: Vec<Species>,
     rng: NeatRng,
     id_gen: IdGenerator,
+    compatability_threshold: f64,
     parameters: Parameters,
     statistics: PopulationStatistics,
 }
@@ -59,6 +60,7 @@ impl Population {
             id_gen,
             rng,
             statistics: Default::default(),
+            compatability_threshold: f64::NAN,
         };
 
         population.init_threshold();
@@ -71,57 +73,32 @@ impl Population {
     }
 
     fn place_genome_into_species(&mut self, individual: Individual) {
-        let context = &self.parameters.speciation;
+        let Speciation {
+            factor_genes,
+            factor_weights,
+            factor_activations,
+            ..
+        } = self.parameters.speciation;
+
+        let weight_cap = self.parameters.mutation.weight_perturbation_std_dev * 3.0;
+        let compatability_threshold = self.compatability_threshold;
+
         // place into matching species
         if let Some(species) = self.species.iter_mut().find(|species| {
             Genome::compatability_distance(
                 &individual,
                 &species.representative,
-                context.factor_genes,
-                context.factor_weights,
-                context.factor_activations,
-            ) < context.compatability_threshold
+                factor_genes,
+                factor_weights,
+                factor_activations,
+                weight_cap,
+            ) < compatability_threshold
         }) {
             species.members.push(individual);
         } else {
             self.species.push(Species::new(individual));
         }
-
-        /* if let Some(species_index) = self.find_best_fitting_species(&genome) {
-            self.species[species_index].members.push(genome);
-        }
-        // or open new species
-        else {
-            self.species.push(Species::new(genome));
-        } */
     }
-
-    /* fn find_best_fitting_species(&self, genome: &Genome) -> Option<usize> {
-        // return when no species exist
-        if self.species.is_empty() {
-            return None;
-        };
-
-        self.species
-            .iter()
-            // map to compatability distance
-            .map(|species| {
-                Genome::compatability_distance(
-                    genome,
-                    &species.representative,
-                    self.context.factor_genes,
-                    self.context.factor_weights,
-                    self.context.factor_activations,
-                )
-            })
-            .enumerate()
-            // select minimum distance
-            .min_by(|(_, distance_0), (_, distance_1)| distance_0.partial_cmp(distance_1).unwrap())
-            // check against compatability threshold
-            .filter(|(_, distance)| distance < &self.context.compatability_threshold)
-            // return species index
-            .map(|(index, _)| index)
-    } */
 
     fn remove_stale_species(&mut self) {
         // sort species by fitness in descending order
@@ -155,8 +132,6 @@ impl Population {
     }
 
     pub fn speciate(&mut self) {
-        // MAYBE: update representative by most similar descendant ?
-
         let now = Instant::now();
 
         // clear population and sort into species
@@ -176,8 +151,7 @@ impl Population {
         self.remove_stale_species();
 
         // collect statistics
-        self.statistics.compatability_threshold =
-            self.parameters.speciation.compatability_threshold;
+        self.statistics.compatability_threshold = self.compatability_threshold;
         self.statistics.milliseconds_elapsed_speciation = now.elapsed().as_millis();
     }
 
@@ -185,7 +159,8 @@ impl Population {
         let mut threshold = Vec::new();
 
         let approximate_species_size = (self.parameters.setup.population_size as f64
-            / self.parameters.speciation.target_species_count as f64)
+            / self.parameters.speciation.target_species_count as f64
+            * 2.0)
             .floor() as usize;
 
         for individual_0 in &self.individuals {
@@ -198,6 +173,7 @@ impl Population {
                     self.parameters.speciation.factor_genes,
                     self.parameters.speciation.factor_weights,
                     self.parameters.speciation.factor_activations,
+                    self.parameters.mutation.weight_perturbation_std_dev * 3.0,
                 ));
             }
 
@@ -206,38 +182,21 @@ impl Population {
             threshold.push(distances[approximate_species_size]);
         }
 
-        // dbg!(&threshold);
-
-        self.parameters.speciation.compatability_threshold =
-            threshold.iter().sum::<f64>() / threshold.len() as f64 * 1.0;
+        self.compatability_threshold =
+            dbg!(threshold.iter().sum::<f64>() / threshold.len() as f64 * 1.0);
     }
 
     fn adjust_threshold(&mut self) {
         let Speciation {
             target_species_count,
-            compatability_threshold_delta,
             ..
         } = self.parameters.speciation;
 
-        let species_count = target_species_count;
-        // check if num species near target species
-        match self.species.len() {
-            length if length > species_count => {
-                self.parameters.speciation.compatability_threshold +=
-                    compatability_threshold_delta * (length as f64 / species_count as f64);
-                //.powi(2);
-            }
-            length if length < species_count => {
-                self.parameters.speciation.compatability_threshold -=
-                    compatability_threshold_delta * (species_count as f64 / length as f64);
-                //.powi(2);
-            }
-            _ => {}
-        }
+        self.compatability_threshold *=
+            (self.species.len() as f64 / target_species_count as f64).sqrt();
 
         // use threshold_delta as lower cap of compatability_threshold
-        self.parameters.speciation.compatability_threshold =
-            compatability_threshold_delta.max(self.parameters.speciation.compatability_threshold);
+        self.compatability_threshold = 0.0_f64.max(self.compatability_threshold);
     }
 
     pub fn reproduce(&mut self) {
@@ -250,8 +209,6 @@ impl Population {
             .species
             .iter()
             .fold(0.0, |sum, species| sum + species.score);
-
-        // dbg!(self.species.len());
 
         // if we can not differentiate species
         if total_fitness == 0.0 {
@@ -269,8 +226,6 @@ impl Population {
             self.species
                 .retain(|species| species.score * offspring_ratio >= 1.0);
         }
-
-        // dbg!(self.species.len());
 
         // iterate species, only ones that qualify for reproduction are left
         for species in &self.species {
@@ -312,7 +267,14 @@ impl Population {
         self.collect_statistics()
     }
 
-    fn collect_statistics(&self) -> PopulationStatistics {
+    fn collect_statistics(&mut self) -> PopulationStatistics {
+        self.statistics.top_performer = self
+            .individuals
+            .iter()
+            .max_by(|a, b| a.score().partial_cmp(&b.score()).unwrap())
+            .unwrap()
+            .clone();
+
         self.statistics.clone()
     }
 

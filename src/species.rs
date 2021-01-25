@@ -71,7 +71,7 @@ impl Species {
         self.members
             .iter()
             .cycle()
-            .take(offspring)
+            .take((offspring - parameters.reproduction.elitism_individuals).max(0))
             .map(move |member| {
                 let mut offspring =
                     member.crossover(self.members.choose(&mut rng.small).unwrap(), &mut rng.small);
@@ -82,7 +82,7 @@ impl Species {
             .chain(
                 self.members
                     .iter()
-                    .take(parameters.reproduction.elitism_individuals)
+                    .take(parameters.reproduction.elitism_individuals.min(offspring))
                     .cloned(),
             )
     }
@@ -198,8 +198,6 @@ mod tests {
             .reproduce(&mut rng, &mut id_gen, &parameters, expected_offspring)
             .collect();
 
-        assert!(
-            offspring.len() == expected_offspring + parameters.reproduction.elitism_individuals
-        );
+        assert!(offspring.len() == expected_offspring);
     }
 }

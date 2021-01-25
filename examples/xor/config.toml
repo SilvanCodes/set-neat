@@ -41,6 +41,6 @@ elitism_individuals = 0
 target_species_count = 15 # number of desired species
 compatability_threshold = 1.0 # difference above threshold is considered incompatible
 compatability_threshold_delta = 0.01 # adjust threshold by x if num species unequal target species
-factor_weights = 0.0 # factor for percent of different genes
+factor_weights = 0.2 # factor for percent of different genes
 factor_genes = 1.0 # weight difference factor
 factor_activations = 0.0 # factor for percent of different activations

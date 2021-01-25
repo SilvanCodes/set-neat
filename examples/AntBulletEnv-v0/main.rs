@@ -5,7 +5,7 @@ use favannat::{
 };
 use gym::{SpaceData, State};
 use ndarray::{array, stack, Array1, Axis};
-use set_neat::{Evaluation, Genome, Neat, Progress};
+use set_neat::{Evaluation, Individual, Neat, Progress};
 
 use log::info;
 use std::time::Instant;
@@ -24,7 +24,7 @@ fn main() {
     if args.get(1).is_some() {
         let winner_json = fs::read_to_string(format!("examples/{}/winner_1601592694.json", ENV))
             .expect("cant read file");
-        let winner: Genome = serde_json::from_str(&winner_json).unwrap();
+        let winner: Individual = serde_json::from_str(&winner_json).unwrap();
         showcase(winner);
     } else {
         train();
@@ -70,11 +70,11 @@ fn train() {
 
     let (means, std_dev) = standard_scaler();
 
-    let fitness_function = move |genome: &Genome| -> Progress {
+    let fitness_function = move |individual: &Individual| -> Progress {
         let gym = gym::GymClient::default();
         let env = gym.make(ENV);
 
-        let mut evaluator = RecurrentMatrixFabricator::fabricate(genome).unwrap();
+        let mut evaluator = RecurrentMatrixFabricator::fabricate(individual).unwrap();
         let mut fitness = 0.0;
 
         let mut final_observation = SpaceData::BOX(array![]);
@@ -147,12 +147,12 @@ fn train() {
                 fitness += total_reward;
             }
             // log possible solutions to file
-            let mut genome = genome.clone();
-            genome.set_fitness(fitness);
-            info!(target: "app::solutions", "{}", serde_json::to_string(&genome).unwrap());
+            let mut individual = individual.clone();
+            individual.fitness.raw = fitness;
+            info!(target: "app::solutions", "{}", serde_json::to_string(&individual).unwrap());
             info!("finished validation runs with {} average fitness", fitness);
             if fitness >= REQUIRED_FITNESS {
-                return Progress::fitness(fitness).solved(genome);
+                return Progress::fitness(fitness).solved(individual);
             }
         }
         Progress::fitness(fitness)
@@ -179,12 +179,12 @@ fn train() {
                 /* if report.fitness_peak > report.archive_threshold {
                     showcase(report.top_performer);
                 } */
-                if report.num_generation % 10 == 0 {
-                    showcase(report.top_performer);
+                if report.population.num_generation % 10 == 0 {
+                    showcase(report.population.top_performer);
                 }
                 None
             }
-            Evaluation::Solution(genome) => Some(genome),
+            Evaluation::Solution(individual) => Some(individual),
         })
         .next()
     {
@@ -205,7 +205,7 @@ fn train() {
 
         let secs = now.elapsed().as_millis();
         info!(
-            "winning genome ({},{}) after {} seconds: {:?}",
+            "winning individual ({},{}) after {} seconds: {:?}",
             winner.nodes().count(),
             winner.len(),
             secs as f64 / 1000.0,
@@ -214,13 +214,13 @@ fn train() {
     }
 }
 
-fn showcase(genome: Genome) {
+fn showcase(individual: Individual) {
     let (means, std_dev) = standard_scaler();
 
     let gym = gym::GymClient::default();
     let env = gym.make(ENV);
 
-    let mut evaluator = RecurrentMatrixFabricator::fabricate(&genome).unwrap();
+    let mut evaluator = RecurrentMatrixFabricator::fabricate(&individual).unwrap();
 
     let mut recent_observation = env.reset().expect("Unable to reset");
     let mut total_reward = 0.0;

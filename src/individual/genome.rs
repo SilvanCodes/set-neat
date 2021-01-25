@@ -84,7 +84,7 @@ impl Genome {
     pub fn mutate(&mut self, rng: &mut NeatRng, id_gen: &mut IdGenerator, parameters: &Parameters) {
         // mutate weigths
         // if context.gamble(parameters.mutation.weight) {
-        self.change_weights(rng);
+        self.change_weights(rng, parameters.mutation.weight_perturbation_std_dev * 3.0);
         // }
 
         // mutate connection gene
@@ -103,12 +103,13 @@ impl Genome {
         }
     }
 
-    pub fn change_weights(&mut self, rng: &mut NeatRng) {
+    pub fn change_weights(&mut self, rng: &mut NeatRng, weight_cap: f64) {
         self.feed_forward = self
             .feed_forward
             .drain_into_random(&mut rng.small)
             .map(|mut connection| {
                 connection.weight += rng.weight_perturbation();
+                connection.weight = connection.weight.max(-weight_cap).min(weight_cap);
                 connection
             })
             .collect();
@@ -294,6 +295,7 @@ impl Genome {
         factor_genes: f64,
         factor_weights: f64,
         factor_activations: f64,
+        weight_cap: f64,
     ) -> f64 {
         let mut weight_difference_total = 0.0;
         let mut activation_difference = 0.0;
@@ -332,10 +334,12 @@ impl Genome {
             })
             .count() as f64;
 
+        let maximum_weight_difference = matching_genes_count_total * 2.0 * weight_cap;
+
         // percent of different genes, considering all unique genes from both genomes
         factor_genes * different_genes_count_total / (matching_genes_count_total + different_genes_count_total)
         // average weight differences , considering matching connection genes
-        + factor_weights * if matching_genes_count_total > 0.0 { weight_difference_total / matching_genes_count_total } else { 0.0 }
+        + factor_weights * if maximum_weight_difference > 0.0 { weight_difference_total / maximum_weight_difference } else { 0.0 }
         // percent of different activation functions, considering matching nodes genes
         + factor_activations * if matching_nodes_count > 0.0 { activation_difference / matching_nodes_count } else { 0.0 }
     }
@@ -658,7 +662,8 @@ mod tests {
 
         let genome_1 = genome_0.clone();
 
-        let delta = Genome::compatability_distance(&genome_0, &genome_1, 1.0, 0.4, 0.0);
+        let delta =
+            Genome::compatability_distance(&genome_0, &genome_1, 1.0, 0.4, 0.0, f64::INFINITY);
 
         assert!(delta < f64::EPSILON);
     }
@@ -697,9 +702,12 @@ mod tests {
         println!("genome_0: {:?}", genome_0);
         println!("genome_1: {:?}", genome_1);
 
-        let delta = Genome::compatability_distance(&genome_0, &genome_1, 0.0, 2.0, 0.0);
+        let delta = Genome::compatability_distance(&genome_0, &genome_1, 0.0, 2.0, 0.0, 2.0);
 
-        assert!((delta - 2.0).abs() < f64::EPSILON);
+        dbg!(&delta);
+
+        // 1.0 (weight difference) / (1.0 (matching gene) * 2.0 (weight_cap) * 2.0) * 2.0 (factor_weights)
+        assert!((delta - 0.5).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -739,7 +747,8 @@ mod tests {
         println!("genome_0: {:?}", genome_0);
         println!("genome_1: {:?}", genome_1);
 
-        let delta = Genome::compatability_distance(&genome_0, &genome_1, 2.0, 0.0, 0.0);
+        let delta =
+            Genome::compatability_distance(&genome_0, &genome_1, 2.0, 0.0, 0.0, f64::INFINITY);
 
         // factor 2 times 2 different genes over 3 total genes
         assert!((delta - 2.0 * 2.0 / 3.0).abs() < f64::EPSILON);

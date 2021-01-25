@@ -12,20 +12,20 @@ new_node_chance = 0.05
 new_connection_chance = 0.10
 connection_is_recurrent_chance = 0.3
 change_activation_function_chance = 0.05
-weight_perturbation_std_dev = 1.5
+weight_perturbation_std_dev = 0.5
 
 [activations]
 output_nodes = "Tanh" # activation function of output nodes
 hidden_nodes = [
-    "Linear",
-    "Sigmoid",
+    # "Linear",
+    # "Sigmoid",
     "Tanh",
     "Gaussian",
     "Step",
-    "Sine",
-    "Cosine",
-    "Inverse",
-    "Absolute",
+    # "Sine",
+    # "Cosine",
+    # "Inverse",
+    # "Absolute",
     "Relu",
     # "Squared",
 ] # pool of activation functions to choose from
@@ -33,14 +33,12 @@ hidden_nodes = [
 
 [reproduction]
 survival_rate = 0.2 # allow the top x percent of species to survive and reproduce
-generations_until_stale = 15 # number of generations allowed without improvement (stale species are reproduced only by the top performing member)
+generations_until_stale = 5 # number of generations allowed without improvement (stale species are reproduced only by the top performing member)
 elitism_species = 1
-elitism_individuals = 0
+elitism_individuals = 1
 
 [speciation]
 target_species_count = 20 # number of desired species
-compatability_threshold = 1.0 # difference above threshold is considered incompatible
-compatability_threshold_delta = 0.02 # adjust threshold by x if num species unequal target species
 factor_weights = 1.0 # factor for percent of different genes
-factor_genes = 0.5 # weight difference factor
+factor_genes = 1.0 # weight difference factor
 factor_activations = 1.0 # factor for percent of different activations

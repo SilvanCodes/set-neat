@@ -105,8 +105,6 @@ impl Default for Reproduction {
 #[derive(Deserialize, Serialize, Default, Debug, Clone)]
 pub struct Speciation {
     pub target_species_count: usize,
-    pub compatability_threshold: f64,
-    pub compatability_threshold_delta: f64,
     pub factor_weights: f64,
     pub factor_genes: f64,
     pub factor_activations: f64,
