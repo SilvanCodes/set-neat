@@ -119,6 +119,7 @@ impl Genome {
             .drain_into_random(&mut rng.small)
             .map(|mut connection| {
                 connection.weight += rng.weight_perturbation();
+                connection.weight = connection.weight.max(-weight_cap).min(weight_cap);
                 connection
             })
             .collect();

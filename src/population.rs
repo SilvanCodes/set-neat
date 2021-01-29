@@ -156,11 +156,18 @@ impl Population {
     }
 
     pub fn init_threshold(&mut self) {
+        let Speciation {
+            factor_genes,
+            factor_weights,
+            factor_activations,
+            ..
+        } = self.parameters.speciation;
+
         let mut threshold = Vec::new();
 
         let approximate_species_size = (self.parameters.setup.population_size as f64
             / self.parameters.speciation.target_species_count as f64
-            * 2.0)
+            * (factor_genes + factor_weights + factor_activations) as f64)
             .floor() as usize;
 
         for individual_0 in &self.individuals {
@@ -187,16 +194,9 @@ impl Population {
     }
 
     fn adjust_threshold(&mut self) {
-        let Speciation {
-            target_species_count,
-            ..
-        } = self.parameters.speciation;
-
-        self.compatability_threshold *=
-            (self.species.len() as f64 / target_species_count as f64).sqrt();
-
-        // use threshold_delta as lower cap of compatability_threshold
-        self.compatability_threshold = 0.0_f64.max(self.compatability_threshold);
+        self.compatability_threshold *= (self.species.len() as f64
+            / self.parameters.speciation.target_species_count as f64)
+            .sqrt();
     }
 
     pub fn reproduce(&mut self) {

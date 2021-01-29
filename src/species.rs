@@ -71,18 +71,32 @@ impl Species {
         self.members
             .iter()
             .cycle()
-            .take((offspring - parameters.reproduction.elitism_individuals).max(0))
+            // produce as many offspring from crossover and mutation as individual elitism taking into account actual species length allows
+            .take(
+                (offspring
+                    - parameters
+                        .reproduction
+                        .elitism_individuals
+                        .min(self.members.len()))
+                .max(0),
+            )
             .map(move |member| {
                 let mut offspring =
                     member.crossover(self.members.choose(&mut rng.small).unwrap(), &mut rng.small);
                 offspring.mutate(rng, id_gen, parameters);
                 offspring
             })
-            // add top x members to offspring
+            // add as many members to offspring as specified individual elitism taking into account actual species length
             .chain(
                 self.members
                     .iter()
-                    .take(parameters.reproduction.elitism_individuals.min(offspring))
+                    .take(
+                        parameters
+                            .reproduction
+                            .elitism_individuals
+                            .min(self.members.len())
+                            .min(offspring),
+                    )
                     .cloned(),
             )
     }
@@ -180,7 +194,7 @@ mod tests {
         let mut id_gen = IdGenerator::default();
         let mut parameters: Parameters = Default::default();
 
-        parameters.reproduction.elitism_individuals = 1;
+        parameters.reproduction.elitism_individuals = 3;
 
         // create random source
         let mut rng = NeatRng::new(
@@ -198,6 +212,6 @@ mod tests {
             .reproduce(&mut rng, &mut id_gen, &parameters, expected_offspring)
             .collect();
 
-        assert!(offspring.len() == expected_offspring);
+        assert_eq!(offspring.len(), expected_offspring);
     }
 }

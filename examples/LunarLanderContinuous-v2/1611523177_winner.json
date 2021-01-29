@@ -1,1 +1,47 @@
-{"genome":{"inputs":[{"id":2,"activation":"Linear"},{"id":7,"activation":"Linear"},{"id":3,"activation":"Linear"},{"id":8,"activation":"Linear"},{"id":5,"activation":"Linear"},{"id":1,"activation":"Linear"},{"id":0,"activation":"Linear"},{"id":4,"activation":"Linear"},{"id":6,"activation":"Linear"}],"hidden":[],"outputs":[{"id":9,"activation":"Tanh"},{"id":10,"activation":"Tanh"}],"feed_forward":[{"input":0,"output":10,"weight":-3.0},{"input":6,"output":10,"weight":1.2967280983269682},{"input":0,"output":9,"weight":0.7735847393355517},{"input":5,"output":10,"weight":3.0},{"input":6,"output":9,"weight":0.5772409951272576},{"input":3,"output":9,"weight":-2.307788031192159},{"input":1,"output":10,"weight":0.39793690994419406},{"input":7,"output":9,"weight":-0.9661568847415194},{"input":4,"output":10,"weight":-1.6356291401546073},{"input":8,"output":10,"weight":2.267912361660576},{"input":4,"output":9,"weight":3.0},{"input":2,"output":9,"weight":-0.9638896573581108},{"input":2,"output":10,"weight":-1.858352254978505},{"input":3,"output":10,"weight":1.6700745936774495},{"input":8,"output":9,"weight":-0.8985382379627862},{"input":1,"output":9,"weight":-0.8627249860128723},{"input":7,"output":10,"weight":-3.0},{"input":5,"output":9,"weight":3.0}],"recurrent":[{"input":4,"output":9,"weight":-4.021242812918923},{"input":4,"output":10,"weight":10.856386400242734}]},"behavior":[],"fitness":{"raw":205.22664556563296,"shifted":0.0,"normalized":0.0},"novelty":{"raw":0.0,"shifted":0.0,"normalized":0.0}}
+{
+  "genome": {
+    "inputs": [
+      { "id": 2, "activation": "Linear" },
+      { "id": 7, "activation": "Linear" },
+      { "id": 3, "activation": "Linear" },
+      { "id": 8, "activation": "Linear" },
+      { "id": 5, "activation": "Linear" },
+      { "id": 1, "activation": "Linear" },
+      { "id": 0, "activation": "Linear" },
+      { "id": 4, "activation": "Linear" },
+      { "id": 6, "activation": "Linear" }
+    ],
+    "hidden": [],
+    "outputs": [
+      { "id": 9, "activation": "Tanh" },
+      { "id": 10, "activation": "Tanh" }
+    ],
+    "feed_forward": [
+      { "input": 0, "output": 10, "weight": -3.0 },
+      { "input": 6, "output": 10, "weight": 1.2967280983269682 },
+      { "input": 0, "output": 9, "weight": 0.7735847393355517 },
+      { "input": 5, "output": 10, "weight": 3.0 },
+      { "input": 6, "output": 9, "weight": 0.5772409951272576 },
+      { "input": 3, "output": 9, "weight": -2.307788031192159 },
+      { "input": 1, "output": 10, "weight": 0.39793690994419406 },
+      { "input": 7, "output": 9, "weight": -0.9661568847415194 },
+      { "input": 4, "output": 10, "weight": -1.6356291401546073 },
+      { "input": 8, "output": 10, "weight": 2.267912361660576 },
+      { "input": 4, "output": 9, "weight": 3.0 },
+      { "input": 2, "output": 9, "weight": -0.9638896573581108 },
+      { "input": 2, "output": 10, "weight": -1.858352254978505 },
+      { "input": 3, "output": 10, "weight": 1.6700745936774495 },
+      { "input": 8, "output": 9, "weight": -0.8985382379627862 },
+      { "input": 1, "output": 9, "weight": -0.8627249860128723 },
+      { "input": 7, "output": 10, "weight": -3.0 },
+      { "input": 5, "output": 9, "weight": 3.0 }
+    ],
+    "recurrent": [
+      { "input": 4, "output": 9, "weight": -4.021242812918923 },
+      { "input": 4, "output": 10, "weight": 10.856386400242734 }
+    ]
+  },
+  "behavior": [],
+  "fitness": { "raw": 205.22664556563296, "shifted": 0.0, "normalized": 0.0 },
+  "novelty": { "raw": 0.0, "shifted": 0.0, "normalized": 0.0 }
+}

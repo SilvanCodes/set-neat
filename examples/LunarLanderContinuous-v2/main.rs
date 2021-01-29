@@ -12,8 +12,9 @@ use std::time::Instant;
 use std::time::SystemTime;
 use std::{env, fs};
 
-pub const RUNS: usize = 3;
+pub const RUNS: usize = 1;
 pub const STEPS: usize = usize::MAX;
+pub const PRE_VALIDATION_RUNS: usize = 3;
 pub const VALIDATION_RUNS: usize = 100;
 pub const ENV: &str = "LunarLanderContinuous-v2";
 pub const REQUIRED_FITNESS: f64 = 200.0;
@@ -55,7 +56,7 @@ fn train(standard_scaler: StandardScaler) {
             dbg!(fitness);
         }
 
-        if fitness >= REQUIRED_FITNESS {
+        /* if fitness >= REQUIRED_FITNESS {
             info!("hit task theshold, starting validation runs...");
 
             let (validation_fitness, all_observations) = run(
@@ -85,6 +86,56 @@ fn train(standard_scaler: StandardScaler) {
                     .to_vec(), */
                 )
                 .solved(individual);
+            }
+        } */
+        if fitness >= REQUIRED_FITNESS {
+            info!("hit task theshold, starting pre-validation runs...");
+
+            let (pre_validation_fitness, _) = run(
+                standard_scaler,
+                individual,
+                PRE_VALIDATION_RUNS,
+                STEPS,
+                false,
+                false,
+            );
+
+            info!(
+                "finished pre-validation runs with {} average fitness",
+                pre_validation_fitness
+            );
+
+            if pre_validation_fitness >= REQUIRED_FITNESS {
+                info!("hit task theshold, starting validation runs...");
+
+                let (validation_fitness, all_observations) = run(
+                    &standard_scaler,
+                    individual,
+                    VALIDATION_RUNS,
+                    STEPS,
+                    false,
+                    false,
+                );
+
+                // log possible solutions to file
+                let individual = individual.clone();
+                info!(target: "app::solutions", "{}", serde_json::to_string(&individual).unwrap());
+                info!(
+                    "finished validation runs with {} average fitness",
+                    validation_fitness
+                );
+                if validation_fitness > REQUIRED_FITNESS {
+                    // let observation_means = all_observations.mean_axis(Axis(0)).unwrap();
+                    // let observation_std_dev = all_observations.std_axis(Axis(0), 0.0);
+                    return Progress::fitness(
+                        validation_fitness,
+                        /* all_observations
+                        .row(all_observations.shape()[0] - 1)
+                        .to_vec()[0..2]
+                        .to_vec(), */
+                    )
+                    .solved(individual);
+                }
             }
         }
         // let observation_means = all_observations.mean_axis(Axis(0)).unwrap();
@@ -176,8 +227,8 @@ fn run(
     let gym = gym::GymClient::default();
     let env = gym.make(ENV);
 
-    // let mut evaluator = RecurrentMatrixFabricator::fabricate(net).unwrap();
-    let mut evaluator = LoopingFabricator::fabricate(net).unwrap();
+    let mut evaluator = RecurrentMatrixFabricator::fabricate(net).unwrap();
+    // let mut evaluator = LoopingFabricator::fabricate(net).unwrap();
     let mut fitness = 0.0;
     let mut all_observations = Array2::zeros((1, 8));
 
