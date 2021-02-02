@@ -1,5 +1,4 @@
 use favannat::{
-    looping::fabricator::LoopingFabricator,
     matrix::fabricator::RecurrentMatrixFabricator,
     network::{StatefulEvaluator, StatefulFabricator},
 };
@@ -12,7 +11,7 @@ use std::time::Instant;
 use std::time::SystemTime;
 use std::{env, fs};
 
-pub const RUNS: usize = 2;
+pub const RUNS: usize = 1;
 pub const STEPS: usize = 100;
 pub const VALIDATION_RUNS: usize = 100;
 pub const ENV: &str = "MountainCarContinuous-v0";
@@ -135,70 +134,93 @@ fn train(standard_scaler: (Array1<f64>, Array1<f64>)) {
 
     info!(target: "app::parameters", "starting training...\nRUNS:{:#?}\nVALIDATION_RUNS:{:#?}\nSTEPS: {:#?}\nREQUIRED_FITNESS:{:#?}\nPARAMETERS: {:#?}", RUNS, VALIDATION_RUNS, STEPS, REQUIRED_FITNESS, neat.parameters);
 
-    if let Some(winner) = neat
-        .run()
-        .filter_map(|evaluation| match evaluation {
-            Evaluation::Progress(report) => {
-                info!(target: "app::progress", "{}", serde_json::to_string(&report).unwrap());
-                println!("{}", report.population.num_generation);
-                /* if report.num_generation % 5 == 0 {
-                    run(
-                        &other_standard_scaler,
-                        &report.top_performer,
-                        1,
-                        STEPS,
-                        true,
-                        true,
-                    );
-                } */
-                None
-            }
-            Evaluation::Solution(individual) => Some(individual),
-        })
-        .next()
-    {
-        let time_stamp = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-        fs::write(
-            format!("examples/{}/winner.json", ENV),
-            serde_json::to_string(&winner).unwrap(),
-        )
-        .expect("Unable to write file");
-        fs::write(
-            format!("examples/{}/{}_winner.json", ENV, time_stamp),
-            serde_json::to_string(&winner).unwrap(),
-        )
-        .expect("Unable to write file");
-        fs::write(
-            format!("examples/{}/{}_winner_parameters.json", ENV, time_stamp),
-            serde_json::to_string(&neat.parameters).unwrap(),
-        )
-        .expect("Unable to write file");
-        fs::write(
-            format!(
-                "examples/{}/{}_winner_standard_scaler.json",
-                ENV, time_stamp
-            ),
-            serde_json::to_string(&other_standard_scaler).unwrap(),
-        )
-        .expect("Unable to write file");
-        fs::write(
-            format!("examples/{}/winner_standard_scaler.json", ENV),
-            serde_json::to_string(&other_standard_scaler).unwrap(),
-        )
-        .expect("Unable to write file");
+    let mut ff_connections_in_winner_in_run = Vec::new();
+    let mut rc_connections_in_winner_in_run = Vec::new();
+    let mut nodes_in_winner_in_run = Vec::new();
+    let mut generations_till_winner_in_run = Vec::new();
+    let mut score_of_winner_in_run = Vec::new();
 
-        let secs = now.elapsed().as_millis();
-        info!(
-            "winning individual ({},{}) after {} seconds: {:?}",
-            winner.nodes().count(),
-            winner.feed_forward.len(),
-            secs as f64 / 1000.0,
-            winner
-        );
+    let mut generations;
+
+    for i in 0..10 {
+        generations = 1;
+        if let Some(winner) = neat
+            .run()
+            .filter_map(|evaluation| match evaluation {
+                Evaluation::Progress(report) => {
+                    generations += 1;
+                    dbg!("######################################## {}", generations);
+                    info!(target: "app::progress", "{}", serde_json::to_string(&report).unwrap());
+                    None
+                }
+                Evaluation::Solution(individual) => Some(individual),
+            })
+            .next()
+        {
+            /* let time_stamp = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
+            fs::write(
+                format!("examples/{}/winner.json", ENV),
+                serde_json::to_string(&winner).unwrap(),
+            )
+            .expect("Unable to write file");
+            fs::write(
+                format!("examples/{}/{}_winner.json", ENV, time_stamp),
+                serde_json::to_string(&winner).unwrap(),
+            )
+            .expect("Unable to write file");
+            fs::write(
+                format!("examples/{}/{}_winner_parameters.json", ENV, time_stamp),
+                serde_json::to_string(&neat.parameters).unwrap(),
+            )
+            .expect("Unable to write file");
+            fs::write(
+                format!(
+                    "examples/{}/{}_winner_standard_scaler.json",
+                    ENV, time_stamp
+                ),
+                serde_json::to_string(&other_standard_scaler).unwrap(),
+            )
+            .expect("Unable to write file");
+            fs::write(
+                format!("examples/{}/winner_standard_scaler.json", ENV),
+                serde_json::to_string(&other_standard_scaler).unwrap(),
+            )
+            .expect("Unable to write file");
+
+            let secs = now.elapsed().as_millis();
+            info!(
+                "winning individual ({},{}) after {} seconds: {:?}",
+                winner.nodes().count(),
+                winner.feed_forward.len(),
+                secs as f64 / 1000.0,
+                winner
+            ); */
+
+            ff_connections_in_winner_in_run.push(winner.feed_forward.len());
+            rc_connections_in_winner_in_run.push(winner.recurrent.len());
+            nodes_in_winner_in_run.push(winner.hidden.len());
+            generations_till_winner_in_run.push(generations);
+            score_of_winner_in_run.push(winner.fitness.raw);
+        }
     }
+
+    let avg_F = ff_connections_in_winner_in_run.iter().sum::<usize>() as f64
+        / ff_connections_in_winner_in_run.len() as f64;
+    let avg_R = rc_connections_in_winner_in_run.iter().sum::<usize>() as f64
+        / rc_connections_in_winner_in_run.len() as f64;
+    let avg_H =
+        nodes_in_winner_in_run.iter().sum::<usize>() as f64 / nodes_in_winner_in_run.len() as f64;
+    let avg_generations = generations_till_winner_in_run.iter().sum::<usize>() as f64
+        / generations_till_winner_in_run.len() as f64;
+    let avg_score =
+        score_of_winner_in_run.iter().sum::<f64>() as f64 / score_of_winner_in_run.len() as f64;
+
+    dbg!(generations_till_winner_in_run);
+
+    info!(target: "app::solutions", "|H| {}, |F| {}, |R| {}, #gens {}, avg_score {}", avg_H, avg_F, avg_R, avg_generations, avg_score);
 }
 
 fn run(
@@ -214,8 +236,8 @@ fn run(
 
     let (means, std_dev) = standard_scaler.clone();
 
-    // let mut evaluator = RecurrentMatrixFabricator::fabricate(net).unwrap();
-    let mut evaluator = LoopingFabricator::fabricate(net).unwrap();
+    let mut evaluator = RecurrentMatrixFabricator::fabricate(net).unwrap();
+    // let mut evaluator = LoopingFabricator::fabricate(net).unwrap();
     let mut fitness = 0.0;
     let mut all_observations = Array2::zeros((1, 2));
 

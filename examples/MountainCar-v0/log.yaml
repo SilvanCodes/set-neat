@@ -4,17 +4,17 @@ appenders:
     kind: console
   progress:
     kind: file
-    path: "examples/MountainCarContinuous-v0/logs/progress.log"
+    path: "examples/MountainCar-v0/logs/progress.log"
     encoder:
       pattern: "{m},{n}"
   parameters:
     kind: file
-    path: "examples/MountainCarContinuous-v0/logs/parameters.log"
+    path: "examples/MountainCar-v0/logs/parameters.log"
     encoder:
       pattern: "{d} - {m}{n}"
   solutions:
     kind: file
-    path: "examples/MountainCarContinuous-v0/logs/solutions.log"
+    path: "examples/MountainCar-v0/logs/solutions.log"
     encoder:
       pattern: "{d} - {m}{n}"
 root:

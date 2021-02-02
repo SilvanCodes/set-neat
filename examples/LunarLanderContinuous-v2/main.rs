@@ -13,11 +13,12 @@ use std::time::SystemTime;
 use std::{env, fs};
 
 pub const RUNS: usize = 1;
-pub const STEPS: usize = usize::MAX;
-pub const PRE_VALIDATION_RUNS: usize = 3;
+pub const PRE_VALIDATION_RUNS: usize = 10;
 pub const VALIDATION_RUNS: usize = 100;
+pub const STEPS: usize = usize::MAX;
 pub const ENV: &str = "LunarLanderContinuous-v2";
 pub const REQUIRED_FITNESS: f64 = 200.0;
+pub const GENERATIONS: usize = 1000;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -56,7 +57,7 @@ fn train(standard_scaler: StandardScaler) {
             dbg!(fitness);
         }
 
-        /* if fitness >= REQUIRED_FITNESS {
+        if fitness >= REQUIRED_FITNESS {
             info!("hit task theshold, starting validation runs...");
 
             let (validation_fitness, all_observations) = run(
@@ -87,8 +88,8 @@ fn train(standard_scaler: StandardScaler) {
                 )
                 .solved(individual);
             }
-        } */
-        if fitness >= REQUIRED_FITNESS {
+        }
+        /* if fitness >= REQUIRED_FITNESS {
             info!("hit task theshold, starting pre-validation runs...");
 
             let (pre_validation_fitness, _) = run(
@@ -137,7 +138,7 @@ fn train(standard_scaler: StandardScaler) {
                     .solved(individual);
                 }
             }
-        }
+        } */
         // let observation_means = all_observations.mean_axis(Axis(0)).unwrap();
         // let observation_std_dev = all_observations.std_axis(Axis(0), 0.0);
 
@@ -160,7 +161,7 @@ fn train(standard_scaler: StandardScaler) {
 
     if let Some(winner) = neat
         .run()
-        .take(100)
+        .take(GENERATIONS)
         .filter_map(|evaluation| match evaluation {
             Evaluation::Progress(report) => {
                 info!(target: "app::progress", "{}", serde_json::to_string(&report).unwrap());

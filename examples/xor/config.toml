@@ -1,46 +1,43 @@
 [setup]
 seed = 42
-population_size = 150
+population_size = 100
 input_dimension = 3
 output_dimension = 1
-connected_input_percent = 0.3
-add_to_archive_chance = 0.5
-novelty_nearest_neighbors = 16
+connected_input_percent = 1.0
+add_to_archive_chance = 0.0
+novelty_nearest_neighbors = 0
 
 [mutation]
 new_node_chance = 0.05
-new_connection_chance = 0.10
-connection_is_recurrent_chance = 0.0
-change_activation_function_chance = 0.0
-weight_perturbation_std_dev = 3.0
+new_connection_chance = 0.1
+connection_is_recurrent_chance = 0.1
+change_activation_function_chance = 0.05
+weight_perturbation_std_dev = 1.0
 
 [activations]
 output_nodes = "Sigmoid" # activation function of output nodes
 hidden_nodes = [
-    # "Linear",
     "Sigmoid",
-    # "Tanh",
-    # "Gaussian",
-    # "Step",
-    # "Sine",
-    # "Cosine",
-    # "Inverse",
-    # "Absolute",
-    # "Relu",
-    # "Squared",
+    "Tanh",
+    "Relu",
+    "Linear",
+    "Gaussian",
+    "Step",
+    "Sine",
+    "Cosine",
+    "Inverse",
+    "Absolute",
 ] # pool of activation functions to choose from
 
 
 [reproduction]
 survival_rate = 0.2 # allow the top x percent of species to survive and reproduce
-generations_until_stale = 15 # number of generations allowed without improvement (stale species are reproduced only by the top performing member)
+generations_until_stale = 10 # number of generations allowed without improvement (stale species are reproduced only by the top performing member)
 elitism_species = 1
 elitism_individuals = 0
 
 [speciation]
-target_species_count = 15 # number of desired species
-compatability_threshold = 1.0 # difference above threshold is considered incompatible
-compatability_threshold_delta = 0.01 # adjust threshold by x if num species unequal target species
-factor_weights = 0.2 # factor for percent of different genes
+target_species_count = 10 # number of desired species
+factor_weights = 1.0 # factor for percent of different genes
 factor_genes = 1.0 # weight difference factor
-factor_activations = 0.0 # factor for percent of different activations
+factor_activations = 1.0 # factor for percent of different activations

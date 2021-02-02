@@ -4,17 +4,17 @@ appenders:
     kind: console
   progress:
     kind: file
-    path: "examples/Pendulum-v0/progress.log"
+    path: "examples/Pendulum-v0/logs/progress.log"
     encoder:
       pattern: "{m},{n}"
   parameters:
     kind: file
-    path: "examples/Pendulum-v0/parameters.log"
+    path: "examples/Pendulum-v0/logs/parameters.log"
     encoder:
       pattern: "{d} - {m}{n}"
   solutions:
     kind: file
-    path: "examples/Pendulum-v0/solutions.log"
+    path: "examples/Pendulum-v0/logs/solutions.log"
     encoder:
       pattern: "{d} - {m}{n}"
 root:

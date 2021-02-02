@@ -1,11 +1,11 @@
 [setup]
 seed = 42
-population_size = 1000
+population_size = 100
 input_dimension = 9
 output_dimension = 2
-connected_input_percent = 0.2
-add_to_archive_chance = 0.5
-novelty_nearest_neighbors = 16
+connected_input_percent = 1.0
+add_to_archive_chance = 0.0
+novelty_nearest_neighbors = 0
 
 [mutation]
 new_node_chance = 0.05
@@ -17,16 +17,16 @@ weight_perturbation_std_dev = 1.0
 [activations]
 output_nodes = "Tanh" # activation function of output nodes
 hidden_nodes = [
-    # "Linear",
     "Sigmoid",
     "Tanh",
-    # "Gaussian",
-    # "Step",
-    # "Sine",
-    # "Cosine",
-    # "Inverse",
-    # "Absolute",
     "Relu",
+    "Linear",
+    "Gaussian",
+    "Step",
+    "Sine",
+    "Cosine",
+    "Inverse",
+    "Absolute",
 ] # pool of activation functions to choose from
 
 
@@ -37,7 +37,7 @@ elitism_species = 1
 elitism_individuals = 0
 
 [speciation]
-target_species_count = 100 # number of desired species
+target_species_count = 10 # number of desired species
 factor_weights = 1.0 # factor for percent of different genes
 factor_genes = 1.0 # weight difference factor
 factor_activations = 1.0 # factor for percent of different activations

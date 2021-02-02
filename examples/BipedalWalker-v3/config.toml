@@ -1,55 +1,43 @@
-seed = 123
-
 [setup]
-population = 250 # number of networks
+seed = 42
+population_size = 100
+input_dimension = 25
+output_dimension = 4
+connected_input_percent = 1.0
+add_to_archive_chance = 0.0
+novelty_nearest_neighbors = 0
 
-[setup.dimension]
-input = 25 # number inputs
-output = 4 # number outputs
+[mutation]
+new_node_chance = 0.05
+new_connection_chance = 0.1
+connection_is_recurrent_chance = 0.1
+change_activation_function_chance = 0.05
+weight_perturbation_std_dev = 1.0
 
-[initialization]
-output = "Tanh" # activation function of output nodes
-activations = [
-    "Linear",
+[activations]
+output_nodes = "Tanh" # activation function of output nodes
+hidden_nodes = [
     "Sigmoid",
     "Tanh",
+    "Relu",
+    "Linear",
     "Gaussian",
     "Step",
     "Sine",
     "Cosine",
     "Inverse",
     "Absolute",
-    "Relu",
-    # "Squared",
 ] # pool of activation functions to choose from
-connections = 0.5 # percent of inputs fully connected to outputs
+
 
 [reproduction]
-surviving = 0.2 # allow the top x percent of species to survive and reproduce
-stale_after = 15 # number of generations allowed without improvement (stale species go extinct)
+survival_rate = 0.2 # allow the top x percent of species to survive and reproduce
+generations_until_stale = 10 # number of generations allowed without improvement (stale species are reproduced only by the top performing member)
 elitism_species = 1
 elitism_individuals = 0
 
-[mutation]
-gene_node = 0.05 # chance of adding a new node gene
-gene_connection = 0.15 # chance of adding a new connection gene
-recurrent = 0.3
-activation_change = 0.05
-
-[mutation.weights]
-percent_min = 0.4
-percent_max = 0.9
-random = 0.005
-perturbation_range = 1.0 # 0.3
-distribution = "Normal"
-
-[compatability]
-target_species = 15 # number of desired species
-threshold = 1.0 # difference above threshold is considered incompatible
-threshold_delta = 0.02 # adjust threshold by x if num species unequal target species
-factor_genes = 1.0 # factor for percent of different genes
-factor_weights = 1.0 # weight difference factor
+[speciation]
+target_species_count = 10 # number of desired species
+factor_weights = 1.0 # factor for percent of different genes
+factor_genes = 1.0 # weight difference factor
 factor_activations = 1.0 # factor for percent of different activations
-
-[novelty]
-nearest_neighbors = 15

@@ -28,11 +28,10 @@
 
 </html>
 <script>
-    // const LOGFILE = 'progress-3_samples.log';
-    const LOGFILE = window.location.href.match(/(?<=\?=).*/)[0];
+    const LOGFILE = 'logs/progress.log';
 
-    let keys = [/* 'compatability_threshold', */ 'archive_threshold', 'novelty_peak', 'novelty_ratio', 'num_consecutive_ineffective_generations'];
-    let keys2 = ['num_species', 'fitness_average', 'fitness_peak', 'fitness_min', 'peak_fitness_average'];
+    let keys = ['compatability_threshold', /* 'archive_threshold', */ 'novelty_peak'/* , 'novelty_ratio' *//* , 'num_consecutive_ineffective_generations' */];
+    let keys2 = ['num_species', 'fitness_average', 'fitness_peak', 'fitness_min'/*, 'peak_fitness_average' */];
     let all_keys = [...keys, ...keys2];
 
     let colors = {
@@ -44,7 +43,8 @@
         'fitness_peak': 'rgb(255, 159, 64)',
         'fitness_min': 'rgb(153, 102, 255)',
         'novelty_ratio': 'rgb(54, 162, 235)',
-        'peak_fitness_average': 'rgb(54, 230, 35)'
+        'peak_fitness_average': 'rgb(54, 230, 35)',
+        'compatability_threshold': 'rgb(54, 230, 35)'
     }
 
     async function load() {
@@ -52,6 +52,8 @@
             .then(response => response.text())
             .then(logs => {
                 logs = JSON.parse(`[${logs.slice(0, -2)}]`)
+
+                console.log(logs);
 
                 let datasets = keys.map((key, idx) => ({
                     label: key,
@@ -63,24 +65,32 @@
                         let value;
 
                         switch (key) {
+                            case 'compatability_threshold': {
+                                value = log['population']['compatability_threshold'];
+                                break;
+                            }
+                            case 'num_species': {
+                                value = log['population']['num_species'];
+                                break;
+                            }
                             case 'fitness_peak': {
-                                value = log['fitness']['raw_maximum'];
+                                value = log['population']['fitness']['raw_maximum'];
                                 break;
                             }
                             case 'fitness_average': {
-                                value = log['fitness']['raw_average'];
+                                value = log['population']['fitness']['raw_average'];
                                 break;
                             }
                             case 'fitness_min': {
-                                value = log['fitness']['raw_minimum'];
+                                value = log['population']['fitness']['raw_minimum'];
                                 break;
                             }
                             case 'novelty_peak': {
-                                value = log['novelty']['raw_maximum'];
+                                value = log['population']['novelty']['raw_maximum'];
                                 break;
                             }
                             case 'fitness_std_dev': {
-                                value = log['fitness']['raw_std_dev'];
+                                value = log['population']['fitness']['raw_std_dev'];
                                 break;
                             }
                             default: {
@@ -89,7 +99,7 @@
                         }
 
                         return {
-                            x: log['num_generation'],
+                            x: log['population']['num_generation'],
                             y: value
                         }
                     }),
@@ -108,24 +118,32 @@
                         let value;
 
                         switch (key) {
+                            case 'compatability_threshold': {
+                                value = log['population']['compatability_threshold'];
+                                break;
+                            }
+                            case 'num_species': {
+                                value = log['population']['num_species'];
+                                break;
+                            }
                             case 'fitness_peak': {
-                                value = log['fitness']['raw_maximum'];
+                                value = log['population']['fitness']['raw_maximum'];
                                 break;
                             }
                             case 'fitness_average': {
-                                value = log['fitness']['raw_average'];
+                                value = log['population']['fitness']['raw_average'];
                                 break;
                             }
                             case 'fitness_min': {
-                                value = log['fitness']['raw_minimum'];
+                                value = log['population']['fitness']['raw_minimum'];
                                 break;
                             }
                             case 'novelty_peak': {
-                                value = log['novelty']['raw_maximum'];
+                                value = log['population']['novelty']['raw_maximum'];
                                 break;
                             }
                             case 'fitness_std_dev': {
-                                value = log['fitness']['raw_std_dev'];
+                                value = log['population']['fitness']['raw_std_dev'];
                                 break;
                             }
                             default: {
@@ -134,7 +152,7 @@
                         }
 
                         return {
-                            x: log['num_generation'],
+                            x: log['population']['num_generation'],
                             y: value
                         }
                     }),
@@ -145,7 +163,7 @@
 
                 datasets.push(...datasets2)
 
-                let labels = logs.map(log => log['num_generation']);
+                let labels = logs.map(log => log['population']['num_generation']);
 
                 console.log(labels)
                 console.log(datasets)
@@ -221,24 +239,32 @@
                         let value;
 
                         switch (key) {
+                            case 'compatability_threshold': {
+                                value = log['population']['compatability_threshold'];
+                                break;
+                            }
+                            case 'num_species': {
+                                value = log['population']['num_species'];
+                                break;
+                            }
                             case 'fitness_peak': {
-                                value = log['fitness']['raw_maximum'];
+                                value = log['population']['fitness']['raw_maximum'];
                                 break;
                             }
                             case 'fitness_average': {
-                                value = log['fitness']['raw_average'];
+                                value = log['population']['fitness']['raw_average'];
                                 break;
                             }
                             case 'fitness_min': {
-                                value = log['fitness']['raw_minimum'];
+                                value = log['population']['fitness']['raw_minimum'];
                                 break;
                             }
                             case 'novelty_peak': {
-                                value = log['novelty']['raw_maximum'];
+                                value = log['population']['novelty']['raw_maximum'];
                                 break;
                             }
                             case 'fitness_std_dev': {
-                                value = log['fitness']['raw_std_dev'];
+                                value = log['population']['fitness']['raw_std_dev'];
                                 break;
                             }
                             default: {
@@ -247,13 +273,13 @@
                         }
 
                         return {
-                            x: log['num_generation'],
+                            x: log['population']['num_generation'],
                             y: value
                         }
                     }),
                 }));
 
-                let labels = logs.map(log => log['num_generation']);
+                let labels = logs.map(log => log['population']['num_generation']);
 
                 console.log(updata)
 

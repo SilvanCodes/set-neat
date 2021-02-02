@@ -7,43 +7,19 @@ use std::time::Instant;
 
 fn main() {
     let fitness_function = |individual: &Individual| -> Progress {
-        /* let result_rr0;
-        let result_rr1;
-        let result_rr2; */
         let result_0;
         let result_1;
         let result_2;
         let result_3;
 
-        match LoopingFabricator::fabricate(individual) {
-            Ok(mut evaluator) => {
-                /* match FeedForwardMatrixFabricator::fabricate(individual) {
-                Ok(evaluator) => { */
+        /* match LoopingFabricator::fabricate(individual) {
+        Ok(mut evaluator) => { */
+        match FeedForwardMatrixFabricator::fabricate(individual) {
+            Ok(evaluator) => {
                 result_0 = evaluator.evaluate(array![1.0, 1.0, 0.0]);
                 result_1 = evaluator.evaluate(array![1.0, 1.0, 1.0]);
                 result_2 = evaluator.evaluate(array![1.0, 0.0, 1.0]);
                 result_3 = evaluator.evaluate(array![1.0, 0.0, 0.0]);
-
-                /* result_rr0 = [
-                    evaluator.evaluate(array![1.0, 1.0, 0.0]),
-                    evaluator.evaluate(array![1.0, 1.0, 1.0]),
-                    evaluator.evaluate(array![1.0, 0.0, 1.0]),
-                    evaluator.evaluate(array![1.0, 0.0, 0.0]),
-                ];
-
-                result_rr1 = [
-                    evaluator.evaluate(array![0.0, 1.0, 1.0]),
-                    evaluator.evaluate(array![1.0, 1.0, 1.0]),
-                    evaluator.evaluate(array![1.0, 1.0, 0.0]),
-                    evaluator.evaluate(array![0.0, 1.0, 0.0]),
-                ];
-
-                result_rr2 = [
-                    evaluator.evaluate(array![1.0, 0.0, 1.0]),
-                    evaluator.evaluate(array![1.0, 1.0, 1.0]),
-                    evaluator.evaluate(array![0.0, 1.0, 1.0]),
-                    evaluator.evaluate(array![0.0, 0.0, 1.0]),
-                ]; */
             }
             Err(e) => {
                 println!("error fabricating individual: {:?} {:?}", individual, e);
@@ -65,26 +41,6 @@ fn main() {
         } else {
             Progress::fitness(fitness)
         }
-
-        // Progress::Fitness(fitness)
-
-        /* let rr0 = (4.0 - ((1.0 - result_rr0[0][0])
-                + (0.0 - result_rr0[1][0]).abs()
-                + (1.0 - result_rr0[2][0])
-                + (0.0 - result_rr0[3][0]).abs()))
-        .powi(2);
-        let rr1 = (4.0 - ((1.0 - result_rr1[0][0])
-                + (0.0 - result_rr1[1][0]).abs()
-                + (1.0 - result_rr1[2][0])
-                + (0.0 - result_rr1[3][0]).abs()))
-        .powi(2);
-        let rr2 = (4.0 - ((1.0 - result_rr2[0][0])
-                + (0.0 - result_rr2[1][0]).abs()
-                + (1.0 - result_rr2[2][0])
-                + (0.0 - result_rr2[3][0]).abs()))
-        .powi(2);
-
-        (rr0 + rr1 + rr2) / 3.0 */
     };
 
     let neat = Neat::new("examples/xor/config.toml", Box::new(fitness_function));

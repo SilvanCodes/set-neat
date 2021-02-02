@@ -1,8 +1,8 @@
 [setup]
 seed = 42
 population_size = 100
-input_dimension = 3
-output_dimension = 1
+input_dimension = 7
+output_dimension = 3
 connected_input_percent = 1.0
 add_to_archive_chance = 0.0
 novelty_nearest_neighbors = 0
