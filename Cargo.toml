@@ -12,22 +12,18 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 config = "0.9"
 rayon = "1.3"
-# favannat = { git = "https://github.com/SilvanCodes/favannat" }
-favannat = { path = "../favannat" }
+favannat = { git = "https://github.com/SilvanCodes/favannat", tag = "thesis" }
 ndarray = { version = "0.13.0", features = ["serde"] }
-# make crate feature
-gym = { path = "../gym-rs" }
+
 
 [features]
 blas = ["favannat/blas"]
 
 [dev-dependencies]
-gym = { path = "../gym-rs" }
+gym = { git = "https://github.com/SilvanCodes/gym-rs", tag = "thesis" }
 criterion = "0.3"
 log = "0.4.11"
 log4rs = "0.13.0"
-# blas-src = { version = "0.2.0", default-features = false, features = ["openblas"] }
-# openblas-src = { version = "0.6.0", default-features = false, features = ["cblas"] }
 
 [[bench]]
 name = "bench_neat"
