@@ -338,11 +338,12 @@ impl Genome {
         let maximum_weight_difference = matching_genes_count_total * 2.0 * weight_cap;
 
         // percent of different genes, considering all unique genes from both genomes
-        factor_genes * different_genes_count_total / (matching_genes_count_total + different_genes_count_total)
+        (factor_genes * different_genes_count_total / (matching_genes_count_total + different_genes_count_total)
         // average weight differences , considering matching connection genes
         + factor_weights * if maximum_weight_difference > 0.0 { weight_difference_total / maximum_weight_difference } else { 0.0 }
         // percent of different activation functions, considering matching nodes genes
-        + factor_activations * if matching_nodes_count > 0.0 { activation_difference / matching_nodes_count } else { 0.0 }
+        + factor_activations * if matching_nodes_count > 0.0 { activation_difference / matching_nodes_count } else { 0.0 })
+            / (factor_genes + factor_weights + factor_activations)
     }
 }
 

@@ -156,18 +156,10 @@ impl Population {
     }
 
     pub fn init_threshold(&mut self) {
-        let Speciation {
-            factor_genes,
-            factor_weights,
-            factor_activations,
-            ..
-        } = self.parameters.speciation;
-
         let mut threshold = Vec::new();
 
-        let approximate_species_size = (self.parameters.setup.population_size as f64
-            / self.parameters.speciation.target_species_count as f64
-            * (factor_genes + factor_weights + factor_activations) as f64)
+        let average_species_size = (self.parameters.setup.population_size as f64
+            / self.parameters.speciation.target_species_count as f64)
             .floor() as usize;
 
         for individual_0 in &self.individuals {
@@ -186,11 +178,10 @@ impl Population {
 
             distances.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
-            threshold.push(distances[approximate_species_size]);
+            threshold.push(distances[average_species_size]);
         }
 
-        self.compatability_threshold =
-            dbg!(threshold.iter().sum::<f64>() / threshold.len() as f64 * 1.0);
+        self.compatability_threshold = threshold.iter().sum::<f64>() / threshold.len() as f64;
     }
 
     fn adjust_threshold(&mut self) {
