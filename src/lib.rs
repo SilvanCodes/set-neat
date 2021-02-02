@@ -3,8 +3,6 @@ mod parameters;
 mod population;
 mod runtime;
 mod species;
-// remove ASAP
-pub mod utility;
 
 mod individual;
 mod rng;

@@ -3,8 +3,6 @@ use std::ops::Deref;
 use ndarray::{Array2, ArrayView1, Axis};
 use serde::{Deserialize, Serialize};
 
-use crate::utility::gym::StandardScaler;
-
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Behavior(pub Vec<f64>);
 
@@ -44,13 +42,21 @@ impl<'a> Behaviors<'a> {
             row += &ArrayView1::from(behavior_iter.next().unwrap().as_slice());
         }
 
-        let standard_scaler = StandardScaler::new(behavior_arr.view().t());
+        // let samples = behavior_arr.view().t();
+
+        let standard_deviations = behavior_arr
+            .view()
+            .t()
+            .var_axis(Axis(0), 0.0)
+            .mapv_into(|x| (x + f64::EPSILON).sqrt());
+
+        let means = behavior_arr.view().t().mean_axis(Axis(0)).unwrap();
 
         let mut z_scores_arr: Array2<f64> = Array2::zeros((width, height));
 
         for (index, row) in behavior_arr.axis_iter(Axis(1)).enumerate() {
             let mut z_row = z_scores_arr.index_axis_mut(Axis(1), index);
-            z_row += &standard_scaler.scale(row);
+            z_row += &((&row - &means) / &standard_deviations)
         }
 
         let mut raw_novelties = Vec::new();
