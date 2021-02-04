@@ -4,11 +4,11 @@ use favannat::{
 };
 use gym::{utility::StandardScaler, SpaceData, SpaceTemplate, State};
 use ndarray::{stack, Array2, Axis};
-use set_neat::{Evaluation, Individual, Neat, Progress};
+use set_neat::{Individual, Neat, Progress};
 
 use log::{error, info};
-use std::time::Instant;
 use std::time::SystemTime;
+use std::{cell::RefCell, time::Instant};
 use std::{env, fs};
 
 pub const RUNS: usize = 1;
@@ -98,23 +98,28 @@ fn train(standard_scaler: StandardScaler) {
     let mut generations_till_winner_in_run = Vec::new();
     let mut score_of_winner_in_run = Vec::new();
 
+    let mut worst_possible = Individual::default();
+    worst_possible.fitness.raw = f64::NEG_INFINITY;
+    let all_time_best: RefCell<Individual> = RefCell::new(worst_possible);
+
     let mut generations;
 
-    for i in 0..10 {
+    for _ in 0..1 {
         generations = 1;
-        if let Some(winner) = neat
-            .run()
-            .filter_map(|evaluation| match evaluation {
-                Evaluation::Progress(report) => {
-                    generations += 1;
-
-                    info!(target: "app::progress", "{}", serde_json::to_string(&report).unwrap());
-                    None
+        if let Some(winner) = neat.run().find_map(|(statistics, solution)| {
+            all_time_best.replace_with(|prev| {
+                if statistics.population.top_performer.fitness.raw > prev.fitness.raw {
+                    statistics.population.top_performer.clone()
+                } else {
+                    prev.clone()
                 }
-                Evaluation::Solution(individual) => Some(individual),
-            })
-            .next()
-        {
+            });
+            generations += 1;
+
+            info!(target: "app::progress", "{}", serde_json::to_string(&statistics).unwrap());
+
+            solution
+        }) {
             /* let time_stamp = SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap()
@@ -176,7 +181,21 @@ fn train(standard_scaler: StandardScaler) {
     let avg_score =
         score_of_winner_in_run.iter().sum::<f64>() as f64 / score_of_winner_in_run.len() as f64;
 
-    info!(target: "app::solutions", "|H| {}, |F| {}, |R| {}, #gens {}, avg_score {}", avg_H, avg_F, avg_R, avg_generations, avg_score);
+    println!(
+        "|H| {}, |F| {}, |R| {}, #gens {}, avg_score {}",
+        avg_H, avg_F, avg_R, avg_generations, avg_score
+    );
+
+    let all_time_best = all_time_best.into_inner();
+
+    println!(
+        "all_time_best: |H| {}, |F| {}, |R| {}, #gens {}, avg_score {}",
+        all_time_best.hidden.len(),
+        all_time_best.feed_forward.len(),
+        all_time_best.recurrent.len(),
+        avg_generations,
+        all_time_best.fitness.raw
+    );
 }
 
 fn run(

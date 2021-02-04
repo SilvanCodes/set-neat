@@ -1,11 +1,12 @@
+use std::cell::RefCell;
+
 use favannat::{
     matrix::fabricator::FeedForwardMatrixFabricator,
     neat_original::fabricator::NeatOriginalFabricator,
     network::{Evaluator, Fabricator, StatefulEvaluator, StatefulFabricator},
 };
 use ndarray::array;
-use set_neat::{Evaluation, Individual, Neat, Progress};
-use std::time::Instant;
+use set_neat::{Individual, Neat, Progress};
 
 fn main() {
     let fitness_function = |individual: &Individual| -> Progress {
@@ -39,7 +40,9 @@ fn main() {
         .powi(2);
 
         if fitness > 15.9 {
-            Progress::fitness(fitness).solved(individual.clone())
+            let mut winner = individual.clone();
+            winner.fitness.raw = fitness;
+            Progress::fitness(fitness).solved(winner)
         } else {
             Progress::fitness(fitness)
         }
@@ -47,81 +50,67 @@ fn main() {
 
     let neat = Neat::new("examples/xor/config.toml", Box::new(fitness_function));
 
-    let mut millis_elapsed_in_run = Vec::new();
-    let mut connections_in_winner_in_run = Vec::new();
+    let mut ff_connections_in_winner_in_run = Vec::new();
+    let mut rc_connections_in_winner_in_run = Vec::new();
     let mut nodes_in_winner_in_run = Vec::new();
     let mut generations_till_winner_in_run = Vec::new();
+    let mut score_of_winner_in_run = Vec::new();
 
-    for i in 0..100 {
-        let now = Instant::now();
-        let mut generations = 0;
+    let mut worst_possible = Individual::default();
+    worst_possible.fitness.raw = f64::NEG_INFINITY;
+    let all_time_best: RefCell<Individual> = RefCell::new(worst_possible);
 
-        if let Some(winner) = neat
-            .run()
-            .filter_map(|evaluation| match evaluation {
-                Evaluation::Progress(report) => {
-                    generations = report.population.num_generation;
-                    None
+    let mut generations;
+
+    for _ in 0..100 {
+        generations = 1;
+
+        if let Some(winner) = neat.run().find_map(|(statistics, solution)| {
+            all_time_best.replace_with(|prev| {
+                if statistics.population.top_performer.fitness.raw > prev.fitness.raw {
+                    statistics.population.top_performer.clone()
+                } else {
+                    prev.clone()
                 }
-                Evaluation::Solution(individual) => Some(individual),
-            })
-            .next()
-        {
-            millis_elapsed_in_run.push(now.elapsed().as_millis() as f64);
-            connections_in_winner_in_run.push(winner.feed_forward.len());
-            nodes_in_winner_in_run.push(winner.nodes().count());
+            });
+            generations += 1;
+
+            solution
+        }) {
+            ff_connections_in_winner_in_run.push(winner.feed_forward.len());
+            rc_connections_in_winner_in_run.push(winner.recurrent.len());
+            nodes_in_winner_in_run.push(winner.hidden.len());
             generations_till_winner_in_run.push(generations);
-            println!(
-                "finished run {} in {} seconds ({}, {}) {}",
-                i,
-                millis_elapsed_in_run.last().unwrap() / 1000.0,
-                winner.nodes().count(),
-                winner.feed_forward.len(),
-                generations
-            );
+            score_of_winner_in_run.push(winner.fitness.raw);
         }
     }
 
-    let num_runs = millis_elapsed_in_run.len() as f64;
-
-    let total_millis: f64 = millis_elapsed_in_run.iter().sum();
-    let total_connections: usize = connections_in_winner_in_run.iter().sum();
-    let total_nodes: usize = nodes_in_winner_in_run.iter().sum();
-    let total_generations: usize = generations_till_winner_in_run.iter().sum();
+    let avg_F = ff_connections_in_winner_in_run.iter().sum::<usize>() as f64
+        / ff_connections_in_winner_in_run.len() as f64;
+    let avg_R = rc_connections_in_winner_in_run.iter().sum::<usize>() as f64
+        / rc_connections_in_winner_in_run.len() as f64;
+    let avg_H =
+        nodes_in_winner_in_run.iter().sum::<usize>() as f64 / nodes_in_winner_in_run.len() as f64;
+    let avg_generations = generations_till_winner_in_run.iter().sum::<usize>() as f64
+        / nodes_in_winner_in_run.len() as f64;
+    let avg_score =
+        score_of_winner_in_run.iter().sum::<f64>() as f64 / score_of_winner_in_run.len() as f64;
 
     println!(
-        "did {} runs in {} seconds / {} nodes average / {} connections / {} generations per run",
-        num_runs,
-        total_millis / num_runs / 1000.0,
-        total_nodes as f64 / num_runs,
-        total_connections as f64 / num_runs,
-        total_generations as f64 / num_runs
+        "|H| {}, |F| {}, |R| {}, #gens {}, avg_score {}",
+        avg_H, avg_F, avg_R, avg_generations, avg_score
     );
 
-    /* let now = Instant::now();
+    let all_time_best = all_time_best.into_inner();
 
-    if let Some(winner) = neat
-        .run()
-        .filter_map(|evaluation| match evaluation {
-            Evaluation::Progress(report) => {
-                println!("{:#?}", report);
-                None
-            }
-            Evaluation::Solution(individual) => Some(individual),
-        })
-        .next()
-    {
-        let secs = now.elapsed().as_millis();
-        println!(
-            "winning individual ({},{}) after {} seconds: {:?}",
-            winner.nodes().count(),
-            winner.feed_forward.len(),
-            secs as f64 / 1000.0,
-            winner
-        );
-        let evaluator = NeatOriginalFabricator::fabricate(&winner).unwrap();
-        println!("as evaluator {:#?}", evaluator);
-    } */
+    println!(
+        "all_time_best: |H| {}, |F| {}, |R| {}, #gens {}, avg_score {}",
+        all_time_best.hidden.len(),
+        all_time_best.feed_forward.len(),
+        all_time_best.recurrent.len(),
+        avg_generations,
+        all_time_best.fitness.raw
+    );
 }
 
 #[cfg(test)]

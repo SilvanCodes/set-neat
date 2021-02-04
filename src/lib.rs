@@ -12,7 +12,7 @@ mod statistics;
 pub use individual::{genes::IdGenerator, Individual};
 pub use parameters::Parameters;
 pub use rng::NeatRng;
-pub use runtime::{Evaluation, Progress, Runtime};
+pub use runtime::{Progress, Runtime};
 
 pub struct Neat {
     pub parameters: Parameters,

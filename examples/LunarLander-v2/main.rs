@@ -6,7 +6,7 @@ use gym::{utility::StandardScaler, SpaceData, State};
 use ndarray::{stack, Array2, Axis};
 use rand::{distributions::WeightedIndex, prelude::SmallRng, SeedableRng};
 use rand_distr::Distribution;
-use set_neat::{Evaluation, Individual, Neat, Progress};
+use set_neat::{Individual, Neat, Progress};
 
 use log::{error, info};
 use std::time::Instant;
@@ -108,28 +108,20 @@ fn train(standard_scaler: StandardScaler) {
 
     info!(target: "app::parameters", "starting training...\nRUNS:{:#?}\nVALIDATION_RUNS:{:#?}\nSTEPS: {:#?}\nREQUIRED_FITNESS:{:#?}\nPARAMETERS: {:#?}", RUNS, VALIDATION_RUNS, STEPS, REQUIRED_FITNESS, neat.parameters);
 
-    if let Some(winner) = neat
-        .run()
-        .take(100)
-        .filter_map(|evaluation| match evaluation {
-            Evaluation::Progress(report) => {
-                info!(target: "app::progress", "{}", serde_json::to_string(&report).unwrap());
-                /* if report.num_generation % 5 == 0 {
-                    run(
-                        &other_standard_scaler,
-                        &report.top_performer,
-                        1,
-                        STEPS,
-                        true,
-                        true,
-                    );
-                } */
-                None
-            }
-            Evaluation::Solution(individual) => Some(individual),
-        })
-        .next()
-    {
+    if let Some(winner) = neat.run().take(100).find_map(|(statistics, solution)| {
+        info!(target: "app::progress", "{}", serde_json::to_string(&statistics).unwrap());
+        /* if report.num_generation % 5 == 0 {
+            run(
+                &other_standard_scaler,
+                &report.top_performer,
+                1,
+                STEPS,
+                true,
+                true,
+            );
+        } */
+        solution
+    }) {
         let time_stamp = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap()

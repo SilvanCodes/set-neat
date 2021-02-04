@@ -4,9 +4,8 @@ use rayon::prelude::*;
 
 use crate::{individual::Individual, population::Population, statistics::Statistics, Neat};
 
-pub use self::{evaluation::Evaluation, progress::Progress};
+pub use self::progress::Progress;
 
-mod evaluation;
 mod progress;
 
 pub struct Runtime<'a> {
@@ -45,7 +44,7 @@ impl<'a> Runtime<'a> {
 }
 
 impl<'a> Iterator for Runtime<'a> {
-    type Item = Evaluation;
+    type Item = (Statistics, Option<Individual>);
 
     fn next(&mut self) -> Option<Self::Item> {
         self.statistics.time_stamp = SystemTime::now()
@@ -59,13 +58,10 @@ impl<'a> Iterator for Runtime<'a> {
 
         self.statistics.milliseconds_elapsed_evaluation = now.elapsed().as_millis();
 
-        if let Some(winner) = self.check_for_solution(&progress) {
-            Some(Evaluation::Solution(winner))
-        } else {
-            self.statistics.population = self.population.next_generation(&progress);
+        // collect statistics and prepare next generation
+        self.statistics.population = self.population.next_generation(&progress);
 
-            Some(Evaluation::Progress(self.statistics.clone()))
-        }
+        Some((self.statistics.clone(), self.check_for_solution(&progress)))
     }
 }
 

@@ -2,7 +2,7 @@ use favannat::matrix::fabricator::RecurrentMatrixFabricator;
 use favannat::network::{StatefulEvaluator, StatefulFabricator};
 use gym::{utility::StandardScaler, SpaceData, SpaceTemplate, State};
 use ndarray::{stack, Array2, Axis};
-use set_neat::{Evaluation, Individual, Neat, Progress};
+use set_neat::{Individual, Neat, Progress};
 
 use log::{error, info};
 use std::time::Instant;
@@ -93,28 +93,19 @@ fn train(standard_scaler: StandardScaler) {
 
     info!(target: "app::parameters", "starting training: {:#?}", neat.parameters);
 
-    if let Some(winner) = neat
-        .run()
-        .filter_map(|evaluation| match evaluation {
-            Evaluation::Progress(report) => {
-                info!(target: "app::progress", "{}", serde_json::to_string(&report).unwrap());
-                if report.population.num_generation % 5 == 0 {
-                    run(
-                        &report.population.top_performer,
-                        &standard_scaler_1,
-                        1,
-                        STEPS,
-                        true,
-                    );
-                }
-
-                // showcase(standard_scaler_1.clone(), report.top_performer);
-                None
-            }
-            Evaluation::Solution(individual) => Some(individual),
-        })
-        .next()
-    {
+    if let Some(winner) = neat.run().find_map(|(statistics, solution)| {
+        info!(target: "app::progress", "{}", serde_json::to_string(&statistics).unwrap());
+        if statistics.population.num_generation % 5 == 0 {
+            run(
+                &statistics.population.top_performer,
+                &standard_scaler_1,
+                1,
+                STEPS,
+                true,
+            );
+        }
+        solution
+    }) {
         let time_stamp = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap()

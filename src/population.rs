@@ -252,21 +252,21 @@ impl Population {
         self.assign_fitness(progress);
         self.assign_behavior(progress);
 
+        self.determine_top_performer();
+
         self.speciate();
         self.reproduce();
 
-        self.collect_statistics()
+        self.statistics.clone()
     }
 
-    fn collect_statistics(&mut self) -> PopulationStatistics {
+    fn determine_top_performer(&mut self) {
         self.statistics.top_performer = self
             .individuals
             .iter()
             .max_by(|a, b| a.score().partial_cmp(&b.score()).unwrap())
             .unwrap()
             .clone();
-
-        self.statistics.clone()
     }
 
     fn assign_behavior(&mut self, progress: &[Progress]) {

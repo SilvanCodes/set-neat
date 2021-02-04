@@ -6,11 +6,11 @@ use gym::{utility::StandardScaler, SpaceData, State};
 use ndarray::{stack, Array2, Axis};
 use rand::{distributions::WeightedIndex, prelude::SmallRng, SeedableRng};
 use rand_distr::Distribution;
-use set_neat::{Evaluation, Individual, Neat, Progress};
+use set_neat::{Individual, Neat, Progress};
 
 use log::{error, info};
-use std::time::Instant;
 use std::time::SystemTime;
+use std::{cell::RefCell, time::Instant};
 use std::{env, fs};
 
 pub const RUNS: usize = 1;
@@ -18,6 +18,7 @@ pub const STEPS: usize = usize::MAX;
 pub const VALIDATION_RUNS: usize = 100;
 pub const ENV: &str = "Acrobot-v1";
 pub const REQUIRED_FITNESS: f64 = -100.0;
+pub const GENERATIONS: usize = 1000;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -108,51 +109,101 @@ fn train(standard_scaler: StandardScaler) {
 
     info!(target: "app::parameters", "starting training...\nRUNS:{:#?}\nVALIDATION_RUNS:{:#?}\nSTEPS: {:#?}\nREQUIRED_FITNESS:{:#?}\nPARAMETERS: {:#?}", RUNS, VALIDATION_RUNS, STEPS, REQUIRED_FITNESS, neat.parameters);
 
-    if let Some(winner) = neat
-        .run()
-        .filter_map(|evaluation| match evaluation {
-            Evaluation::Progress(report) => {
-                info!(target: "app::progress", "{}", serde_json::to_string(&report).unwrap());
-                None
-            }
-            Evaluation::Solution(individual) => Some(individual),
-        })
-        .next()
-    {
-        let time_stamp = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-        fs::write(
-            format!("examples/{}/{}_winner.json", ENV, time_stamp),
-            serde_json::to_string(&winner).unwrap(),
-        )
-        .expect("Unable to write file");
-        fs::write(
-            format!("examples/{}/{}_winner_parameters.json", ENV, time_stamp),
-            serde_json::to_string(&neat.parameters).unwrap(),
-        )
-        .expect("Unable to write file");
-        fs::write(
-            format!(
-                "examples/{}/{}_winner_standard_scaler.json",
-                ENV, time_stamp
-            ),
-            serde_json::to_string(&other_standard_scaler).unwrap(),
-        )
-        .expect("Unable to write file");
+    let mut ff_connections_in_winner_in_run = Vec::new();
+    let mut rc_connections_in_winner_in_run = Vec::new();
+    let mut nodes_in_winner_in_run = Vec::new();
+    let mut generations_till_winner_in_run = Vec::new();
+    let mut score_of_winner_in_run = Vec::new();
 
-        let secs = now.elapsed().as_millis();
-        info!(
-            "winning individual ({},{}) after {} seconds: {:?}",
-            winner.nodes().count(),
-            winner.feed_forward.len(),
-            secs as f64 / 1000.0,
-            winner
-        );
-    } else {
-        println!("##### OUT OF TIME #####");
+    let mut worst_possible = Individual::default();
+    worst_possible.fitness.raw = f64::NEG_INFINITY;
+    let all_time_best: RefCell<Individual> = RefCell::new(worst_possible);
+
+    let mut generations;
+
+    for _ in 0..1 {
+        generations = 1;
+        if let Some(winner) = neat
+            .run()
+            .take(GENERATIONS)
+            .find_map(|(statistics, solution)| {
+                all_time_best.replace_with(|prev| {
+                    if statistics.population.top_performer.fitness.raw > prev.fitness.raw {
+                        statistics.population.top_performer.clone()
+                    } else {
+                        prev.clone()
+                    }
+                });
+                generations += 1;
+                solution
+            })
+        {
+            /* let time_stamp = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
+            fs::write(
+                format!("examples/{}/{}_winner.json", ENV, time_stamp),
+                serde_json::to_string(&winner).unwrap(),
+            )
+            .expect("Unable to write file");
+            fs::write(
+                format!("examples/{}/{}_winner_parameters.json", ENV, time_stamp),
+                serde_json::to_string(&neat.parameters).unwrap(),
+            )
+            .expect("Unable to write file");
+            fs::write(
+                format!(
+                    "examples/{}/{}_winner_standard_scaler.json",
+                    ENV, time_stamp
+                ),
+                serde_json::to_string(&other_standard_scaler).unwrap(),
+            )
+            .expect("Unable to write file");
+
+            let secs = now.elapsed().as_millis();
+            info!(
+                "winning individual ({},{}) after {} seconds: {:?}",
+                winner.nodes().count(),
+                winner.feed_forward.len(),
+                secs as f64 / 1000.0,
+                winner
+            ); */
+
+            ff_connections_in_winner_in_run.push(winner.feed_forward.len());
+            rc_connections_in_winner_in_run.push(winner.recurrent.len());
+            nodes_in_winner_in_run.push(winner.hidden.len());
+            generations_till_winner_in_run.push(generations);
+            score_of_winner_in_run.push(winner.fitness.raw);
+        }
     }
+
+    let avg_F = ff_connections_in_winner_in_run.iter().sum::<usize>() as f64
+        / ff_connections_in_winner_in_run.len() as f64;
+    let avg_R = rc_connections_in_winner_in_run.iter().sum::<usize>() as f64
+        / rc_connections_in_winner_in_run.len() as f64;
+    let avg_H =
+        nodes_in_winner_in_run.iter().sum::<usize>() as f64 / nodes_in_winner_in_run.len() as f64;
+    let avg_generations = generations_till_winner_in_run.iter().sum::<usize>() as f64
+        / nodes_in_winner_in_run.len() as f64;
+    let avg_score =
+        score_of_winner_in_run.iter().sum::<f64>() as f64 / score_of_winner_in_run.len() as f64;
+
+    println!(
+        "|H| {}, |F| {}, |R| {}, #gens {}, avg_score {}",
+        avg_H, avg_F, avg_R, avg_generations, avg_score
+    );
+
+    let all_time_best = all_time_best.into_inner();
+
+    println!(
+        "all_time_best: |H| {}, |F| {}, |R| {}, #gens {}, avg_score {}",
+        all_time_best.hidden.len(),
+        all_time_best.feed_forward.len(),
+        all_time_best.recurrent.len(),
+        avg_generations,
+        all_time_best.fitness.raw
+    );
 }
 
 fn run(

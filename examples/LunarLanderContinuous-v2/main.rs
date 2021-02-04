@@ -5,7 +5,7 @@ use favannat::{
 };
 use gym::{utility::StandardScaler, SpaceData, State};
 use ndarray::{stack, Array2, Axis};
-use set_neat::{Evaluation, Individual, Neat, Progress};
+use set_neat::{Individual, Neat, Progress};
 
 use log::{error, info};
 use std::time::Instant;
@@ -162,24 +162,20 @@ fn train(standard_scaler: StandardScaler) {
     if let Some(winner) = neat
         .run()
         .take(GENERATIONS)
-        .filter_map(|evaluation| match evaluation {
-            Evaluation::Progress(report) => {
-                info!(target: "app::progress", "{}", serde_json::to_string(&report).unwrap());
-                /* if report.num_generation % 5 == 0 {
-                    run(
-                        &other_standard_scaler,
-                        &report.top_performer,
-                        1,
-                        STEPS,
-                        true,
-                        true,
-                    );
-                } */
-                None
-            }
-            Evaluation::Solution(individual) => Some(individual),
+        .find_map(|(statistics, solution)| {
+            info!(target: "app::progress", "{}", serde_json::to_string(&statistics).unwrap());
+            /* if report.num_generation % 5 == 0 {
+                run(
+                    &other_standard_scaler,
+                    &report.top_performer,
+                    1,
+                    STEPS,
+                    true,
+                    true,
+                );
+            } */
+            solution
         })
-        .next()
     {
         let time_stamp = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
