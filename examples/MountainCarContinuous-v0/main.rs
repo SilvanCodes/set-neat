@@ -237,7 +237,6 @@ fn run(
     let (means, std_dev) = standard_scaler.clone();
 
     let mut evaluator = RecurrentMatrixFabricator::fabricate(net).unwrap();
-    // let mut evaluator = LoopingFabricator::fabricate(net).unwrap();
     let mut fitness = 0.0;
     let mut all_observations = Array2::zeros((1, 2));
 

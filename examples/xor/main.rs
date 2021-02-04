@@ -1,6 +1,8 @@
-use favannat::looping::fabricator::LoopingFabricator;
-use favannat::matrix::fabricator::FeedForwardMatrixFabricator;
-use favannat::network::{Evaluator, Fabricator, StatefulEvaluator, StatefulFabricator};
+use favannat::{
+    matrix::fabricator::FeedForwardMatrixFabricator,
+    neat_original::fabricator::NeatOriginalFabricator,
+    network::{Evaluator, Fabricator, StatefulEvaluator, StatefulFabricator},
+};
 use ndarray::array;
 use set_neat::{Evaluation, Individual, Neat, Progress};
 use std::time::Instant;
@@ -12,10 +14,10 @@ fn main() {
         let result_2;
         let result_3;
 
-        /* match LoopingFabricator::fabricate(individual) {
-        Ok(mut evaluator) => { */
-        match FeedForwardMatrixFabricator::fabricate(individual) {
-            Ok(evaluator) => {
+        match NeatOriginalFabricator::fabricate(individual) {
+            Ok(mut evaluator) => {
+                /* match FeedForwardMatrixFabricator::fabricate(individual) {
+                Ok(evaluator) => { */
                 result_0 = evaluator.evaluate(array![1.0, 1.0, 0.0]);
                 result_1 = evaluator.evaluate(array![1.0, 1.0, 1.0]);
                 result_2 = evaluator.evaluate(array![1.0, 0.0, 1.0]);
@@ -117,7 +119,7 @@ fn main() {
             secs as f64 / 1000.0,
             winner
         );
-        let evaluator = LoopingFabricator::fabricate(&winner).unwrap();
+        let evaluator = NeatOriginalFabricator::fabricate(&winner).unwrap();
         println!("as evaluator {:#?}", evaluator);
     } */
 }

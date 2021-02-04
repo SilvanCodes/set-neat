@@ -1,6 +1,6 @@
-use favannat::matrix::fabricator::RecurrentMatrixFabricator;
 use favannat::{
-    looping::fabricator::LoopingFabricator,
+    matrix::fabricator::RecurrentMatrixFabricator,
+    neat_original::fabricator::NeatOriginalFabricator,
     network::{StatefulEvaluator, StatefulFabricator},
 };
 use gym::{utility::StandardScaler, SpaceData, State};
@@ -229,7 +229,7 @@ fn run(
     let env = gym.make(ENV);
 
     let mut evaluator = RecurrentMatrixFabricator::fabricate(net).unwrap();
-    // let mut evaluator = LoopingFabricator::fabricate(net).unwrap();
+    // let mut evaluator = NeatOriginalFabricator::fabricate(net).unwrap();
     let mut fitness = 0.0;
     let mut all_observations = Array2::zeros((1, 8));
 
