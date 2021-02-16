@@ -47,6 +47,18 @@ pub struct PopulationStatistics {
     pub num_species: usize,
     pub fitness: FitnessStatisitcs,
     pub novelty: NoveltyStatisitcs,
+    pub species: SpeciesStatistics,
     pub compatability_threshold: f64,
     pub milliseconds_elapsed_speciation: u128,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct SpeciesStatistics {
+    pub raw_genes_diff: Vec<f64>,
+    pub raw_weights_diff: Vec<f64>,
+    pub raw_activations_diff: Vec<f64>,
+    pub avg_genes_diff: f64,
+    pub avg_weights_diff: f64,
+    pub avg_activations_diff: f64,
+    pub sizes: Vec<usize>,
 }

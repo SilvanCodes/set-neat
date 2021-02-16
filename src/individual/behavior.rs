@@ -42,8 +42,6 @@ impl<'a> Behaviors<'a> {
             row += &ArrayView1::from(behavior_iter.next().unwrap().as_slice());
         }
 
-        // let samples = behavior_arr.view().t();
-
         let standard_deviations = behavior_arr
             .view()
             .t()

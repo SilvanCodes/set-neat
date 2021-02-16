@@ -69,6 +69,7 @@ pub struct Mutation {
     pub connection_is_recurrent_chance: f64,
     pub change_activation_function_chance: f64,
     pub weight_perturbation_std_dev: f64,
+    pub weight_perturbation_cap: f64,
 }
 
 impl Default for Mutation {
@@ -79,6 +80,7 @@ impl Default for Mutation {
             connection_is_recurrent_chance: 0.0,
             change_activation_function_chance: 0.05,
             weight_perturbation_std_dev: 1.0,
+            weight_perturbation_cap: 3.0,
         }
     }
 }

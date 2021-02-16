@@ -84,7 +84,7 @@ impl Genome {
     pub fn mutate(&mut self, rng: &mut NeatRng, id_gen: &mut IdGenerator, parameters: &Parameters) {
         // mutate weigths
         // if context.gamble(parameters.mutation.weight) {
-        self.change_weights(rng, parameters.mutation.weight_perturbation_std_dev * 3.0);
+        self.change_weights(rng, parameters.mutation.weight_perturbation_cap);
         // }
 
         // mutate connection gene
@@ -104,12 +104,25 @@ impl Genome {
     }
 
     pub fn change_weights(&mut self, rng: &mut NeatRng, weight_cap: f64) {
+        let change_feed_forward_amount =
+            (rng.small.gen::<f64>() * self.feed_forward.len() as f64).ceil() as usize;
+        let change_recurrent_amount =
+            (rng.small.gen::<f64>() * self.recurrent.len() as f64).ceil() as usize;
+
         self.feed_forward = self
             .feed_forward
             .drain_into_random(&mut rng.small)
-            .map(|mut connection| {
-                connection.weight += rng.weight_perturbation();
-                connection.weight = connection.weight.max(-weight_cap).min(weight_cap);
+            .enumerate()
+            .map(|(index, mut connection)| {
+                if index < change_feed_forward_amount {
+                    let mut perturbation = rng.weight_perturbation();
+                    if (connection.weight + perturbation) > weight_cap
+                        || (connection.weight + perturbation) < -weight_cap
+                    {
+                        perturbation = -perturbation;
+                    }
+                    connection.weight += perturbation;
+                }
                 connection
             })
             .collect();
@@ -117,9 +130,17 @@ impl Genome {
         self.recurrent = self
             .recurrent
             .drain_into_random(&mut rng.small)
-            .map(|mut connection| {
-                connection.weight += rng.weight_perturbation();
-                connection.weight = connection.weight.max(-weight_cap).min(weight_cap);
+            .enumerate()
+            .map(|(index, mut connection)| {
+                if index < change_recurrent_amount {
+                    let mut perturbation = rng.weight_perturbation();
+                    if (connection.weight + perturbation) > weight_cap
+                        || (connection.weight + perturbation) < -weight_cap
+                    {
+                        perturbation = -perturbation;
+                    }
+                    connection.weight += perturbation;
+                }
                 connection
             })
             .collect();
@@ -297,7 +318,7 @@ impl Genome {
         factor_weights: f64,
         factor_activations: f64,
         weight_cap: f64,
-    ) -> f64 {
+    ) -> (f64, f64, f64, f64) {
         let mut weight_difference_total = 0.0;
         let mut activation_difference = 0.0;
 
@@ -338,12 +359,32 @@ impl Genome {
         let maximum_weight_difference = matching_genes_count_total * 2.0 * weight_cap;
 
         // percent of different genes, considering all unique genes from both genomes
-        (factor_genes * different_genes_count_total / (matching_genes_count_total + different_genes_count_total)
+        let gene_diff = factor_genes * different_genes_count_total
+            / (matching_genes_count_total + different_genes_count_total);
+
         // average weight differences , considering matching connection genes
-        + factor_weights * if maximum_weight_difference > 0.0 { weight_difference_total / maximum_weight_difference } else { 0.0 }
+        let weight_diff = factor_weights
+            * if maximum_weight_difference > 0.0 {
+                weight_difference_total / maximum_weight_difference
+            } else {
+                0.0
+            };
+
         // percent of different activation functions, considering matching nodes genes
-        + factor_activations * if matching_nodes_count > 0.0 { activation_difference / matching_nodes_count } else { 0.0 })
-            / (factor_genes + factor_weights + factor_activations)
+        let activation_diff = factor_activations
+            * if matching_nodes_count > 0.0 {
+                activation_difference / matching_nodes_count
+            } else {
+                0.0
+            };
+
+        (
+            (gene_diff + weight_diff + activation_diff)
+                / (factor_genes + factor_weights + factor_activations),
+            gene_diff,
+            weight_diff,
+            activation_diff,
+        )
     }
 }
 
@@ -665,7 +706,7 @@ mod tests {
         let genome_1 = genome_0.clone();
 
         let delta =
-            Genome::compatability_distance(&genome_0, &genome_1, 1.0, 0.4, 0.0, f64::INFINITY);
+            Genome::compatability_distance(&genome_0, &genome_1, 1.0, 0.4, 0.0, f64::INFINITY).0;
 
         assert!(delta < f64::EPSILON);
     }
@@ -704,7 +745,7 @@ mod tests {
         println!("genome_0: {:?}", genome_0);
         println!("genome_1: {:?}", genome_1);
 
-        let delta = Genome::compatability_distance(&genome_0, &genome_1, 0.0, 2.0, 0.0, 2.0);
+        let delta = Genome::compatability_distance(&genome_0, &genome_1, 0.0, 2.0, 0.0, 2.0).0;
 
         dbg!(&delta);
 
@@ -750,7 +791,7 @@ mod tests {
         println!("genome_1: {:?}", genome_1);
 
         let delta =
-            Genome::compatability_distance(&genome_0, &genome_1, 2.0, 0.0, 0.0, f64::INFINITY);
+            Genome::compatability_distance(&genome_0, &genome_1, 2.0, 0.0, 0.0, f64::INFINITY).0;
 
         // factor 2 times 2 different genes over 3 total genes
         assert!((delta - 2.0 * 2.0 / 3.0).abs() < f64::EPSILON);

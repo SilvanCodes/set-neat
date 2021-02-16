@@ -80,19 +80,31 @@ impl Population {
             ..
         } = self.parameters.speciation;
 
-        let weight_cap = self.parameters.mutation.weight_perturbation_std_dev * 3.0;
+        let weight_cap = self.parameters.mutation.weight_perturbation_cap;
         let compatability_threshold = self.compatability_threshold;
+        let species_statistics = &mut self.statistics.species;
 
         // place into matching species
         if let Some(species) = self.species.iter_mut().find(|species| {
-            Genome::compatability_distance(
-                &individual,
-                &species.representative,
-                factor_genes,
-                factor_weights,
-                factor_activations,
-                weight_cap,
-            ) < compatability_threshold
+            let (compatability, gene_diff, weight_diff, activation_diff) =
+                Genome::compatability_distance(
+                    &individual,
+                    &species.representative,
+                    factor_genes,
+                    factor_weights,
+                    factor_activations,
+                    weight_cap,
+                );
+
+            if compatability < compatability_threshold {
+                species_statistics.raw_genes_diff.push(gene_diff);
+                species_statistics.raw_weights_diff.push(weight_diff);
+                species_statistics
+                    .raw_activations_diff
+                    .push(activation_diff);
+            }
+
+            compatability < compatability_threshold
         }) {
             species.members.push(individual);
         } else {
@@ -139,6 +151,8 @@ impl Population {
             self.place_genome_into_species(genome);
         }
 
+        self.statistics.species.sizes = self.species.iter().map(|s| s.members.len()).collect();
+
         // sort members of species and compute species score
         for species in &mut self.species {
             species.adjust(self.parameters.reproduction.survival_rate);
@@ -151,6 +165,24 @@ impl Population {
         self.remove_stale_species();
 
         // collect statistics
+        self.statistics.species.avg_genes_diff =
+            self.statistics.species.raw_genes_diff.iter().sum::<f64>()
+                / self.statistics.species.raw_genes_diff.len() as f64;
+        self.statistics.species.avg_weights_diff =
+            self.statistics.species.raw_weights_diff.iter().sum::<f64>()
+                / self.statistics.species.raw_weights_diff.len() as f64;
+        self.statistics.species.avg_activations_diff = self
+            .statistics
+            .species
+            .raw_activations_diff
+            .iter()
+            .sum::<f64>()
+            / self.statistics.species.raw_activations_diff.len() as f64;
+
+        self.statistics.species.raw_genes_diff = Vec::new();
+        self.statistics.species.raw_weights_diff = Vec::new();
+        self.statistics.species.raw_activations_diff = Vec::new();
+
         self.statistics.compatability_threshold = self.compatability_threshold;
         self.statistics.milliseconds_elapsed_speciation = now.elapsed().as_millis();
     }
@@ -166,14 +198,17 @@ impl Population {
             let mut distances = Vec::new();
 
             for individual_1 in &self.individuals {
-                distances.push(Genome::compatability_distance(
-                    individual_0,
-                    individual_1,
-                    self.parameters.speciation.factor_genes,
-                    self.parameters.speciation.factor_weights,
-                    self.parameters.speciation.factor_activations,
-                    self.parameters.mutation.weight_perturbation_std_dev * 3.0,
-                ));
+                distances.push(
+                    Genome::compatability_distance(
+                        individual_0,
+                        individual_1,
+                        self.parameters.speciation.factor_genes,
+                        self.parameters.speciation.factor_weights,
+                        self.parameters.speciation.factor_activations,
+                        self.parameters.mutation.weight_perturbation_cap,
+                    )
+                    .0,
+                );
             }
 
             distances.sort_by(|a, b| a.partial_cmp(b).unwrap());
