@@ -12,7 +12,9 @@ new_node_chance = 0.05
 new_connection_chance = 0.1
 connection_is_recurrent_chance = 0.1
 change_activation_function_chance = 0.05
+weight_perturbation_percent = 0.5
 weight_perturbation_std_dev = 1.0
+weight_perturbation_cap = 3.0
 
 [activations]
 output_nodes = "Tanh" # activation function of output nodes
