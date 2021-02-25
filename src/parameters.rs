@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Deserialize, Serialize, Default, Debug, Clone)]
 pub struct Parameters {
     pub setup: Setup,
+    #[serde(default)]
     pub reproduction: Reproduction,
     pub mutation: Mutation,
     pub activations: Activations,
@@ -13,12 +14,16 @@ pub struct Parameters {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Setup {
+    #[serde(default = "Parameters::the_answer")]
     pub seed: u64,
     pub population_size: usize,
     pub input_dimension: usize,
     pub output_dimension: usize,
+    #[serde(default = "Parameters::one_f64")]
     pub connected_input_percent: f64,
+    #[serde(default)]
     pub add_to_archive_chance: f64,
+    #[serde(default)]
     pub novelty_nearest_neighbors: usize,
 }
 
@@ -26,12 +31,12 @@ impl Default for Setup {
     fn default() -> Self {
         Self {
             seed: 42,
-            population_size: 250,
+            population_size: 100,
             input_dimension: 1,
             output_dimension: 1,
             connected_input_percent: 1.0,
-            add_to_archive_chance: 0.5,
-            novelty_nearest_neighbors: 16,
+            add_to_archive_chance: 0.0,
+            novelty_nearest_neighbors: 0,
         }
     }
 }
@@ -68,6 +73,7 @@ pub struct Mutation {
     pub new_connection_chance: f64,
     pub connection_is_recurrent_chance: f64,
     pub change_activation_function_chance: f64,
+    pub weight_perturbation_percent: f64,
     pub weight_perturbation_std_dev: f64,
     pub weight_perturbation_cap: f64,
 }
@@ -79,6 +85,7 @@ impl Default for Mutation {
             new_connection_chance: 0.1,
             connection_is_recurrent_chance: 0.0,
             change_activation_function_chance: 0.05,
+            weight_perturbation_percent: 0.5,
             weight_perturbation_std_dev: 1.0,
             weight_perturbation_cap: 3.0,
         }
@@ -97,14 +104,14 @@ impl Default for Reproduction {
     fn default() -> Self {
         Self {
             survival_rate: 0.2,
-            generations_until_stale: 15,
+            generations_until_stale: 10,
             elitism_species: 1,
             elitism_individuals: 0,
         }
     }
 }
 
-#[derive(Deserialize, Serialize, Default, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Speciation {
     pub target_species_count: usize,
     pub factor_weights: f64,
@@ -112,7 +119,26 @@ pub struct Speciation {
     pub factor_activations: f64,
 }
 
+impl Default for Speciation {
+    fn default() -> Self {
+        Self {
+            target_species_count: 10,
+            factor_weights: 1.0,
+            factor_genes: 1.0,
+            factor_activations: 1.0,
+        }
+    }
+}
+
 impl Parameters {
+    fn one_f64() -> f64 {
+        1.0
+    }
+
+    fn the_answer() -> u64 {
+        42
+    }
+
     pub fn new(path: &str) -> Result<Self, ConfigError> {
         let mut s = Config::new();
 

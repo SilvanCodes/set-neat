@@ -26,8 +26,6 @@ pub struct Population {
     statistics: PopulationStatistics,
 }
 
-// uses setup/compatability/reproduction
-
 impl Population {
     pub fn new(parameters: Parameters) -> Self {
         // create id book-keeping
