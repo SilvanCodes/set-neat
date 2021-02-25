@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::{
     individual::genes::{connections::Connection, nodes::Node, Activation, Genes, IdGenerator},
     parameters::Parameters,
@@ -84,7 +86,11 @@ impl Genome {
     pub fn mutate(&mut self, rng: &mut NeatRng, id_gen: &mut IdGenerator, parameters: &Parameters) {
         // mutate weigths
         // if context.gamble(parameters.mutation.weight) {
-        self.change_weights(rng, parameters.mutation.weight_perturbation_cap);
+        self.change_weights(
+            rng,
+            parameters.mutation.weight_perturbation_cap,
+            parameters.mutation.weight_perturbation_percent,
+        );
         // }
 
         // mutate connection gene
@@ -103,11 +109,16 @@ impl Genome {
         }
     }
 
-    pub fn change_weights(&mut self, rng: &mut NeatRng, weight_cap: f64) {
+    pub fn change_weights(
+        &mut self,
+        rng: &mut NeatRng,
+        perturbation_cap: f64,
+        perturbation_percent: f64,
+    ) {
         let change_feed_forward_amount =
-            (rng.small.gen::<f64>() * self.feed_forward.len() as f64).ceil() as usize;
+            (perturbation_percent * self.feed_forward.len() as f64).ceil() as usize;
         let change_recurrent_amount =
-            (rng.small.gen::<f64>() * self.recurrent.len() as f64).ceil() as usize;
+            (perturbation_percent * self.recurrent.len() as f64).ceil() as usize;
 
         self.feed_forward = self
             .feed_forward
@@ -116,8 +127,8 @@ impl Genome {
             .map(|(index, mut connection)| {
                 if index < change_feed_forward_amount {
                     let mut perturbation = rng.weight_perturbation();
-                    if (connection.weight + perturbation) > weight_cap
-                        || (connection.weight + perturbation) < -weight_cap
+                    if (connection.weight + perturbation) > perturbation_cap
+                        || (connection.weight + perturbation) < -perturbation_cap
                     {
                         perturbation = -perturbation;
                     }
@@ -134,8 +145,8 @@ impl Genome {
             .map(|(index, mut connection)| {
                 if index < change_recurrent_amount {
                     let mut perturbation = rng.weight_perturbation();
-                    if (connection.weight + perturbation) > weight_cap
-                        || (connection.weight + perturbation) < -weight_cap
+                    if (connection.weight + perturbation) > perturbation_cap
+                        || (connection.weight + perturbation) < -perturbation_cap
                     {
                         perturbation = -perturbation;
                     }
@@ -282,31 +293,24 @@ impl Genome {
 
     // can only operate when no cycles present yet, which is assumed
     fn would_form_cycle(&self, start_node: &Node, end_node: &Node) -> bool {
-        // needs to detect if there is a path from end to start
-        let mut possible_paths: Vec<&Connection> = self
-            .feed_forward
-            .iter()
-            .filter(|connection| connection.input == end_node.id)
-            .collect();
-        let mut next_possible_path = Vec::new();
+        let mut to_visit = vec![end_node.id];
+        let mut visited = HashSet::new();
 
-        while !possible_paths.is_empty() {
-            for path in possible_paths {
-                // we have a cycle if path leads to start_node_gene
-                if path.output == start_node.id {
-                    return true;
-                }
-                // collect further paths
-                else {
-                    next_possible_path.extend(
-                        self.feed_forward
-                            .iter()
-                            .filter(|connection| connection.input == path.output),
-                    );
+        while let Some(node) = to_visit.pop() {
+            if !visited.contains(&node) {
+                visited.insert(node);
+                for connection in self
+                    .feed_forward
+                    .iter()
+                    .filter(|connection| connection.input == node)
+                {
+                    if connection.output == start_node.id {
+                        return true;
+                    } else {
+                        to_visit.push(connection.output)
+                    }
                 }
             }
-            possible_paths = next_possible_path;
-            next_possible_path = Vec::new();
         }
         false
     }
