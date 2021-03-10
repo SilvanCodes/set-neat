@@ -1,30 +1,22 @@
 [package]
 name = "set-neat"
 version = "0.1.0"
-authors = ["Silvan Buedenbender <s.buedenbender@badgersystems.de>"]
+authors = ["Silvan Buedenbender <silvancodes@gmail.com>"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
-rand = { version = "0.7.3", features = [ "small_rng" ] }
-rand_distr = "0.2"
+rand = { version = "0.8", features = [ "small_rng" ] }
+rand_distr = "0.4"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 config = "0.9"
 rayon = "1.3"
-favannat = { git = "https://github.com/SilvanCodes/favannat", tag = "thesis" }
 ndarray = { version = "0.13.0", features = ["serde"] }
-
-
-[features]
-blas = ["favannat/blas"]
+set_genome = { git = "https://github.com/SilvanCodes/set-genome" }
 
 [dev-dependencies]
+favannat = { git = "https://github.com/SilvanCodes/favannat", tag = "thesis" }
 gym = { git = "https://github.com/SilvanCodes/gym-rs", tag = "thesis" }
-criterion = "0.3"
 log = "0.4.11"
 log4rs = "0.13.0"
-
-[[bench]]
-name = "bench_neat"
-harness = false
