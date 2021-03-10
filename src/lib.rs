@@ -1,15 +1,12 @@
-// mod favannat_impl;
+mod individual;
 mod parameters;
 mod population;
+mod rng;
 mod runtime;
 mod species;
-
-mod individual;
-mod rng;
 mod statistics;
 
-// re-exports
-pub use individual::{genes::IdGenerator, Individual};
+pub use individual::Individual;
 pub use parameters::Parameters;
 pub use rng::NeatRng;
 pub use runtime::{Progress, Runtime};

@@ -4,8 +4,6 @@ use std::{mem, time::Instant};
 use crate::{
     individual::{
         behavior::{Behavior, Behaviors},
-        // genes::IdGenerator,
-        // genome::Genome,
         scores::Score,
         Individual,
     },
@@ -20,8 +18,6 @@ pub struct Population {
     archive: Vec<Individual>,
     species: Vec<Species>,
     genome_context: GenomeContext,
-    // rng: GenomeRng,
-    // id_gen: IdGenerator,
     compatability_threshold: f64,
     parameters: NeatParameters,
     statistics: PopulationStatistics,
@@ -31,17 +27,8 @@ impl Population {
     pub fn new(parameters: Parameters) -> Self {
         let mut genome_context = GenomeContext::new(parameters.genome);
 
-        // create id book-keeping
-        // let mut id_gen = IdGenerator::default();
-
         // generate genome with initial ids for structure
         let initial_individual = Individual::from_genome(genome_context.uninitialized_genome());
-
-        // create randomn source
-        // let mut rng = GenomeRng::new(
-        //     parameters.setup.seed,
-        //     parameters.mutation.weight_perturbation_std_dev,
-        // );
 
         let mut individuals = Vec::new();
 
@@ -59,8 +46,6 @@ impl Population {
             archive: Vec::new(),
             individuals,
             genome_context,
-            // id_gen,
-            // rng,
             statistics: Default::default(),
             compatability_threshold: f64::NAN,
         };

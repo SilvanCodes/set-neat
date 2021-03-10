@@ -1,9 +1,7 @@
 use rand::prelude::SliceRandom;
 
-use crate::parameters::Parameters;
 use crate::{individual::Individual, parameters::Reproduction};
-// use crate::rng::NeatRng;
-use set_genome::{GenomeContext, GenomeRng, IdGenerator};
+use set_genome::GenomeContext;
 
 #[derive(Debug, Clone)]
 pub struct Species {
@@ -98,22 +96,17 @@ impl Species {
 
 #[cfg(test)]
 mod tests {
-    /* use crate::{
-        individual::{genes::IdGenerator, scores::Score},
-        parameters::Parameters,
-        rng::NeatRng,
-        Individual,
-    };
+    use set_genome::GenomeContext;
+
+    use crate::{individual::scores::Score, parameters::Reproduction, Individual};
 
     use super::Species;
 
     #[test]
     fn order_and_truncate_members() {
-        // create id book-keeping
-        let mut id_gen = IdGenerator::default();
-        let parameters: Parameters = Default::default();
+        let gc = GenomeContext::default();
 
-        let individual_0 = Individual::initial(&mut id_gen, &parameters);
+        let individual_0 = Individual::from_genome(gc.initialized_genome());
 
         let mut individual_1 = individual_0.clone();
         individual_1.fitness = Score::new(5.0, 0.0, 1.0);
@@ -128,11 +121,9 @@ mod tests {
 
     #[test]
     fn check_score_and_staleness() {
-        // create id book-keeping
-        let mut id_gen = IdGenerator::default();
-        let parameters: Parameters = Default::default();
+        let gc = GenomeContext::default();
 
-        let mut individual_0 = Individual::initial(&mut id_gen, &parameters);
+        let mut individual_0 = Individual::from_genome(gc.initialized_genome());
 
         individual_0.fitness = Score::new(5.0, 0.0, 1.0);
 
@@ -159,24 +150,23 @@ mod tests {
 
     #[test]
     fn check_reproduction() {
-        // create id book-keeping
-        let mut id_gen = IdGenerator::default();
-        let parameters: Parameters = Default::default();
+        let mut gc = GenomeContext::default();
 
-        // create random source
-        let mut rng = NeatRng::new(
-            parameters.setup.seed,
-            parameters.mutation.weight_perturbation_std_dev,
-        );
+        let reproduction = Reproduction {
+            survival_rate: 0.2,
+            generations_until_stale: 10,
+            elitism_species: 1,
+            elitism_individuals: 0,
+        };
 
-        let individual_0 = Individual::initial(&mut id_gen, &parameters);
+        let individual = Individual::from_genome(gc.initialized_genome());
 
-        let species = Species::new(individual_0);
+        let species = Species::new(individual);
 
         let expected_offspring = 5;
 
         let offspring: Vec<Individual> = species
-            .reproduce(&mut rng, &mut id_gen, &parameters, expected_offspring)
+            .reproduce(&mut gc, &reproduction, expected_offspring)
             .collect();
 
         assert!(offspring.len() == expected_offspring);
@@ -184,28 +174,25 @@ mod tests {
 
     #[test]
     fn check_reproduction_with_elitism() {
-        // create id book-keeping
-        let mut id_gen = IdGenerator::default();
-        let mut parameters: Parameters = Default::default();
+        let mut gc = GenomeContext::default();
 
-        parameters.reproduction.elitism_individuals = 3;
+        let reproduction = Reproduction {
+            survival_rate: 0.2,
+            generations_until_stale: 10,
+            elitism_species: 1,
+            elitism_individuals: 3,
+        };
 
-        // create random source
-        let mut rng = NeatRng::new(
-            parameters.setup.seed,
-            parameters.mutation.weight_perturbation_std_dev,
-        );
+        let individual = Individual::from_genome(gc.initialized_genome());
 
-        let individual_0 = Individual::initial(&mut id_gen, &parameters);
-
-        let species = Species::new(individual_0);
+        let species = Species::new(individual);
 
         let expected_offspring = 5;
 
         let offspring: Vec<Individual> = species
-            .reproduce(&mut rng, &mut id_gen, &parameters, expected_offspring)
+            .reproduce(&mut gc, &reproduction, expected_offspring)
             .collect();
 
         assert_eq!(offspring.len(), expected_offspring);
-    } */
+    }
 }

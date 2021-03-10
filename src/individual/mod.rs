@@ -4,13 +4,9 @@ use rand::Rng;
 use serde::{Deserialize, Serialize};
 use set_genome::Genome;
 
-use crate::parameters::Parameters;
-
-use self::{behavior::Behavior, genes::IdGenerator, scores::Score};
+use self::{behavior::Behavior, scores::Score};
 
 pub mod behavior;
-pub mod genes;
-// pub mod genome;
 pub mod scores;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -42,13 +38,6 @@ impl Individual {
             ..Default::default()
         }
     }
-
-    /* pub fn initial(id_gen: &mut IdGenerator, parameters: &Parameters) -> Self {
-        Self {
-            genome: Genome::new(id_gen, parameters),
-            ..Default::default()
-        }
-    } */
 
     // score is combination of fitness & novelty
     pub fn score(&self) -> f64 {
@@ -104,41 +93,40 @@ impl Individual {
 
 #[cfg(test)]
 mod tests {
-    /* use crate::{IdGenerator, Individual, NeatRng, Parameters};
+    use set_genome::{GenomeContext, Parameters, Structure};
+
+    use crate::Individual;
 
     use super::scores::Score;
 
     #[test]
     fn crossover_different_fitness() {
-        // create id book-keeping
-        let mut id_gen = IdGenerator::default();
+        let parameters = Parameters {
+            seed: None,
+            structure: Structure {
+                inputs: 2,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
 
-        let mut parameters: Parameters = Default::default();
-
-        parameters.setup.input_dimension = 2;
+        let mut gc = GenomeContext::new(parameters);
 
         // create randomn source
-        let mut rng = NeatRng::new(
-            parameters.setup.seed,
-            parameters.mutation.weight_perturbation_std_dev,
-        );
+        let mut individual_0 = Individual::from_genome(gc.initialized_genome());
 
-        let mut individuals_0 = Individual::initial(&mut id_gen, &parameters);
-
-        individuals_0.init(&mut rng, &parameters);
-
-        let mut individual_1 = individuals_0.clone();
+        let mut individual_1 = individual_0.clone();
 
         individual_1.fitness = Score::new(1.0, 0.0, 1.0);
 
-        // mutate individuals_0
-        individuals_0.add_node(&mut rng, &mut id_gen, &parameters);
+        // mutate individual_0
+        individual_0.add_node_with_context(&mut gc);
 
         // mutate individual_1
-        individual_1.add_node(&mut rng, &mut id_gen, &parameters);
-        individual_1.add_connection(&mut rng, &parameters).unwrap();
+        individual_1.add_node_with_context(&mut gc);
+        individual_1.add_connection_with_context(&mut gc);
 
-        let offspring = individuals_0.crossover(&individual_1, &mut rng.small);
+        let offspring = individual_0.crossover(&individual_1, &mut gc.rng);
 
         assert_eq!(offspring.hidden.len(), 1);
         assert_eq!(offspring.feed_forward.len(), 5);
@@ -146,35 +134,32 @@ mod tests {
 
     #[test]
     fn crossover_equal_fittnes_different_len() {
-        // create id book-keeping
-        let mut id_gen = IdGenerator::default();
+        let parameters = Parameters {
+            seed: None,
+            structure: Structure {
+                inputs: 2,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
 
-        let mut parameters: Parameters = Default::default();
-
-        parameters.setup.input_dimension = 2;
+        let mut gc = GenomeContext::new(parameters);
 
         // create randomn source
-        let mut rng = NeatRng::new(
-            parameters.setup.seed,
-            parameters.mutation.weight_perturbation_std_dev,
-        );
+        let mut individual_0 = Individual::from_genome(gc.initialized_genome());
 
-        let mut individuals_0 = Individual::initial(&mut id_gen, &parameters);
-
-        individuals_0.init(&mut rng, &parameters);
-
-        let mut individual_1 = individuals_0.clone();
+        let mut individual_1 = individual_0.clone();
 
         // mutate genome_0
-        individuals_0.add_node(&mut rng, &mut id_gen, &parameters);
+        individual_0.add_node_with_context(&mut gc);
 
         // mutate genome_1
-        individual_1.add_node(&mut rng, &mut id_gen, &parameters);
-        individual_1.add_connection(&mut rng, &parameters).unwrap();
+        individual_1.add_node_with_context(&mut gc);
+        individual_1.add_connection_with_context(&mut gc);
 
-        let offspring = individuals_0.crossover(&individual_1, &mut rng.small);
+        let offspring = individual_0.crossover(&individual_1, &mut gc.rng);
 
         assert_eq!(offspring.hidden.len(), 1);
         assert_eq!(offspring.feed_forward.len(), 4);
-    } */
+    }
 }
