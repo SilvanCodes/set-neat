@@ -2,14 +2,15 @@ use std::ops::{Deref, DerefMut};
 
 use rand::Rng;
 use serde::{Deserialize, Serialize};
+use set_genome::Genome;
 
 use crate::parameters::Parameters;
 
-use self::{behavior::Behavior, genes::IdGenerator, genome::Genome, scores::Score};
+use self::{behavior::Behavior, genes::IdGenerator, scores::Score};
 
 pub mod behavior;
 pub mod genes;
-pub mod genome;
+// pub mod genome;
 pub mod scores;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -35,12 +36,19 @@ impl DerefMut for Individual {
 }
 
 impl Individual {
-    pub fn initial(id_gen: &mut IdGenerator, parameters: &Parameters) -> Self {
+    pub fn from_genome(genome: Genome) -> Self {
+        Self {
+            genome,
+            ..Default::default()
+        }
+    }
+
+    /* pub fn initial(id_gen: &mut IdGenerator, parameters: &Parameters) -> Self {
         Self {
             genome: Genome::new(id_gen, parameters),
             ..Default::default()
         }
-    }
+    } */
 
     // score is combination of fitness & novelty
     pub fn score(&self) -> f64 {
@@ -96,7 +104,7 @@ impl Individual {
 
 #[cfg(test)]
 mod tests {
-    use crate::{IdGenerator, Individual, NeatRng, Parameters};
+    /* use crate::{IdGenerator, Individual, NeatRng, Parameters};
 
     use super::scores::Score;
 
@@ -168,5 +176,5 @@ mod tests {
 
         assert_eq!(offspring.hidden.len(), 1);
         assert_eq!(offspring.feed_forward.len(), 4);
-    }
+    } */
 }

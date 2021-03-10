@@ -1,8 +1,9 @@
 use rand::prelude::SliceRandom;
 
-use crate::individual::{genes::IdGenerator, Individual};
 use crate::parameters::Parameters;
-use crate::rng::NeatRng;
+use crate::{individual::Individual, parameters::Reproduction};
+// use crate::rng::NeatRng;
+use set_genome::{GenomeContext, GenomeRng, IdGenerator};
 
 #[derive(Debug, Clone)]
 pub struct Species {
@@ -63,27 +64,21 @@ impl Species {
 
     pub fn reproduce<'a>(
         &'a self,
-        rng: &'a mut NeatRng,
-        id_gen: &'a mut IdGenerator,
-        parameters: &'a Parameters,
+        context: &'a mut GenomeContext,
+        reproduction: &'a Reproduction,
         offspring: usize,
     ) -> impl Iterator<Item = Individual> + 'a {
         self.members
             .iter()
             .cycle()
             // produce as many offspring from crossover and mutation as individual elitism taking into account actual species length allows
-            .take(
-                (offspring
-                    - parameters
-                        .reproduction
-                        .elitism_individuals
-                        .min(self.members.len()))
-                .max(0),
-            )
+            .take((offspring - reproduction.elitism_individuals.min(self.members.len())).max(0))
             .map(move |member| {
-                let mut offspring =
-                    member.crossover(self.members.choose(&mut rng.small).unwrap(), &mut rng.small);
-                offspring.mutate(rng, id_gen, parameters);
+                let mut offspring = member.crossover(
+                    self.members.choose(&mut context.rng).unwrap(),
+                    &mut context.rng,
+                );
+                offspring.mutate_with_context(context);
                 offspring
             })
             // add as many members to offspring as specified individual elitism taking into account actual species length
@@ -91,8 +86,7 @@ impl Species {
                 self.members
                     .iter()
                     .take(
-                        parameters
-                            .reproduction
+                        reproduction
                             .elitism_individuals
                             .min(self.members.len())
                             .min(offspring),
@@ -104,7 +98,7 @@ impl Species {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
+    /* use crate::{
         individual::{genes::IdGenerator, scores::Score},
         parameters::Parameters,
         rng::NeatRng,
@@ -213,5 +207,5 @@ mod tests {
             .collect();
 
         assert_eq!(offspring.len(), expected_offspring);
-    }
+    } */
 }

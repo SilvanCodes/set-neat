@@ -1,15 +1,15 @@
+use set_genome::{Genome, GenomeContext};
 use std::{mem, time::Instant};
 
 use crate::{
     individual::{
         behavior::{Behavior, Behaviors},
-        genes::IdGenerator,
-        genome::Genome,
+        // genes::IdGenerator,
+        // genome::Genome,
         scores::Score,
         Individual,
     },
-    parameters::{Reproduction, Speciation},
-    rng::NeatRng,
+    parameters::{NeatParameters, Reproduction, Speciation},
     species::Species,
     statistics::PopulationStatistics,
     Parameters, Progress,
@@ -19,44 +19,48 @@ pub struct Population {
     pub individuals: Vec<Individual>,
     archive: Vec<Individual>,
     species: Vec<Species>,
-    rng: NeatRng,
-    id_gen: IdGenerator,
+    genome_context: GenomeContext,
+    // rng: GenomeRng,
+    // id_gen: IdGenerator,
     compatability_threshold: f64,
-    parameters: Parameters,
+    parameters: NeatParameters,
     statistics: PopulationStatistics,
 }
 
 impl Population {
     pub fn new(parameters: Parameters) -> Self {
+        let mut genome_context = GenomeContext::new(parameters.genome);
+
         // create id book-keeping
-        let mut id_gen = IdGenerator::default();
+        // let mut id_gen = IdGenerator::default();
 
         // generate genome with initial ids for structure
-        let initial_individual = Individual::initial(&mut id_gen, &parameters);
+        let initial_individual = Individual::from_genome(genome_context.uninitialized_genome());
 
         // create randomn source
-        let mut rng = NeatRng::new(
-            parameters.setup.seed,
-            parameters.mutation.weight_perturbation_std_dev,
-        );
+        // let mut rng = GenomeRng::new(
+        //     parameters.setup.seed,
+        //     parameters.mutation.weight_perturbation_std_dev,
+        // );
 
         let mut individuals = Vec::new();
 
         // generate initial, mutated individuals
-        for _ in 0..parameters.setup.population_size {
+        for _ in 0..parameters.neat.population_size {
             let mut other_genome = initial_individual.clone();
-            other_genome.init(&mut rng, &parameters);
-            other_genome.mutate(&mut rng, &mut id_gen, &parameters);
+            other_genome.init_with_context(&mut genome_context);
+            other_genome.mutate_with_context(&mut genome_context);
             individuals.push(other_genome);
         }
 
         let mut population = Population {
             species: Vec::new(),
-            parameters,
+            parameters: parameters.neat,
             archive: Vec::new(),
             individuals,
-            id_gen,
-            rng,
+            genome_context,
+            // id_gen,
+            // rng,
             statistics: Default::default(),
             compatability_threshold: f64::NAN,
         };
@@ -78,7 +82,7 @@ impl Population {
             ..
         } = self.parameters.speciation;
 
-        let weight_cap = self.parameters.mutation.weight_perturbation_cap;
+        let weight_cap = self.genome_context.parameters.structure.weight_cap;
         let compatability_threshold = self.compatability_threshold;
         let species_statistics = &mut self.statistics.species;
 
@@ -188,7 +192,7 @@ impl Population {
     pub fn init_threshold(&mut self) {
         let mut threshold = Vec::new();
 
-        let average_species_size = (self.parameters.setup.population_size as f64
+        let average_species_size = (self.parameters.population_size as f64
             / self.parameters.speciation.target_species_count as f64)
             .floor() as usize;
 
@@ -203,7 +207,7 @@ impl Population {
                         self.parameters.speciation.factor_genes,
                         self.parameters.speciation.factor_weights,
                         self.parameters.speciation.factor_activations,
-                        self.parameters.mutation.weight_perturbation_cap,
+                        self.genome_context.parameters.structure.weight_cap,
                     )
                     .0,
                 );
@@ -239,13 +243,12 @@ impl Population {
             // remove species with no members
             self.species.retain(|species| !species.members.is_empty());
             // give everyone equal offspring
-            offspring_ratio =
-                self.parameters.setup.population_size as f64 / self.species.len() as f64;
+            offspring_ratio = self.parameters.population_size as f64 / self.species.len() as f64;
         }
         // if we can differentiate species
         else {
             // give offspring in proportion to archived score
-            offspring_ratio = self.parameters.setup.population_size as f64 / total_fitness;
+            offspring_ratio = self.parameters.population_size as f64 / total_fitness;
             // remove species that do not qualify for offspring
             self.species
                 .retain(|species| species.score * offspring_ratio >= 1.0);
@@ -262,9 +265,8 @@ impl Population {
             .round() as usize;
 
             self.individuals.extend(species.reproduce(
-                &mut self.rng,
-                &mut self.id_gen,
-                &self.parameters,
+                &mut self.genome_context,
+                &self.parameters.reproduction,
                 offspring_count,
             ));
         }
@@ -397,11 +399,14 @@ impl Population {
 
         let behavior_count = behaviors.len() as f64;
 
-        let raw_novelties =
-            behaviors.compute_novelty(self.parameters.setup.novelty_nearest_neighbors);
+        let raw_novelties = behaviors.compute_novelty(self.parameters.novelty_nearest_neighbors);
 
         // add most novel current individual to archive
-        if self.rng.gamble(self.parameters.setup.add_to_archive_chance) {
+        if self
+            .genome_context
+            .rng
+            .gamble(self.parameters.add_to_archive_chance)
+        {
             let current_generation_most_novel = raw_novelties
                 .iter()
                 .enumerate()

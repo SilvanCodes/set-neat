@@ -1,93 +1,34 @@
-use crate::individual::genes::Activation;
 use config::{Config, ConfigError, File};
 use serde::{Deserialize, Serialize};
+use set_genome::Parameters as GenomeParameters;
 
 #[derive(Deserialize, Serialize, Default, Debug, Clone)]
 pub struct Parameters {
-    pub setup: Setup,
-    #[serde(default)]
-    pub reproduction: Reproduction,
-    pub mutation: Mutation,
-    pub activations: Activations,
-    pub speciation: Speciation,
+    pub neat: NeatParameters,
+    pub genome: GenomeParameters,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct Setup {
-    #[serde(default = "Parameters::the_answer")]
-    pub seed: u64,
+pub struct NeatParameters {
     pub population_size: usize,
-    pub input_dimension: usize,
-    pub output_dimension: usize,
-    #[serde(default = "Parameters::one_f64")]
-    pub connected_input_percent: f64,
     #[serde(default)]
     pub add_to_archive_chance: f64,
     #[serde(default)]
     pub novelty_nearest_neighbors: usize,
+    #[serde(default)]
+    pub reproduction: Reproduction,
+    #[serde(default)]
+    pub speciation: Speciation,
 }
 
-impl Default for Setup {
+impl Default for NeatParameters {
     fn default() -> Self {
         Self {
-            seed: 42,
             population_size: 100,
-            input_dimension: 1,
-            output_dimension: 1,
-            connected_input_percent: 1.0,
             add_to_archive_chance: 0.0,
             novelty_nearest_neighbors: 0,
-        }
-    }
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct Activations {
-    pub output_nodes: Activation,
-    pub hidden_nodes: Vec<Activation>,
-}
-
-impl Default for Activations {
-    fn default() -> Self {
-        Self {
-            output_nodes: Activation::Tanh,
-            hidden_nodes: vec![
-                Activation::Linear,
-                Activation::Sigmoid,
-                Activation::Tanh,
-                Activation::Gaussian,
-                Activation::Step,
-                Activation::Sine,
-                Activation::Cosine,
-                Activation::Inverse,
-                Activation::Absolute,
-                Activation::Relu,
-            ],
-        }
-    }
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct Mutation {
-    pub new_node_chance: f64,
-    pub new_connection_chance: f64,
-    pub connection_is_recurrent_chance: f64,
-    pub change_activation_function_chance: f64,
-    pub weight_perturbation_percent: f64,
-    pub weight_perturbation_std_dev: f64,
-    pub weight_perturbation_cap: f64,
-}
-
-impl Default for Mutation {
-    fn default() -> Self {
-        Self {
-            new_node_chance: 0.05,
-            new_connection_chance: 0.1,
-            connection_is_recurrent_chance: 0.0,
-            change_activation_function_chance: 0.05,
-            weight_perturbation_percent: 0.5,
-            weight_perturbation_std_dev: 1.0,
-            weight_perturbation_cap: 3.0,
+            reproduction: Default::default(),
+            speciation: Default::default(),
         }
     }
 }
@@ -131,14 +72,6 @@ impl Default for Speciation {
 }
 
 impl Parameters {
-    fn one_f64() -> f64 {
-        1.0
-    }
-
-    fn the_answer() -> u64 {
-        42
-    }
-
     pub fn new(path: &str) -> Result<Self, ConfigError> {
         let mut s = Config::new();
 
