@@ -7,15 +7,16 @@ use ndarray::{stack, Array2, Axis};
 use set_neat::{Individual, Neat, Progress};
 
 use log::{error, info};
-use std::time::SystemTime;
 use std::{cell::RefCell, time::Instant};
 use std::{env, fs};
+use std::{ops::Deref, time::SystemTime};
 
 pub const RUNS: usize = 1;
 pub const STEPS: usize = usize::MAX;
 pub const VALIDATION_RUNS: usize = 100;
 pub const ENV: &str = "Pendulum-v0";
-pub const REQUIRED_FITNESS: f64 = -300.0;
+pub const REQUIRED_FITNESS: f64 = -130.0;
+pub const GENERATIONS: usize = 1000;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -102,24 +103,28 @@ fn train(standard_scaler: StandardScaler) {
     worst_possible.fitness.raw = f64::NEG_INFINITY;
     let all_time_best: RefCell<Individual> = RefCell::new(worst_possible);
 
-    let mut generations;
+    let mut generations = 1;
 
     for _ in 0..1 {
         generations = 1;
-        if let Some(winner) = neat.run().find_map(|(statistics, solution)| {
-            all_time_best.replace_with(|prev| {
-                if statistics.population.top_performer.fitness.raw > prev.fitness.raw {
-                    statistics.population.top_performer.clone()
-                } else {
-                    prev.clone()
-                }
-            });
-            generations += 1;
+        if let Some(winner) = neat
+            .run()
+            .take(GENERATIONS)
+            .find_map(|(statistics, solution)| {
+                all_time_best.replace_with(|prev| {
+                    if statistics.population.top_performer.fitness.raw > prev.fitness.raw {
+                        statistics.population.top_performer.clone()
+                    } else {
+                        prev.clone()
+                    }
+                });
+                generations += 1;
 
-            info!(target: "app::progress", "{}", serde_json::to_string(&statistics).unwrap());
+                info!(target: "app::progress", "{}", serde_json::to_string(&statistics).unwrap());
 
-            solution
-        }) {
+                solution
+            })
+        {
             /* let time_stamp = SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap()
@@ -181,19 +186,21 @@ fn train(standard_scaler: StandardScaler) {
     let avg_score =
         score_of_winner_in_run.iter().sum::<f64>() as f64 / score_of_winner_in_run.len() as f64;
 
-    println!(
+    info!(
+        target: "app::solutions",
         "|H| {}, |F| {}, |R| {}, #gens {}, avg_score {}",
         avg_H, avg_F, avg_R, avg_generations, avg_score
     );
 
     let all_time_best = all_time_best.into_inner();
 
-    println!(
+    info!(
+        target: "app::solutions",
         "all_time_best: |H| {}, |F| {}, |R| {}, #gens {}, avg_score {}",
         all_time_best.hidden.len(),
         all_time_best.feed_forward.len(),
         all_time_best.recurrent.len(),
-        avg_generations,
+        generations,
         all_time_best.fitness.raw
     );
 }
@@ -209,7 +216,7 @@ fn run(
     let gym = gym::GymClient::default();
     let env = gym.make(ENV);
 
-    let mut evaluator = RecurrentMatrixFabricator::fabricate(net).unwrap();
+    let mut evaluator = RecurrentMatrixFabricator::fabricate(net.deref()).unwrap();
     let mut fitness = 0.0;
 
     let mut all_observations;

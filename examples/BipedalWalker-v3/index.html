@@ -30,21 +30,65 @@
 <script>
     const LOGFILE = 'logs/progress.log';
 
-    let keys = ['compatability_threshold', /* 'archive_threshold', */ 'novelty_peak'/* , 'novelty_ratio' *//* , 'num_consecutive_ineffective_generations' */];
+    let keys = [
+        'compatability_threshold',
+        'avg_genes_difference',
+        'avg_weights_difference',
+        'avg_activations_difference' /* 'archive_threshold', */ /* 'novelty_peak' *//* , 'novelty_ratio' *//* , 'num_consecutive_ineffective_generations' */];
     let keys2 = ['num_species', 'fitness_average', 'fitness_peak', 'fitness_min'/*, 'peak_fitness_average' */];
     let all_keys = [...keys, ...keys2];
 
     let colors = {
-        'archive_threshold': 'rgb(75, 192, 192)',
-        'novelty_peak': 'rgb(255, 99, 132)',
+        // 'archive_threshold': 'rgb(75, 192, 192)',
+        // 'novelty_peak': 'rgb(255, 99, 132)',
         'num_species': 'rgb(255, 0, 0)',
         'fitness_average': 'rgb(201, 203, 207)',
         'num_consecutive_ineffective_generations': 'rgb(255, 205, 86)',
         'fitness_peak': 'rgb(255, 159, 64)',
         'fitness_min': 'rgb(153, 102, 255)',
-        'novelty_ratio': 'rgb(54, 162, 235)',
         'peak_fitness_average': 'rgb(54, 230, 35)',
-        'compatability_threshold': 'rgb(54, 230, 35)'
+        'compatability_threshold': 'rgb(54, 230, 35)',
+        'avg_genes_difference': 'rgb(75, 192, 192)',
+        'avg_weights_difference': 'rgb(255, 99, 132)',
+        'avg_activations_difference': 'rgb(54, 162, 235)' 
+    }
+
+    function getValue(key, log) {
+        switch (key) {
+            case 'compatability_threshold': {
+                return log['population']['compatability_threshold'];
+            }
+            case 'avg_genes_difference': {
+                return log['population']['species']['avg_genes_diff'];
+            }
+            case 'avg_weights_difference': {
+                return log['population']['species']['avg_weights_diff'];
+            }
+            case 'avg_activations_difference': {
+                return log['population']['species']['avg_activations_diff'];
+            }
+            case 'num_species': {
+                return log['population']['num_species'];
+            }
+            case 'fitness_peak': {
+                return log['population']['fitness']['raw_maximum'];
+            }
+            case 'fitness_average': {
+                return log['population']['fitness']['raw_average'];
+            }
+            case 'fitness_min': {
+                return log['population']['fitness']['raw_minimum'];
+            }
+            case 'novelty_peak': {
+                return log['population']['novelty']['raw_maximum'];
+            }
+            case 'fitness_std_dev': {
+                return log['population']['fitness']['raw_std_dev'];
+            }
+            default: {
+                return log[key];
+            }
+        }
     }
 
     async function load() {
@@ -55,52 +99,16 @@
 
                 console.log(logs);
 
-                let datasets = keys.map((key, idx) => ({
+                let datasets = keys.map(key => ({
                     label: key,
                     // backgroundColor: colors[idx],
                     borderColor: colors[key],
                     pointRadius: 1,
                     borderWidth: 1,
-                    data: logs.map((log, idx) => {
-                        let value;
-
-                        switch (key) {
-                            case 'compatability_threshold': {
-                                value = log['population']['compatability_threshold'];
-                                break;
-                            }
-                            case 'num_species': {
-                                value = log['population']['num_species'];
-                                break;
-                            }
-                            case 'fitness_peak': {
-                                value = log['population']['fitness']['raw_maximum'];
-                                break;
-                            }
-                            case 'fitness_average': {
-                                value = log['population']['fitness']['raw_average'];
-                                break;
-                            }
-                            case 'fitness_min': {
-                                value = log['population']['fitness']['raw_minimum'];
-                                break;
-                            }
-                            case 'novelty_peak': {
-                                value = log['population']['novelty']['raw_maximum'];
-                                break;
-                            }
-                            case 'fitness_std_dev': {
-                                value = log['population']['fitness']['raw_std_dev'];
-                                break;
-                            }
-                            default: {
-                                value = log[key];
-                            }
-                        }
-
+                    data: logs.map(log => {
                         return {
                             x: log['population']['num_generation'],
-                            y: value
+                            y: getValue(key, log)
                         }
                     }),
                     yAxisID: 'y-axis-1',
@@ -114,46 +122,10 @@
                     borderColor: colors[key],
                     pointRadius: 1,
                     borderWidth: 1,
-                    data: logs.map((log, idx) => {
-                        let value;
-
-                        switch (key) {
-                            case 'compatability_threshold': {
-                                value = log['population']['compatability_threshold'];
-                                break;
-                            }
-                            case 'num_species': {
-                                value = log['population']['num_species'];
-                                break;
-                            }
-                            case 'fitness_peak': {
-                                value = log['population']['fitness']['raw_maximum'];
-                                break;
-                            }
-                            case 'fitness_average': {
-                                value = log['population']['fitness']['raw_average'];
-                                break;
-                            }
-                            case 'fitness_min': {
-                                value = log['population']['fitness']['raw_minimum'];
-                                break;
-                            }
-                            case 'novelty_peak': {
-                                value = log['population']['novelty']['raw_maximum'];
-                                break;
-                            }
-                            case 'fitness_std_dev': {
-                                value = log['population']['fitness']['raw_std_dev'];
-                                break;
-                            }
-                            default: {
-                                value = log[key];
-                            }
-                        }
-
+                    data: logs.map(log => {
                         return {
                             x: log['population']['num_generation'],
-                            y: value
+                            y: getValue(key, log)
                         }
                     }),
                     yAxisID: 'y-axis-2',
@@ -180,7 +152,7 @@
                         responsive: true,
                         title: {
                             display: true,
-                            text: 'LunarLander-v2 training'
+                            text: 'BipedalWalker-v3 training'
                         },
                         tooltips: {
                             mode: 'nearest',
@@ -235,48 +207,12 @@
                 // logs.splice(0, 40);
 
                 let updata = all_keys.map((key, idx) => ({
-                    data: logs.map((log, idx) => {
-                        let value;
-
-                        switch (key) {
-                            case 'compatability_threshold': {
-                                value = log['population']['compatability_threshold'];
-                                break;
-                            }
-                            case 'num_species': {
-                                value = log['population']['num_species'];
-                                break;
-                            }
-                            case 'fitness_peak': {
-                                value = log['population']['fitness']['raw_maximum'];
-                                break;
-                            }
-                            case 'fitness_average': {
-                                value = log['population']['fitness']['raw_average'];
-                                break;
-                            }
-                            case 'fitness_min': {
-                                value = log['population']['fitness']['raw_minimum'];
-                                break;
-                            }
-                            case 'novelty_peak': {
-                                value = log['population']['novelty']['raw_maximum'];
-                                break;
-                            }
-                            case 'fitness_std_dev': {
-                                value = log['population']['fitness']['raw_std_dev'];
-                                break;
-                            }
-                            default: {
-                                value = log[key];
-                            }
-                        }
-
+                    data: logs.map(log => {
                         return {
                             x: log['population']['num_generation'],
-                            y: value
+                            y: getValue(key, log)
                         }
-                    }),
+                    })
                 }));
 
                 let labels = logs.map(log => log['population']['num_generation']);
@@ -297,4 +233,4 @@
 
 </script>
 
-</html>s
+</html>

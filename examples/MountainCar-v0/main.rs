@@ -4,12 +4,14 @@ use favannat::{
 };
 use gym::{utility::StandardScaler, SpaceData, State};
 use ndarray::{stack, Array2, Axis};
+use rand::{distributions::WeightedIndex, prelude::SmallRng, SeedableRng};
+use rand_distr::Distribution;
 use set_neat::{Individual, Neat, Progress};
 
 use log::{error, info};
-use std::time::SystemTime;
 use std::{cell::RefCell, time::Instant};
 use std::{env, fs};
+use std::{ops::Deref, time::SystemTime};
 
 pub const RUNS: usize = 1;
 pub const STEPS: usize = 100;
@@ -117,7 +119,7 @@ fn train(standard_scaler: StandardScaler) {
     worst_possible.fitness.raw = f64::NEG_INFINITY;
     let all_time_best: RefCell<Individual> = RefCell::new(worst_possible);
 
-    let mut generations;
+    let mut generations = 1;
 
     for _ in 0..1 {
         generations = 1;
@@ -190,19 +192,21 @@ fn train(standard_scaler: StandardScaler) {
     let avg_score =
         score_of_winner_in_run.iter().sum::<f64>() as f64 / score_of_winner_in_run.len() as f64;
 
-    println!(
-        "avg: |H| {}, |F| {}, |R| {}, #gens {}, avg_score {}",
+    info!(
+        target: "app::solutions",
+        "|H| {}, |F| {}, |R| {}, #gens {}, avg_score {}",
         avg_H, avg_F, avg_R, avg_generations, avg_score
     );
 
     let all_time_best = all_time_best.into_inner();
 
-    println!(
+    info!(
+        target: "app::solutions",
         "all_time_best: |H| {}, |F| {}, |R| {}, #gens {}, avg_score {}",
         all_time_best.hidden.len(),
         all_time_best.feed_forward.len(),
         all_time_best.recurrent.len(),
-        avg_generations,
+        generations,
         all_time_best.fitness.raw
     );
 }
@@ -217,14 +221,15 @@ fn run(
 ) -> (f64, Array2<f64>) {
     let gym = gym::GymClient::default();
     let env = gym.make(ENV);
+    let mut rng = SmallRng::seed_from_u64(42);
 
     let actions = [
         &SpaceData::DISCRETE(0),
-        // &SpaceData::DISCRETE(1),
+        &SpaceData::DISCRETE(1),
         &SpaceData::DISCRETE(2),
     ];
 
-    let mut evaluator = RecurrentMatrixFabricator::fabricate(net).unwrap();
+    let mut evaluator = RecurrentMatrixFabricator::fabricate(net.deref()).unwrap();
     let mut fitness = 0.0;
     let mut all_observations = Array2::zeros((1, 2));
 
@@ -261,18 +266,26 @@ fn run(
             let input = stack![Axis(0), observations, [1.0]];
             let output = evaluator.evaluate(input.clone());
 
-            let action = if output[0] > 0.0 {
+            let softmaxsum: f64 = output.iter().map(|x| x.exp()).sum();
+            let softmax: Vec<f64> = output.iter().map(|x| x.exp() / softmaxsum).collect();
+
+            let dist = WeightedIndex::new(&softmax).unwrap();
+
+            /* let action = if output[0] > 0.5 {
                 &actions[0]
+            } else if output[0] < -0.5 {
+                &actions[2]
             } else {
                 &actions[1]
-            };
+            }; */
 
             if debug {
                 dbg!(&input);
                 dbg!(&output);
             }
 
-            let (observation, reward, is_done) = match env.step(action) {
+            let (observation, reward, is_done) = match env.step(actions[dist.sample(&mut rng)]) {
+                // let (observation, reward, is_done) = match env.step(action) {
                 Ok(State {
                     observation,
                     reward,

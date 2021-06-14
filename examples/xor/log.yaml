@@ -1,19 +1,20 @@
+refresh_rate: 30 seconds
 appenders:
   stdout:
     kind: console
   progress:
     kind: file
-    path: "examples/BipedalWalker-v3/logs/progress.log"
+    path: "examples/xor/logs/progress.log"
     encoder:
       pattern: "{m},{n}"
   parameters:
     kind: file
-    path: "examples/BipedalWalker-v3/logs/parameters.log"
+    path: "examples/xor/logs/parameters.log"
     encoder:
       pattern: "{d} - {m}{n}"
   solutions:
     kind: file
-    path: "examples/BipedalWalker-v3/logs/solutions.log"
+    path: "examples/xor/logs/solutions.log"
     encoder:
       pattern: "{d} - {m}{n}"
 root:
@@ -22,6 +23,7 @@ root:
     - stdout
 
 loggers:
+  # Route log events sent to the "app::requests" logger to the "requests" appender,
   app::progress:
     level: info
     appenders:

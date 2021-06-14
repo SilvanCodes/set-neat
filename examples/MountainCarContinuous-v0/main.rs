@@ -1,5 +1,6 @@
 use favannat::{
     matrix::fabricator::RecurrentMatrixFabricator,
+    neat_original::fabricator::NeatOriginalFabricator,
     network::{StatefulEvaluator, StatefulFabricator},
 };
 use gym::{SpaceData, State};
@@ -7,9 +8,9 @@ use ndarray::{stack, Array1, Array2, Axis};
 use set_neat::{Individual, Neat, Progress};
 
 use log::{error, info};
-use std::time::SystemTime;
 use std::{cell::RefCell, time::Instant};
 use std::{env, fs};
+use std::{ops::Deref, time::SystemTime};
 
 pub const RUNS: usize = 1;
 pub const STEPS: usize = 100;
@@ -145,9 +146,9 @@ fn train(standard_scaler: (Array1<f64>, Array1<f64>)) {
     worst_possible.fitness.raw = f64::NEG_INFINITY;
     let all_time_best: RefCell<Individual> = RefCell::new(worst_possible);
 
-    let mut generations;
+    let mut generations = 1;
 
-    for _ in 0..10 {
+    for _ in 0..1 {
         generations = 1;
         if let Some(winner) = neat
             .run()
@@ -166,7 +167,7 @@ fn train(standard_scaler: (Array1<f64>, Array1<f64>)) {
                 solution
             })
         {
-            /* let time_stamp = SystemTime::now()
+            let time_stamp = SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap()
                 .as_secs();
@@ -206,7 +207,7 @@ fn train(standard_scaler: (Array1<f64>, Array1<f64>)) {
                 winner.feed_forward.len(),
                 secs as f64 / 1000.0,
                 winner
-            ); */
+            );
 
             ff_connections_in_winner_in_run.push(winner.feed_forward.len());
             rc_connections_in_winner_in_run.push(winner.recurrent.len());
@@ -227,19 +228,21 @@ fn train(standard_scaler: (Array1<f64>, Array1<f64>)) {
     let avg_score =
         score_of_winner_in_run.iter().sum::<f64>() as f64 / score_of_winner_in_run.len() as f64;
 
-    println!(
+    info!(
+        target: "app::solutions",
         "|H| {}, |F| {}, |R| {}, #gens {}, avg_score {}",
         avg_H, avg_F, avg_R, avg_generations, avg_score
     );
 
     let all_time_best = all_time_best.into_inner();
 
-    println!(
+    info!(
+        target: "app::solutions",
         "all_time_best: |H| {}, |F| {}, |R| {}, #gens {}, avg_score {}",
         all_time_best.hidden.len(),
         all_time_best.feed_forward.len(),
         all_time_best.recurrent.len(),
-        avg_generations,
+        generations,
         all_time_best.fitness.raw
     );
 }
@@ -257,7 +260,8 @@ fn run(
 
     let (means, std_dev) = standard_scaler.clone();
 
-    let mut evaluator = RecurrentMatrixFabricator::fabricate(net).unwrap();
+    let mut evaluator = NeatOriginalFabricator::fabricate(net.deref()).unwrap();
+    // let mut evaluator = RecurrentMatrixFabricator::fabricate(net.deref()).unwrap();
     let mut fitness = 0.0;
     let mut all_observations = Array2::zeros((1, 2));
 

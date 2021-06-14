@@ -1,24 +1,29 @@
-use std::cell::RefCell;
+use std::{cell::RefCell, ops::Deref};
 
 use favannat::{
     matrix::fabricator::FeedForwardMatrixFabricator,
     neat_original::fabricator::NeatOriginalFabricator,
     network::{Evaluator, Fabricator, StatefulEvaluator, StatefulFabricator},
 };
-use ndarray::array;
+use log::info;
+use ndarray::{array, Array1, Axis};
 use set_neat::{Individual, Neat, Progress};
 
+pub const ENV: &str = "xor";
+
 fn main() {
+    log4rs::init_file(format!("examples/{}/log.yaml", ENV), Default::default()).unwrap();
+
     let fitness_function = |individual: &Individual| -> Progress {
         let result_0;
         let result_1;
         let result_2;
         let result_3;
 
-        match NeatOriginalFabricator::fabricate(individual) {
-            Ok(mut evaluator) => {
-                /* match FeedForwardMatrixFabricator::fabricate(individual) {
-                Ok(evaluator) => { */
+        /* match NeatOriginalFabricator::fabricate(individual.deref()) {
+        Ok(mut evaluator) => { */
+        match FeedForwardMatrixFabricator::fabricate(individual.deref()) {
+            Ok(evaluator) => {
                 result_0 = evaluator.evaluate(array![1.0, 1.0, 0.0]);
                 result_1 = evaluator.evaluate(array![1.0, 1.0, 1.0]);
                 result_2 = evaluator.evaluate(array![1.0, 0.0, 1.0]);
@@ -62,7 +67,7 @@ fn main() {
 
     let mut generations;
 
-    for _ in 0..100 {
+    for run in 0..100 {
         generations = 1;
 
         if let Some(winner) = neat.run().find_map(|(statistics, solution)| {
@@ -73,42 +78,77 @@ fn main() {
                     prev.clone()
                 }
             });
+            dbg!(
+                "######################################## {}",
+                generations,
+                run,
+            );
+
+            // info!(target: "app::progress", "{}", serde_json::to_string(&statistics).unwrap());
+
             generations += 1;
 
             solution
         }) {
-            ff_connections_in_winner_in_run.push(winner.feed_forward.len());
-            rc_connections_in_winner_in_run.push(winner.recurrent.len());
-            nodes_in_winner_in_run.push(winner.hidden.len());
-            generations_till_winner_in_run.push(generations);
+            ff_connections_in_winner_in_run.push(winner.feed_forward.len() as f64);
+            rc_connections_in_winner_in_run.push(winner.recurrent.len() as f64);
+            nodes_in_winner_in_run.push(winner.hidden.len() as f64);
+            generations_till_winner_in_run.push(generations as f64);
             score_of_winner_in_run.push(winner.fitness.raw);
         }
     }
 
-    let avg_F = ff_connections_in_winner_in_run.iter().sum::<usize>() as f64
-        / ff_connections_in_winner_in_run.len() as f64;
-    let avg_R = rc_connections_in_winner_in_run.iter().sum::<usize>() as f64
-        / rc_connections_in_winner_in_run.len() as f64;
-    let avg_H =
-        nodes_in_winner_in_run.iter().sum::<usize>() as f64 / nodes_in_winner_in_run.len() as f64;
-    let avg_generations = generations_till_winner_in_run.iter().sum::<usize>() as f64
-        / nodes_in_winner_in_run.len() as f64;
-    let avg_score =
-        score_of_winner_in_run.iter().sum::<f64>() as f64 / score_of_winner_in_run.len() as f64;
+    let ff_connections_in_winner_in_run = Array1::from(ff_connections_in_winner_in_run);
+    let rc_connections_in_winner_in_run = Array1::from(rc_connections_in_winner_in_run);
+    let nodes_in_winner_in_run = Array1::from(nodes_in_winner_in_run);
+    let generations_till_winner_in_run = Array1::from(generations_till_winner_in_run);
+    let score_of_winner_in_run = Array1::from(score_of_winner_in_run);
 
-    println!(
-        "|H| {}, |F| {}, |R| {}, #gens {}, avg_score {}",
-        avg_H, avg_F, avg_R, avg_generations, avg_score
+    let f_std_dev = ff_connections_in_winner_in_run
+        .var_axis(Axis(0), 0.0)
+        .mapv_into(|x| (x + f64::EPSILON).sqrt());
+
+    let f_avg = ff_connections_in_winner_in_run.mean_axis(Axis(0)).unwrap();
+
+    let r_std_dev = rc_connections_in_winner_in_run
+        .var_axis(Axis(0), 0.0)
+        .mapv_into(|x| (x + f64::EPSILON).sqrt());
+
+    let r_avg = rc_connections_in_winner_in_run.mean_axis(Axis(0)).unwrap();
+
+    let h_std_dev = nodes_in_winner_in_run
+        .var_axis(Axis(0), 0.0)
+        .mapv_into(|x| (x + f64::EPSILON).sqrt());
+
+    let h_avg = nodes_in_winner_in_run.mean_axis(Axis(0)).unwrap();
+
+    let gens_std_dev = generations_till_winner_in_run
+        .var_axis(Axis(0), 0.0)
+        .mapv_into(|x| (x + f64::EPSILON).sqrt());
+
+    let gens_avg = generations_till_winner_in_run.mean_axis(Axis(0)).unwrap();
+
+    let score_std_dev = score_of_winner_in_run
+        .var_axis(Axis(0), 0.0)
+        .mapv_into(|x| (x + f64::EPSILON).sqrt());
+
+    let score_avg = score_of_winner_in_run.mean_axis(Axis(0)).unwrap();
+
+    info!(
+        target: "app::solutions",
+        "|H| {} (+/- {}), |F| {} (+/- {}), |R| {} (+/- {}), #gens {} (+/- {}), avg_score {} (+/- {})",
+        h_avg, h_std_dev, f_avg, f_std_dev, r_avg, r_std_dev, gens_avg, gens_std_dev, score_avg, score_std_dev
     );
 
     let all_time_best = all_time_best.into_inner();
 
-    println!(
+    info!(
+        target: "app::solutions",
         "all_time_best: |H| {}, |F| {}, |R| {}, #gens {}, avg_score {}",
         all_time_best.hidden.len(),
         all_time_best.feed_forward.len(),
         all_time_best.recurrent.len(),
-        avg_generations,
+        f64::NAN,
         all_time_best.fitness.raw
     );
 }

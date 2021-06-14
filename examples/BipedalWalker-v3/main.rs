@@ -5,11 +5,13 @@ use ndarray::{stack, Array2, Axis};
 use set_neat::{Individual, Neat, Progress};
 
 use log::{error, info};
-use std::time::Instant;
-use std::time::SystemTime;
-use std::{env, fs};
+use std::{env, fs, sync::RwLock};
+use std::{
+    ops::Deref,
+    time::{Instant, SystemTime},
+};
 
-pub const RUNS: usize = 1;
+pub const RUNS: usize = 3;
 pub const VALIDATION_RUNS: usize = 100;
 pub const STEPS: usize = 1600;
 pub const ENV: &str = "BipedalWalker-v3";
@@ -18,12 +20,13 @@ pub const REQUIRED_FITNESS: f64 = 300.0;
 fn main() {
     let args: Vec<String> = env::args().collect();
 
-    if args.get(1).is_some() {
-        let winner_json = fs::read_to_string(format!("examples/{}/winner_1601592694.json", ENV))
-            .expect("cant read file");
+    if let Some(timestamp) = args.get(1) {
+        let winner_json =
+            fs::read_to_string(format!("examples/{}/{}_candidate.json", ENV, timestamp))
+                .expect("cant read file");
         let winner: Individual = serde_json::from_str(&winner_json).unwrap();
-        let standard_scaler: StandardScaler = serde_json::from_str(&winner_json).unwrap();
-        run(&winner, &standard_scaler, 1, STEPS, true);
+        // let standard_scaler: StandardScaler = serde_json::from_str(&winner_json).unwrap();
+        run(&winner, 1, STEPS, true);
     } else {
         train(StandardScaler::for_environment(ENV));
     }
@@ -32,19 +35,45 @@ fn main() {
 fn train(standard_scaler: StandardScaler) {
     log4rs::init_file(format!("examples/{}/log.yaml", ENV), Default::default()).unwrap();
 
+    let max_score: RwLock<f64> = RwLock::new(0.0);
+
     let standard_scaler_1 = standard_scaler.clone();
 
     let fitness_function = move |individual: &Individual| -> Progress {
-        let (fitness, all_observations) = run(individual, &standard_scaler, RUNS, STEPS, false);
+        let (fitness, all_observations) = run(individual, RUNS, STEPS, false);
 
         if fitness > 0.0 {
             dbg!(fitness);
+            let mut save = false;
+
+            if let Ok(max_score) = max_score.read() {
+                if fitness > *max_score {
+                    save = true;
+                }
+            }
+
+            if save {
+                if let Ok(mut max_score) = max_score.write() {
+                    *max_score = fitness;
+                    let time_stamp = SystemTime::now()
+                        .duration_since(SystemTime::UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs();
+                    let mut individual = individual.clone();
+                    individual.fitness.raw = fitness;
+                    fs::write(
+                        format!("examples/{}/{}_candidate.json", ENV, time_stamp),
+                        serde_json::to_string(&individual).unwrap(),
+                    )
+                    .expect("Unable to write file");
+                }
+            }
         }
 
         if fitness >= REQUIRED_FITNESS {
             info!("hit task theshold, starting validation runs...");
             let (validation_fitness, all_observations) =
-                run(individual, &standard_scaler, VALIDATION_RUNS, STEPS, false);
+                run(individual, VALIDATION_RUNS, STEPS, false);
             // log possible solutions to file
             let mut individual = individual.clone();
             individual.fitness.raw = validation_fitness;
@@ -96,13 +125,13 @@ fn train(standard_scaler: StandardScaler) {
     if let Some(winner) = neat.run().find_map(|(statistics, solution)| {
         info!(target: "app::progress", "{}", serde_json::to_string(&statistics).unwrap());
         if statistics.population.num_generation % 5 == 0 {
-            run(
+            /* run(
                 &statistics.population.top_performer,
                 &standard_scaler_1,
                 1,
                 STEPS,
                 true,
-            );
+            ); */
         }
         solution
     }) {
@@ -141,7 +170,7 @@ fn train(standard_scaler: StandardScaler) {
 
 fn run(
     net: &Individual,
-    standard_scaler: &StandardScaler,
+    // standard_scaler: &StandardScaler,
     runs: usize,
     steps: usize,
     render: bool,
@@ -149,7 +178,7 @@ fn run(
     let gym = gym::GymClient::default();
     let env = gym.make(ENV);
 
-    let mut evaluator = RecurrentMatrixFabricator::fabricate(net).unwrap();
+    let mut evaluator = RecurrentMatrixFabricator::fabricate(net.deref()).unwrap();
     let mut fitness = 0.0;
 
     let mut all_observations;
@@ -179,7 +208,7 @@ fn run(
             ];
 
             // normalize inputs
-            standard_scaler.scale_inplace(observations.view_mut());
+            // standard_scaler.scale_inplace(observations.view_mut());
 
             // add bias input
             let input = stack![Axis(0), observations, [1.0]];

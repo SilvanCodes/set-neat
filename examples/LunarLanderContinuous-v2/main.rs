@@ -4,15 +4,15 @@ use favannat::{
     network::{StatefulEvaluator, StatefulFabricator},
 };
 use gym::{utility::StandardScaler, SpaceData, State};
-use ndarray::{stack, Array2, Axis};
+use ndarray::{stack, Array1, Array2, Axis};
 use set_neat::{Individual, Neat, Progress};
 
 use log::{error, info};
-use std::time::Instant;
-use std::time::SystemTime;
+use std::{cell::RefCell, time::Instant};
 use std::{env, fs};
+use std::{ops::Deref, time::SystemTime};
 
-pub const RUNS: usize = 1;
+pub const RUNS: usize = 3;
 pub const PRE_VALIDATION_RUNS: usize = 10;
 pub const VALIDATION_RUNS: usize = 100;
 pub const STEPS: usize = usize::MAX;
@@ -159,58 +159,133 @@ fn train(standard_scaler: StandardScaler) {
 
     info!(target: "app::parameters", "starting training...\nRUNS:{:#?}\nVALIDATION_RUNS:{:#?}\nSTEPS: {:#?}\nREQUIRED_FITNESS:{:#?}\nPARAMETERS: {:#?}", RUNS, VALIDATION_RUNS, STEPS, REQUIRED_FITNESS, neat.parameters);
 
-    if let Some(winner) = neat
-        .run()
-        .take(GENERATIONS)
-        .find_map(|(statistics, solution)| {
-            info!(target: "app::progress", "{}", serde_json::to_string(&statistics).unwrap());
-            /* if report.num_generation % 5 == 0 {
-                run(
-                    &other_standard_scaler,
-                    &report.top_performer,
-                    1,
-                    STEPS,
-                    true,
-                    true,
-                );
-            } */
-            solution
-        })
-    {
-        let time_stamp = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-        fs::write(
-            format!("examples/{}/{}_winner.json", ENV, time_stamp),
-            serde_json::to_string(&winner).unwrap(),
-        )
-        .expect("Unable to write file");
-        fs::write(
-            format!("examples/{}/{}_winner_parameters.json", ENV, time_stamp),
-            serde_json::to_string(&neat.parameters).unwrap(),
-        )
-        .expect("Unable to write file");
-        fs::write(
-            format!(
-                "examples/{}/{}_winner_standard_scaler.json",
-                ENV, time_stamp
-            ),
-            serde_json::to_string(&other_standard_scaler).unwrap(),
-        )
-        .expect("Unable to write file");
+    let mut ff_connections_in_winner_in_run = Vec::new();
+    let mut rc_connections_in_winner_in_run = Vec::new();
+    let mut nodes_in_winner_in_run = Vec::new();
+    let mut generations_till_winner_in_run = Vec::new();
+    let mut score_of_winner_in_run = Vec::new();
 
-        let secs = now.elapsed().as_millis();
-        info!(
-            "winning individual ({},{}) after {} seconds: {:?}",
-            winner.nodes().count(),
-            winner.feed_forward.len(),
-            secs as f64 / 1000.0,
-            winner
-        );
-    } else {
-        println!("##### OUT OF TIME #####");
+    let mut worst_possible = Individual::default();
+    worst_possible.fitness.raw = f64::NEG_INFINITY;
+    let all_time_best: RefCell<Individual> = RefCell::new(worst_possible);
+
+    let mut generations;
+
+    for i in 0..1 {
+        println!("### MEASUREMENT {} ###", i);
+        generations = 1;
+
+        if let Some(winner) = neat
+            .run()
+            .take(GENERATIONS)
+            .find_map(|(statistics, solution)| {
+                info!(target: "app::progress", "{}", serde_json::to_string(&statistics).unwrap());
+
+                generations += 1;
+                all_time_best.replace_with(|prev| {
+                    if statistics.population.top_performer.fitness.raw > prev.fitness.raw {
+                        statistics.population.top_performer.clone()
+                    } else {
+                        prev.clone()
+                    }
+                });
+                solution
+            })
+        {
+            let time_stamp = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
+            fs::write(
+                format!("examples/{}/{}_winner.json", ENV, time_stamp),
+                serde_json::to_string(&winner).unwrap(),
+            )
+            .expect("Unable to write file");
+            fs::write(
+                format!("examples/{}/{}_winner_parameters.json", ENV, time_stamp),
+                serde_json::to_string(&neat.parameters).unwrap(),
+            )
+            .expect("Unable to write file");
+            fs::write(
+                format!(
+                    "examples/{}/{}_winner_standard_scaler.json",
+                    ENV, time_stamp
+                ),
+                serde_json::to_string(&other_standard_scaler).unwrap(),
+            )
+            .expect("Unable to write file");
+
+            let secs = now.elapsed().as_millis();
+            info!(
+                target: "app::solutions",
+                "winning individual ({},{}) after {} seconds: {:?}",
+                winner.nodes().count(),
+                winner.feed_forward.len(),
+                secs as f64 / 1000.0,
+                winner
+            );
+
+            ff_connections_in_winner_in_run.push(winner.feed_forward.len() as f64);
+            rc_connections_in_winner_in_run.push(winner.recurrent.len() as f64);
+            nodes_in_winner_in_run.push(winner.hidden.len() as f64);
+            generations_till_winner_in_run.push(generations as f64);
+            score_of_winner_in_run.push(winner.fitness.raw);
+        }
     }
+
+    let ff_connections_in_winner_in_run = Array1::from(ff_connections_in_winner_in_run);
+    let rc_connections_in_winner_in_run = Array1::from(rc_connections_in_winner_in_run);
+    let nodes_in_winner_in_run = Array1::from(nodes_in_winner_in_run);
+    let generations_till_winner_in_run = Array1::from(generations_till_winner_in_run);
+    let score_of_winner_in_run = Array1::from(score_of_winner_in_run);
+
+    let f_std_dev = ff_connections_in_winner_in_run
+        .var_axis(Axis(0), 0.0)
+        .mapv_into(|x| (x + f64::EPSILON).sqrt());
+
+    let f_avg = ff_connections_in_winner_in_run.mean_axis(Axis(0)).unwrap();
+
+    let r_std_dev = rc_connections_in_winner_in_run
+        .var_axis(Axis(0), 0.0)
+        .mapv_into(|x| (x + f64::EPSILON).sqrt());
+
+    let r_avg = rc_connections_in_winner_in_run.mean_axis(Axis(0)).unwrap();
+
+    let h_std_dev = nodes_in_winner_in_run
+        .var_axis(Axis(0), 0.0)
+        .mapv_into(|x| (x + f64::EPSILON).sqrt());
+
+    let h_avg = nodes_in_winner_in_run.mean_axis(Axis(0)).unwrap();
+
+    let gens_std_dev = generations_till_winner_in_run
+        .var_axis(Axis(0), 0.0)
+        .mapv_into(|x| (x + f64::EPSILON).sqrt());
+
+    let gens_avg = generations_till_winner_in_run.mean_axis(Axis(0)).unwrap();
+
+    let score_std_dev = score_of_winner_in_run
+        .var_axis(Axis(0), 0.0)
+        .mapv_into(|x| (x + f64::EPSILON).sqrt());
+
+    let score_avg = score_of_winner_in_run.mean_axis(Axis(0)).unwrap();
+
+    info!(
+        target: "app::solutions",
+        "|H| {} (+/- {}), |F| {} (+/- {}), |R| {} (+/- {}), #gens {} (+/- {}), avg_score {} (+/- {})",
+        h_avg, h_std_dev, f_avg, f_std_dev, r_avg, r_std_dev, gens_avg, gens_std_dev, score_avg, score_std_dev
+    );
+
+    let all_time_best = all_time_best.into_inner();
+
+    info!(
+        target: "app::solutions",
+        "all_time_best: |H| {}, |F| {}, |R| {}, #gens {}, avg_score {}",
+        all_time_best.hidden.len(),
+        all_time_best.feed_forward.len(),
+        all_time_best.recurrent.len(),
+        f64::NAN,
+        all_time_best.fitness.raw
+    );
 }
 
 fn run(
@@ -224,8 +299,8 @@ fn run(
     let gym = gym::GymClient::default();
     let env = gym.make(ENV);
 
-    let mut evaluator = RecurrentMatrixFabricator::fabricate(net).unwrap();
-    // let mut evaluator = NeatOriginalFabricator::fabricate(net).unwrap();
+    let mut evaluator = RecurrentMatrixFabricator::fabricate(net.deref()).unwrap();
+    // let mut evaluator = NeatOriginalFabricator::fabricate(net.deref()).unwrap();
     let mut fitness = 0.0;
     let mut all_observations = Array2::zeros((1, 8));
 
@@ -256,7 +331,7 @@ fn run(
                 observations.clone().insert_axis(Axis(0))
             ];
 
-            standard_scaler.scale_inplace(observations.view_mut());
+            // standard_scaler.scale_inplace(observations.view_mut());
 
             // add bias input
             let input = stack![Axis(0), observations, [1.0]];

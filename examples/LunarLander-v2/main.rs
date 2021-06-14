@@ -9,9 +9,9 @@ use rand_distr::Distribution;
 use set_neat::{Individual, Neat, Progress};
 
 use log::{error, info};
-use std::time::Instant;
 use std::time::SystemTime;
 use std::{env, fs};
+use std::{ops::Deref, time::Instant};
 
 pub const RUNS: usize = 1;
 pub const STEPS: usize = usize::MAX;
@@ -177,7 +177,7 @@ fn run(
         &SpaceData::DISCRETE(3),
     ];
 
-    let mut evaluator = RecurrentMatrixFabricator::fabricate(net).unwrap();
+    let mut evaluator = RecurrentMatrixFabricator::fabricate(net.deref()).unwrap();
     let mut fitness = 0.0;
     let mut all_observations = Array2::zeros((1, 8));
 

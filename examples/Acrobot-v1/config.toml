@@ -1,22 +1,32 @@
-[setup]
-seed = 42
-population_size = 100
-input_dimension = 7
-output_dimension = 3
-connected_input_percent = 1.0
-add_to_archive_chance = 0.0
-novelty_nearest_neighbors = 0
+[neat]
+population_size = 300
 
-[mutation]
-new_node_chance = 0.05
-new_connection_chance = 0.1
-connection_is_recurrent_chance = 0.1
-change_activation_function_chance = 0.05
-weight_perturbation_std_dev = 1.0
+[neat.speciation]
+target_species_count = 30 # number of desired species
+factor_weights = 1.5 # factor for percent of different genes
+factor_genes = 1.5 # weight difference factor
+factor_activations = 1.0 # factor for percent of different activations
 
-[activations]
-output_nodes = "Tanh" # activation function of output nodes
-hidden_nodes = [
+[genome.structure]
+inputs = 7
+outputs = 1
+inputs_connected_percent = 1.0
+outputs_activation = "Tanh"
+weight_std_dev = 0.1
+weight_cap = 1.0
+
+[[genome.mutations]]
+type = "add_connection"
+chance = 0.1
+
+[[genome.mutations]]
+type = "add_recurrent_connection"
+chance = 0.01
+
+[[genome.mutations]]
+type = "add_node"
+chance = 0.005
+activation_pool = [
     "Sigmoid",
     "Tanh",
     "Relu",
@@ -27,17 +37,25 @@ hidden_nodes = [
     "Cosine",
     "Inverse",
     "Absolute",
-] # pool of activation functions to choose from
+]
 
+[[genome.mutations]]
+type = "change_weights"
+chance = 1.0
+percent_perturbed = 0.5
 
-[reproduction]
-survival_rate = 0.2 # allow the top x percent of species to survive and reproduce
-generations_until_stale = 10 # number of generations allowed without improvement (stale species are reproduced only by the top performing member)
-elitism_species = 1
-elitism_individuals = 0
-
-[speciation]
-target_species_count = 10 # number of desired species
-factor_weights = 1.0 # factor for percent of different genes
-factor_genes = 1.0 # weight difference factor
-factor_activations = 1.0 # factor for percent of different activations
+[[genome.mutations]]
+type = "change_activation"
+chance = 0.05
+activation_pool = [
+    "Sigmoid",
+    "Tanh",
+    "Relu",
+    "Linear",
+    "Gaussian",
+    "Step",
+    "Sine",
+    "Cosine",
+    "Inverse",
+    "Absolute",
+]
