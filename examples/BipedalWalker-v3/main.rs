@@ -1,7 +1,8 @@
-use favannat::matrix::fabricator::RecurrentMatrixFabricator;
-use favannat::network::{StatefulEvaluator, StatefulFabricator};
-use gym::{utility::StandardScaler, SpaceData, SpaceTemplate, State};
-use ndarray::{stack, Array2, Axis};
+use favannat::{SparseMatrixRecurrentFabricator, StatefulEvaluator, StatefulFabricator};
+use gym::client::MakeOptions;
+use gym::space_data::SpaceData;
+use gym::{space_template::SpaceTemplate, utility::StandardScaler, Action, State};
+use ndarray::{concatenate, stack, Array2, Axis};
 use set_neat::{Individual, Neat, Progress};
 
 use log::{error, info};
@@ -125,13 +126,13 @@ fn train(standard_scaler: StandardScaler) {
     if let Some(winner) = neat.run().find_map(|(statistics, solution)| {
         info!(target: "app::progress", "{}", serde_json::to_string(&statistics).unwrap());
         if statistics.population.num_generation % 5 == 0 {
-            /* run(
+            run(
                 &statistics.population.top_performer,
-                &standard_scaler_1,
+                // &standard_scaler_1,
                 1,
                 STEPS,
                 true,
-            ); */
+            );
         }
         solution
     }) {
@@ -175,15 +176,26 @@ fn run(
     steps: usize,
     render: bool,
 ) -> (f64, Array2<f64>) {
-    let gym = gym::GymClient::default();
-    let env = gym.make(ENV);
+    let gym = gym::client::GymClient::default();
+    let env = if render {
+        gym.make(
+            ENV,
+            Some(MakeOptions {
+                render_mode: Some(gym::client::RenderMode::Human),
+                ..Default::default()
+            }),
+        )
+        .unwrap()
+    } else {
+        gym.make(ENV, None).unwrap()
+    };
 
-    let mut evaluator = RecurrentMatrixFabricator::fabricate(net.deref()).unwrap();
+    let mut evaluator = SparseMatrixRecurrentFabricator::fabricate(net.deref()).unwrap();
     let mut fitness = 0.0;
 
     let mut all_observations;
 
-    if let SpaceTemplate::BOX { shape, .. } = env.observation_space() {
+    if let SpaceTemplate::Box { shape, .. } = env.observation_space() {
         all_observations = Array2::zeros((1, shape[0]));
     } else {
         panic!("is no box observation space")
@@ -191,7 +203,7 @@ fn run(
 
     for run in 0..runs {
         evaluator.reset_internal_state();
-        let mut recent_observation = env.reset().expect("Unable to reset");
+        let (mut recent_observation, _info) = env.reset(None).expect("Unable to reset");
         let mut total_reward = 0.0;
 
         for step in 0..steps {
@@ -201,7 +213,7 @@ fn run(
 
             let mut observations = recent_observation.get_box().unwrap();
 
-            all_observations = stack![
+            all_observations = concatenate![
                 Axis(0),
                 all_observations,
                 observations.clone().insert_axis(Axis(0))
@@ -211,14 +223,15 @@ fn run(
             // standard_scaler.scale_inplace(observations.view_mut());
 
             // add bias input
-            let input = stack![Axis(0), observations, [1.0]];
+            let input = concatenate![Axis(0), observations, [1.0]];
             let output = evaluator.evaluate(input.clone());
 
-            let (observation, reward, is_done) = match env.step(&SpaceData::BOX(output.clone())) {
+            let (observation, reward, is_done) = match env.step(&SpaceData::Box(output.clone())) {
                 Ok(State {
                     observation,
                     reward,
                     is_done,
+                    ..
                 }) => (observation, reward, is_done),
                 Err(err) => {
                     error!("evaluation error: {}", err);

@@ -1,61 +1,61 @@
 [neat]
-population_size = 250
+population_size = 1000
 
 [neat.speciation]
-target_species_count = 25
-factor_weights = 2.0
-factor_genes = 3.0
+target_species_count = 10
+factor_weights = 1.0
+factor_genes = 1.0
 factor_activations = 1.0
 
 [genome.structure]
-inputs = 25
-outputs = 4
-inputs_connected_percent = 1.0
+number_of_inputs = 25
+number_of_outputs = 4
+percent_of_connected_inputs = 1.0
 outputs_activation = "Tanh"
-weight_std_dev = 0.1
-weight_cap = 1.0
+seed = 12
 
 [[genome.mutations]]
 type = "add_connection"
-chance = 0.1
+chance = 0.2
 
 [[genome.mutations]]
 type = "add_recurrent_connection"
-chance = 0.01
+chance = 0.1
 
 [[genome.mutations]]
 type = "add_node"
-chance = 0.005
+chance = 0.1
 activation_pool = [
-    "Sigmoid",
-    "Tanh",
-    "Relu",
+    # "Sigmoid",
+    # "Tanh",
+    # "Relu",
     "Linear",
-    "Gaussian",
-    "Step",
-    "Sine",
-    "Cosine",
-    "Inverse",
-    "Absolute",
+    # "Gaussian",
+    # "Step",
+    # "Sine",
+    # "Cosine",
+    # "Inverse",
+    # "Absolute",
 ]
 
 [[genome.mutations]]
 type = "remove_node"
-chance = 0.0001
+chance = 0.001
 
 [[genome.mutations]]
 type = "change_weights"
-chance = 0.95
-percent_perturbed = 0.25
+chance = 0.90
+percent_perturbed = 0.30
+standard_deviation = 0.1
 
 [[genome.mutations]]
 type = "change_activation"
-chance = 0.05
+chance = 0.1
 activation_pool = [
     "Sigmoid",
     "Tanh",
     "Relu",
-    "Linear",
+    # "Linear",
     "Gaussian",
     "Step",
     "Sine",
