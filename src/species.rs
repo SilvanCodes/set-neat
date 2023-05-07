@@ -1,7 +1,7 @@
-use rand::prelude::SliceRandom;
+use rand::{prelude::SliceRandom, Rng};
 
 use crate::{individual::Individual, parameters::Reproduction};
-use set_genome::GenomeContext;
+use set_genome::Parameters as GenomeParameters;
 
 #[derive(Debug, Clone)]
 pub struct Species {
@@ -62,7 +62,8 @@ impl Species {
 
     pub fn reproduce<'a>(
         &'a self,
-        context: &'a mut GenomeContext,
+        rng: &'a mut impl Rng,
+        genome_parameters: &'a GenomeParameters,
         reproduction: &'a Reproduction,
         offspring: usize,
     ) -> impl Iterator<Item = Individual> + 'a {
@@ -72,11 +73,8 @@ impl Species {
             // produce as many offspring from crossover and mutation as individual elitism taking into account actual species length allows
             .take((offspring - reproduction.elitism_individuals.min(self.members.len())).max(0))
             .map(move |member| {
-                let mut offspring = member.crossover(
-                    self.members.choose(&mut context.rng).unwrap(),
-                    &mut context.rng,
-                );
-                offspring.mutate_with_context(context);
+                let mut offspring = member.crossover(self.members.choose(rng).unwrap());
+                offspring.mutate(genome_parameters);
                 offspring
             })
             // add as many members to offspring as specified individual elitism taking into account actual species length
@@ -96,17 +94,18 @@ impl Species {
 
 #[cfg(test)]
 mod tests {
-    use set_genome::GenomeContext;
 
     use crate::{individual::scores::Score, parameters::Reproduction, Individual};
+    use rand::thread_rng;
+    use set_genome::{Genome, Parameters as GenomeParameters};
 
     use super::Species;
 
     #[test]
     fn order_and_truncate_members() {
-        let gc = GenomeContext::default();
+        let parameters = GenomeParameters::default();
 
-        let individual_0 = Individual::from_genome(gc.initialized_genome());
+        let individual_0 = Individual::from_genome(Genome::initialized(&parameters));
 
         let mut individual_1 = individual_0.clone();
         individual_1.fitness = Score::new(5.0, 0.0, 1.0);
@@ -121,9 +120,9 @@ mod tests {
 
     #[test]
     fn check_score_and_staleness() {
-        let gc = GenomeContext::default();
+        let parameters = GenomeParameters::default();
 
-        let mut individual_0 = Individual::from_genome(gc.initialized_genome());
+        let mut individual_0 = Individual::from_genome(Genome::initialized(&parameters));
 
         individual_0.fitness = Score::new(5.0, 0.0, 1.0);
 
@@ -150,7 +149,7 @@ mod tests {
 
     #[test]
     fn check_reproduction() {
-        let mut gc = GenomeContext::default();
+        let parameters = GenomeParameters::default();
 
         let reproduction = Reproduction {
             survival_rate: 0.2,
@@ -159,14 +158,19 @@ mod tests {
             elitism_individuals: 0,
         };
 
-        let individual = Individual::from_genome(gc.initialized_genome());
+        let individual = Individual::from_genome(Genome::initialized(&parameters));
 
         let species = Species::new(individual);
 
         let expected_offspring = 5;
 
         let offspring: Vec<Individual> = species
-            .reproduce(&mut gc, &reproduction, expected_offspring)
+            .reproduce(
+                &mut thread_rng(),
+                &parameters,
+                &reproduction,
+                expected_offspring,
+            )
             .collect();
 
         assert!(offspring.len() == expected_offspring);
@@ -174,7 +178,7 @@ mod tests {
 
     #[test]
     fn check_reproduction_with_elitism() {
-        let mut gc = GenomeContext::default();
+        let parameters = GenomeParameters::default();
 
         let reproduction = Reproduction {
             survival_rate: 0.2,
@@ -183,14 +187,19 @@ mod tests {
             elitism_individuals: 3,
         };
 
-        let individual = Individual::from_genome(gc.initialized_genome());
+        let individual = Individual::from_genome(Genome::initialized(&parameters));
 
         let species = Species::new(individual);
 
         let expected_offspring = 5;
 
         let offspring: Vec<Individual> = species
-            .reproduce(&mut gc, &reproduction, expected_offspring)
+            .reproduce(
+                &mut thread_rng(),
+                &parameters,
+                &reproduction,
+                expected_offspring,
+            )
             .collect();
 
         assert_eq!(offspring.len(), expected_offspring);

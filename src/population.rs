@@ -1,4 +1,5 @@
-use set_genome::{Genome, GenomeContext};
+use rand::{rngs::SmallRng, thread_rng, Rng, SeedableRng};
+use set_genome::{CompatibilityDistance, Genome, Parameters as GenomeParameters};
 use std::{mem, time::Instant};
 
 use crate::{
@@ -17,7 +18,8 @@ pub struct Population {
     pub individuals: Vec<Individual>,
     archive: Vec<Individual>,
     species: Vec<Species>,
-    genome_context: GenomeContext,
+    genome_parameters: GenomeParameters,
+    rng: SmallRng,
     compatability_threshold: f64,
     parameters: NeatParameters,
     statistics: PopulationStatistics,
@@ -25,18 +27,16 @@ pub struct Population {
 
 impl Population {
     pub fn new(parameters: Parameters) -> Self {
-        let mut genome_context = GenomeContext::new(parameters.genome);
-
         // generate genome with initial ids for structure
-        let initial_individual = Individual::from_genome(genome_context.uninitialized_genome());
+        let initial_individual = Individual::from_genome(Genome::uninitialized(&parameters.genome));
 
         let mut individuals = Vec::new();
 
         // generate initial, mutated individuals
         for _ in 0..parameters.neat.population_size {
             let mut other_genome = initial_individual.clone();
-            other_genome.init_with_context(&mut genome_context);
-            other_genome.mutate_with_context(&mut genome_context);
+            other_genome.init(&parameters.genome.structure);
+            other_genome.mutate(&parameters.genome);
             individuals.push(other_genome);
         }
 
@@ -45,9 +45,10 @@ impl Population {
             parameters: parameters.neat,
             archive: Vec::new(),
             individuals,
-            genome_context,
+            genome_parameters: parameters.genome,
             statistics: Default::default(),
             compatability_threshold: f64::NAN,
+            rng: SmallRng::from_rng(thread_rng()).unwrap(),
         };
 
         population.init_threshold();
@@ -67,20 +68,19 @@ impl Population {
             ..
         } = self.parameters.speciation;
 
-        let weight_cap = self.genome_context.parameters.structure.weight_cap;
+        // let weight_cap = self.genome_context.parameters.structure.weight_cap;
         let compatability_threshold = self.compatability_threshold;
         let species_statistics = &mut self.statistics.species;
 
         // place into matching species
         if let Some(species) = self.species.iter_mut().find(|species| {
             let (compatability, gene_diff, weight_diff, activation_diff) =
-                Genome::compatability_distance(
+                CompatibilityDistance::compatability_distance(
                     &individual,
                     &species.representative,
                     factor_genes,
                     factor_weights,
                     factor_activations,
-                    weight_cap,
                 );
 
             if compatability < compatability_threshold {
@@ -186,13 +186,12 @@ impl Population {
 
             for individual_1 in &self.individuals {
                 distances.push(
-                    Genome::compatability_distance(
+                    CompatibilityDistance::compatability_distance(
                         individual_0,
                         individual_1,
                         self.parameters.speciation.factor_genes,
                         self.parameters.speciation.factor_weights,
                         self.parameters.speciation.factor_activations,
-                        self.genome_context.parameters.structure.weight_cap,
                     )
                     .0,
                 );
@@ -209,7 +208,7 @@ impl Population {
     fn adjust_threshold(&mut self) {
         self.compatability_threshold *= (self.species.len() as f64
             / self.parameters.speciation.target_species_count as f64)
-            .sqrt();
+            .powf(0.1);
     }
 
     pub fn reproduce(&mut self) {
@@ -250,7 +249,8 @@ impl Population {
             .round() as usize;
 
             self.individuals.extend(species.reproduce(
-                &mut self.genome_context,
+                &mut self.rng,
+                &self.genome_parameters,
                 &self.parameters.reproduction,
                 offspring_count,
             ));
@@ -387,11 +387,7 @@ impl Population {
         let raw_novelties = behaviors.compute_novelty(self.parameters.novelty_nearest_neighbors);
 
         // add most novel current individual to archive
-        if self
-            .genome_context
-            .rng
-            .gamble(self.parameters.add_to_archive_chance)
-        {
+        if self.rng.gen::<f64>() < self.parameters.add_to_archive_chance {
             let current_generation_most_novel = raw_novelties
                 .iter()
                 .enumerate()
