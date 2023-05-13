@@ -1,10 +1,9 @@
-use favannat::{
-    matrix::fabricator::RecurrentMatrixFabricator,
-    neat_original::fabricator::NeatOriginalFabricator,
-    network::{StatefulEvaluator, StatefulFabricator},
-};
-use gym::{utility::StandardScaler, SpaceData, State};
-use ndarray::{stack, Array1, Array2, Axis};
+use favannat::{MatrixRecurrentFabricator, StatefulEvaluator, StatefulFabricator};
+use gym::client::MakeOptions;
+use gym::space_data::SpaceData;
+use gym::{space_template::SpaceTemplate, utility::StandardScaler, Action, State};
+use ndarray::{concatenate, stack, Array1, Array2, Axis};
+// use ndarray::{stack, Array1, Array2, Axis};
 use set_neat::{Individual, Neat, Progress};
 
 use log::{error, info};
@@ -258,12 +257,12 @@ fn run(
     render: bool,
     debug: bool,
 ) -> (f64, Array2<f64>) {
-    let gym = gym::GymClient::default();
-    let env = gym.make(ENV);
-    let actions = [&SpaceData::DISCRETE(0), &SpaceData::DISCRETE(1)];
+    let gym = gym::client::GymClient::default();
+    let env = gym.make(ENV, None).unwrap();
+    let actions = [&Action::Discrete(0), &Action::Discrete(1)];
 
     // let mut evaluator = NeatOriginalFabricator::fabricate(net.deref()).unwrap();
-    let mut evaluator = RecurrentMatrixFabricator::fabricate(net.deref()).unwrap();
+    let mut evaluator = MatrixRecurrentFabricator::fabricate(net.deref()).unwrap();
     let mut fitness = 0.0;
     let mut all_observations = Array2::zeros((1, 4));
 
@@ -274,7 +273,7 @@ fn run(
 
     for run in 0..runs {
         evaluator.reset_internal_state();
-        let mut recent_observation = env.reset().expect("Unable to reset");
+        let (mut recent_observation, _info) = env.reset(None).expect("Unable to reset");
         let mut total_reward = 0.0;
 
         if debug {
@@ -288,7 +287,7 @@ fn run(
 
             let mut observations = recent_observation.get_box().unwrap();
 
-            all_observations = stack![
+            all_observations = concatenate![
                 Axis(0),
                 all_observations,
                 observations.clone().insert_axis(Axis(0))
@@ -297,7 +296,7 @@ fn run(
             standard_scaler.scale_inplace(observations.view_mut());
 
             // add bias input
-            let input = stack![Axis(0), observations, [1.0]];
+            let input = concatenate![Axis(0), observations, [1.0]];
             let output = evaluator.evaluate(input.clone());
 
             if debug {
@@ -316,6 +315,7 @@ fn run(
                     observation,
                     reward,
                     is_done,
+                    ..
                 }) => (observation, reward, is_done),
                 Err(err) => {
                     error!("evaluation error: {}", err);

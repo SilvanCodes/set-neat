@@ -1,9 +1,9 @@
 use favannat::{
-    matrix::fabricator::RecurrentMatrixFabricator,
+    matrix::recurrent::fabricator::MatrixRecurrentFabricator,
     network::{StatefulEvaluator, StatefulFabricator},
 };
-use gym::{utility::StandardScaler, SpaceData, State};
-use ndarray::{stack, Array2, Axis};
+use gym::{utility::StandardScaler, Action, State};
+use ndarray::{concatenate, Array2, Axis};
 use rand::{distributions::WeightedIndex, prelude::SmallRng, SeedableRng};
 use rand_distr::Distribution;
 use set_neat::{Individual, Neat, Progress};
@@ -13,8 +13,8 @@ use std::time::SystemTime;
 use std::{env, fs};
 use std::{ops::Deref, time::Instant};
 
-pub const RUNS: usize = 1;
-pub const STEPS: usize = usize::MAX;
+pub const RUNS: usize = 3;
+pub const STEPS: usize = 3000;
 pub const VALIDATION_RUNS: usize = 100;
 pub const ENV: &str = "LunarLander-v2";
 pub const REQUIRED_FITNESS: f64 = 200.0;
@@ -166,18 +166,18 @@ fn run(
     render: bool,
     debug: bool,
 ) -> (f64, Array2<f64>) {
-    let gym = gym::GymClient::default();
-    let env = gym.make(ENV);
+    let gym = gym::client::GymClient::default();
+    let env = gym.make(ENV, None).unwrap();
     let mut rng = SmallRng::seed_from_u64(42);
 
     let actions = [
-        &SpaceData::DISCRETE(0),
-        &SpaceData::DISCRETE(1),
-        &SpaceData::DISCRETE(2),
-        &SpaceData::DISCRETE(3),
+        &Action::Discrete(0),
+        &Action::Discrete(1),
+        &Action::Discrete(2),
+        &Action::Discrete(3),
     ];
 
-    let mut evaluator = RecurrentMatrixFabricator::fabricate(net.deref()).unwrap();
+    let mut evaluator = MatrixRecurrentFabricator::fabricate(net.deref()).unwrap();
     let mut fitness = 0.0;
     let mut all_observations = Array2::zeros((1, 8));
 
@@ -188,7 +188,7 @@ fn run(
 
     for run in 0..runs {
         evaluator.reset_internal_state();
-        let mut recent_observation = env.reset().expect("Unable to reset");
+        let (mut recent_observation, _info) = env.reset(None).expect("Unable to reset");
         let mut total_reward = 0.0;
 
         if debug {
@@ -202,7 +202,7 @@ fn run(
 
             let mut observations = recent_observation.get_box().unwrap();
 
-            all_observations = stack![
+            all_observations = concatenate![
                 Axis(0),
                 all_observations,
                 observations.clone().insert_axis(Axis(0))
@@ -211,7 +211,7 @@ fn run(
             standard_scaler.scale_inplace(observations.view_mut());
 
             // add bias input
-            let input = stack![Axis(0), observations, [1.0]];
+            let input = concatenate![Axis(0), observations, [1.0]];
             let output = evaluator.evaluate(input.clone());
 
             let softmaxsum: f64 = output.iter().map(|x| x.exp()).sum();
@@ -228,6 +228,7 @@ fn run(
                     observation,
                     reward,
                     is_done,
+                    ..
                 }) => (observation, reward, is_done),
                 Err(err) => {
                     error!("evaluation error: {}", err);

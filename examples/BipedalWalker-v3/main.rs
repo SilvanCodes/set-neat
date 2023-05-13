@@ -1,8 +1,8 @@
 use favannat::{SparseMatrixRecurrentFabricator, StatefulEvaluator, StatefulFabricator};
 use gym::client::MakeOptions;
 use gym::space_data::SpaceData;
-use gym::{space_template::SpaceTemplate, utility::StandardScaler, Action, State};
-use ndarray::{concatenate, stack, Array2, Axis};
+use gym::{space_template::SpaceTemplate, utility::StandardScaler, State};
+use ndarray::{concatenate, Array2, Axis};
 use set_neat::{Individual, Neat, Progress};
 
 use log::{error, info};
@@ -41,7 +41,7 @@ fn train(standard_scaler: StandardScaler) {
     let standard_scaler_1 = standard_scaler.clone();
 
     let fitness_function = move |individual: &Individual| -> Progress {
-        let (fitness, all_observations) = run(individual, RUNS, STEPS, false);
+        let (fitness, _all_observations) = run(individual, RUNS, STEPS, false);
 
         if fitness > 0.0 {
             dbg!(fitness);
@@ -73,7 +73,7 @@ fn train(standard_scaler: StandardScaler) {
 
         if fitness >= REQUIRED_FITNESS {
             info!("hit task theshold, starting validation runs...");
-            let (validation_fitness, all_observations) =
+            let (validation_fitness, _all_observations) =
                 run(individual, VALIDATION_RUNS, STEPS, false);
             // log possible solutions to file
             let mut individual = individual.clone();
@@ -84,8 +84,8 @@ fn train(standard_scaler: StandardScaler) {
                 validation_fitness
             );
             if validation_fitness > REQUIRED_FITNESS {
-                let observation_means = all_observations.mean_axis(Axis(0)).unwrap();
-                let observation_std_dev = all_observations.std_axis(Axis(0), 0.0);
+                // let observation_means = all_observations.mean_axis(Axis(0)).unwrap();
+                // let observation_std_dev = all_observations.std_axis(Axis(0), 0.0);
 
                 return Progress::fitness(
                     validation_fitness,
@@ -100,8 +100,8 @@ fn train(standard_scaler: StandardScaler) {
             }
         }
 
-        let observation_means = all_observations.mean_axis(Axis(0)).unwrap();
-        let observation_std_dev = all_observations.std_axis(Axis(0), 0.0);
+        // let observation_means = all_observations.mean_axis(Axis(0)).unwrap();
+        // let observation_std_dev = all_observations.std_axis(Axis(0), 0.0);
 
         Progress::fitness(
             fitness,
@@ -201,7 +201,7 @@ fn run(
         panic!("is no box observation space")
     }
 
-    for run in 0..runs {
+    for _run in 0..runs {
         evaluator.reset_internal_state();
         let (mut recent_observation, _info) = env.reset(None).expect("Unable to reset");
         let mut total_reward = 0.0;
@@ -211,7 +211,7 @@ fn run(
                 env.render();
             }
 
-            let mut observations = recent_observation.get_box().unwrap();
+            let observations = recent_observation.get_box().unwrap();
 
             all_observations = concatenate![
                 Axis(0),

@@ -1,10 +1,10 @@
-use favannat::{
-    matrix::fabricator::RecurrentMatrixFabricator,
-    neat_original::fabricator::NeatOriginalFabricator,
-    network::{StatefulEvaluator, StatefulFabricator},
-};
-use gym::{SpaceData, State};
-use ndarray::{stack, Array1, Array2, Axis};
+use favannat::neat_original::fabricator::NeatOriginalFabricator;
+use favannat::{StatefulEvaluator, StatefulFabricator};
+use gym::client::MakeOptions;
+use gym::space_data::SpaceData;
+use gym::utility::StandardScaler;
+use gym::State;
+use ndarray::{concatenate, Array2, Axis};
 use set_neat::{Individual, Neat, Progress};
 
 use log::{error, info};
@@ -29,45 +29,44 @@ fn main() {
         let scaler_json =
             fs::read_to_string(format!("examples/{}/winner_standard_scaler.json", ENV))
                 .expect("cant read file");
-        let standard_scaler: (Array1<f64>, Array1<f64>) =
-            serde_json::from_str(&scaler_json).unwrap();
+        let standard_scaler: StandardScaler = serde_json::from_str(&scaler_json).unwrap();
         // showcase(standard_scaler, winner);
         run(&standard_scaler, &winner, 1, STEPS, true, false);
     } else {
-        train(standard_scaler());
+        train(StandardScaler::for_environment(ENV));
     }
 }
 
-fn standard_scaler() -> (Array1<f64>, Array1<f64>) {
-    let gym = gym::GymClient::default();
-    let env = gym.make(ENV);
+// fn standard_scaler() -> (Array1<f64>, Array1<f64>) {
+//     let gym = gym::client::GymClient::default();
+//     let env = gym.make(ENV, None).unwrap();
 
-    // collect samples for standard scaler
-    let samples = env.reset().unwrap().get_box().unwrap();
+//     // collect samples for standard scaler
+//     let (mut samples, _info) = env.reset(None).expect("Unable to reset");
 
-    let mut samples = samples.insert_axis(Axis(0));
+//     let mut samples = samples.insert_axis(Axis(0));
 
-    println!("sampling for scaler");
-    for i in 0..1000 {
-        println!("sampling {}", i);
-        let State { observation, .. } = env.step(&env.action_space().sample()).unwrap();
+//     println!("sampling for scaler");
+//     for i in 0..1000 {
+//         println!("sampling {}", i);
+//         let State { observation, .. } = env.step(&env.action_space().sample()).unwrap();
 
-        samples = stack![
-            Axis(0),
-            samples,
-            observation.get_box().unwrap().insert_axis(Axis(0))
-        ];
-    }
-    println!("done sampling");
+//         samples = stack![
+//             Axis(0),
+//             samples,
+//             observation.get_box().unwrap().insert_axis(Axis(0))
+//         ];
+//     }
+//     println!("done sampling");
 
-    let std_dev = samples
-        .var_axis(Axis(0), 0.0)
-        .mapv_into(|x| (x + f64::EPSILON).sqrt());
+//     let std_dev = samples
+//         .var_axis(Axis(0), 0.0)
+//         .mapv_into(|x| (x + f64::EPSILON).sqrt());
 
-    dbg!(samples.mean_axis(Axis(0)).unwrap(), std_dev)
-}
+//     dbg!(samples.mean_axis(Axis(0)).unwrap(), std_dev)
+// }
 
-fn train(standard_scaler: (Array1<f64>, Array1<f64>)) {
+fn train(standard_scaler: StandardScaler) {
     log4rs::init_file(format!("examples/{}/log.yaml", ENV), Default::default()).unwrap();
 
     info!(target: "app::parameters", "standard scaler: {:?}", &standard_scaler);
@@ -248,17 +247,26 @@ fn train(standard_scaler: (Array1<f64>, Array1<f64>)) {
 }
 
 fn run(
-    standard_scaler: &(Array1<f64>, Array1<f64>),
+    standard_scaler: &StandardScaler,
     net: &Individual,
     runs: usize,
     steps: usize,
     render: bool,
     debug: bool,
 ) -> (f64, Array2<f64>) {
-    let gym = gym::GymClient::default();
-    let env = gym.make(ENV);
-
-    let (means, std_dev) = standard_scaler.clone();
+    let gym = gym::client::GymClient::default();
+    let env = if render {
+        gym.make(
+            ENV,
+            Some(MakeOptions {
+                render_mode: Some(gym::client::RenderMode::Human),
+                ..Default::default()
+            }),
+        )
+        .unwrap()
+    } else {
+        gym.make(ENV, None).unwrap()
+    };
 
     let mut evaluator = NeatOriginalFabricator::fabricate(net.deref()).unwrap();
     // let mut evaluator = RecurrentMatrixFabricator::fabricate(net.deref()).unwrap();
@@ -272,7 +280,7 @@ fn run(
 
     for run in 0..runs {
         evaluator.reset_internal_state();
-        let mut recent_observation = env.reset().expect("Unable to reset");
+        let (mut recent_observation, _info) = env.reset(None).expect("Unable to reset");
         let mut total_reward = 0.0;
 
         if debug {
@@ -286,17 +294,16 @@ fn run(
 
             let mut observations = recent_observation.get_box().unwrap();
 
-            all_observations = stack![
+            all_observations = concatenate![
                 Axis(0),
                 all_observations,
                 observations.clone().insert_axis(Axis(0))
             ];
 
-            observations -= &means;
-            observations /= &std_dev;
+            standard_scaler.scale_inplace(observations.view_mut());
 
             // add bias input
-            let input = stack![Axis(0), observations, [1.0]];
+            let input = concatenate![Axis(0), observations, [1.0]];
             let output = evaluator.evaluate(input.clone());
 
             if debug {
@@ -304,11 +311,12 @@ fn run(
                 dbg!(&output);
             }
 
-            let (observation, reward, is_done) = match env.step(&SpaceData::BOX(output.clone())) {
+            let (observation, reward, is_done) = match env.step(&SpaceData::Box(output.clone())) {
                 Ok(State {
                     observation,
                     reward,
                     is_done,
+                    ..
                 }) => (observation, reward, is_done),
                 Err(err) => {
                     error!("evaluation error: {}", err);

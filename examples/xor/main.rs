@@ -1,12 +1,9 @@
 use std::{cell::RefCell, ops::Deref};
 
-use favannat::{
-    matrix::fabricator::FeedForwardMatrixFabricator,
-    neat_original::fabricator::NeatOriginalFabricator,
-    network::{Evaluator, Fabricator, StatefulEvaluator, StatefulFabricator},
-};
+use favannat::{Evaluator, Fabricator, MatrixFeedforwardFabricator};
 use log::info;
-use ndarray::{array, Array1, Axis};
+use nalgebra::dmatrix;
+use ndarray::{Array1, Axis};
 use set_neat::{Individual, Neat, Progress};
 
 pub const ENV: &str = "xor";
@@ -22,12 +19,12 @@ fn main() {
 
         /* match NeatOriginalFabricator::fabricate(individual.deref()) {
         Ok(mut evaluator) => { */
-        match FeedForwardMatrixFabricator::fabricate(individual.deref()) {
+        match MatrixFeedforwardFabricator::fabricate(individual.deref()) {
             Ok(evaluator) => {
-                result_0 = evaluator.evaluate(array![1.0, 1.0, 0.0]);
-                result_1 = evaluator.evaluate(array![1.0, 1.0, 1.0]);
-                result_2 = evaluator.evaluate(array![1.0, 0.0, 1.0]);
-                result_3 = evaluator.evaluate(array![1.0, 0.0, 0.0]);
+                result_0 = evaluator.evaluate(dmatrix![1.0, 1.0, 0.0]);
+                result_1 = evaluator.evaluate(dmatrix![1.0, 1.0, 1.0]);
+                result_2 = evaluator.evaluate(dmatrix![1.0, 0.0, 1.0]);
+                result_3 = evaluator.evaluate(dmatrix![1.0, 0.0, 0.0]);
             }
             Err(e) => {
                 println!("error fabricating individual: {:?} {:?}", individual, e);

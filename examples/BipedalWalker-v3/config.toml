@@ -1,5 +1,5 @@
 [neat]
-population_size = 1000
+population_size = 100
 
 [neat.speciation]
 target_species_count = 10
@@ -16,15 +16,15 @@ seed = 12
 
 [[genome.mutations]]
 type = "add_connection"
-chance = 0.2
+chance = 0.3
 
 [[genome.mutations]]
 type = "add_recurrent_connection"
-chance = 0.1
+chance = 0.15
 
 [[genome.mutations]]
 type = "add_node"
-chance = 0.1
+chance = 0.15
 activation_pool = [
     # "Sigmoid",
     # "Tanh",
@@ -39,18 +39,22 @@ activation_pool = [
 ]
 
 [[genome.mutations]]
+type = "duplicate_node"
+chance = 0.15
+
+[[genome.mutations]]
 type = "remove_node"
-chance = 0.001
+chance = 0.003
 
 [[genome.mutations]]
 type = "change_weights"
 chance = 0.90
 percent_perturbed = 0.30
-standard_deviation = 0.1
+standard_deviation = 0.15
 
 [[genome.mutations]]
 type = "change_activation"
-chance = 0.1
+chance = 0.15
 activation_pool = [
     "Sigmoid",
     "Tanh",

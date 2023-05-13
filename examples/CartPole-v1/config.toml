@@ -8,12 +8,11 @@ factor_genes = 1.0
 factor_activations = 1.0
 
 [genome.structure]
-inputs = 5
-outputs = 1
-inputs_connected_percent = 1.0
-outputs_activation = "Tanh"
-weight_std_dev = 1.0
-weight_cap = 3.0
+number_of_inputs = 5
+number_of_outputs = 1
+percent_of_connected_inputs = 1.0
+outputs_activation = "Sigmoid"
+seed = 12
 
 [[genome.mutations]]
 type = "add_connection"
@@ -47,6 +46,7 @@ chance = 0.0001
 type = "change_weights"
 chance = 0.95
 percent_perturbed = 0.5
+standard_deviation = 0.1
 
 [[genome.mutations]]
 type = "change_activation"

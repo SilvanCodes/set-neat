@@ -8,12 +8,10 @@ factor_genes = 2.0 # weight difference factor
 factor_activations = 1.0 # factor for percent of different activations
 
 [genome.structure]
-inputs = 9
-outputs = 2
-inputs_connected_percent = 1.0
+number_of_inputs = 9
+number_of_outputs = 2
+percent_of_connected_inputs = 1.0
 outputs_activation = "Tanh"
-weight_std_dev = 0.1
-weight_cap = 1.0
 
 [[genome.mutations]]
 type = "add_connection"
@@ -43,6 +41,7 @@ activation_pool = [
 type = "change_weights"
 chance = 1.0
 percent_perturbed = 0.5
+standard_deviation = 0.1
 
 [[genome.mutations]]
 type = "change_activation"
